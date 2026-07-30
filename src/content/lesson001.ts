@@ -31,7 +31,17 @@ export const lesson001Vocabulary: VocabularyItem[] = [
     writtenForm: "先生",
     reading: "せんせい",
     meaningsRu: ["учитель", "преподаватель"],
-    partOfSpeech: ["существительное"],
+    partOfSpeech: ["существительное", "титул"],
+    jlptLevel: "N5",
+    tags: ["обычно о другом человеке"],
+  },
+  {
+    id: "word-tanaka-san",
+    type: "vocabulary",
+    writtenForm: "田中さん",
+    reading: "たなかさん",
+    meaningsRu: ["господин или госпожа Танака"],
+    partOfSpeech: ["имя человека"],
     jlptLevel: "N5",
   },
 ];
@@ -54,7 +64,7 @@ export const lesson001Grammar: GrammarPoint[] = [
     title: "Связка です",
     meaningRu: "вежливо завершает именное предложение",
     explanationRu:
-      "です ставится после существительного или прилагательного и делает высказывание вежливым. В русском отдельное слово часто не переводится.",
+      "です ставится после существительного и делает именное высказывание вежливым. В русском отдельным словом обычно не переводится.",
     formation: ["[существительное] です"],
     jlptLevel: "N5",
   },
@@ -71,13 +81,13 @@ export const lesson001Sentences: ExampleSentence[] = [
     vocabularyIds: ["word-watashi", "word-gakusei"],
   },
   {
-    id: "sentence-watashi-sensei",
+    id: "sentence-tanaka-sensei",
     type: "sentence",
-    japanese: "私は先生です。",
-    reading: "わたしはせんせいです。",
-    translationRu: "Я преподаватель.",
+    japanese: "田中さんは先生です。",
+    reading: "たなかさんはせんせいです。",
+    translationRu: "Танака — преподаватель.",
     grammarIds: ["grammar-wa-topic", "grammar-desu"],
-    vocabularyIds: ["word-watashi", "word-sensei"],
+    vocabularyIds: ["word-tanaka-san", "word-sensei"],
   },
 ];
 
@@ -108,15 +118,17 @@ export const lesson001Exercises: Exercise[] = [
   {
     id: "exercise-build-sentence",
     type: "sentence-builder",
-    prompt: "Собери предложение: Я преподаватель.",
+    prompt: "Собери предложение: Танака — преподаватель.",
     targetItemIds: [
       "grammar-wa-topic",
       "grammar-desu",
-      "word-watashi",
+      "word-tanaka-san",
       "word-sensei",
     ],
-    correctAnswers: ["私|は|先生|です"],
+    correctAnswers: ["田中さん|は|先生|です"],
     distractors: ["を", "学生"],
+    explanationRu:
+      "先生 естественно использовать о другом человеке. О своей профессии обычно говорят 教師です.",
   },
 ];
 
@@ -133,5 +145,5 @@ export const lesson001: Lesson = {
     ...lesson001Sentences.map((item) => item.id),
   ],
   exerciseIds: lesson001Exercises.map((exercise) => exercise.id),
-  estimatedMinutes: 12,
+  estimatedMinutes: 13,
 };
