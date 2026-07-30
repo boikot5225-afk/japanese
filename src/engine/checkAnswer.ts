@@ -13,9 +13,9 @@ export interface AnswerCheckResult {
 const normalizeJapanese = (value: string): string =>
   value
     .trim()
+    .normalize("NFKC")
     .replace(/[。！？!?.,，]/g, "")
-    .replace(/\s+/g, "")
-    .normalize("NFKC");
+    .replace(/[|\s]+/g, "");
 
 export function checkAnswer(
   answer: string,
