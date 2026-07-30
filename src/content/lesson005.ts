@@ -31,8 +31,8 @@ export const lesson005Vocabulary: VocabularyItem[] = [
     type: "vocabulary",
     writtenForm: "食べます",
     reading: "たべます",
-    meaningsRu: ["есть", "кушать"],
-    partOfSpeech: ["глагол"],
+    meaningsRu: ["есть"],
+    partOfSpeech: ["глагол", "вежливая форма"],
     jlptLevel: "N5",
   },
   {
@@ -41,7 +41,7 @@ export const lesson005Vocabulary: VocabularyItem[] = [
     writtenForm: "飲みます",
     reading: "のみます",
     meaningsRu: ["пить"],
-    partOfSpeech: ["глагол"],
+    partOfSpeech: ["глагол", "вежливая форма"],
     jlptLevel: "N5",
   },
 ];
@@ -62,10 +62,13 @@ export const lesson005Grammar: GrammarPoint[] = [
     id: "grammar-masu-polite",
     type: "grammar",
     title: "Вежливая форма ～ます",
-    meaningRu: "нейтрально-вежливое настоящее и будущее действие",
+    meaningRu: "нейтрально-вежливое настоящее, привычное или будущее действие",
     explanationRu:
-      "Форма ～ます используется в вежливой речи. Без контекста она может обозначать регулярное, настоящее или будущее действие.",
+      "Форма ～ます используется в вежливой речи. В зависимости от контекста 食べます может означать «ем обычно» или «буду есть», но не обязательно «ем прямо сейчас».",
     formation: ["食べる → 食べます", "飲む → 飲みます"],
+    cautions: [
+      "Пока запоминай 食べます и 飲みます как готовые формы. Общего правила спряжения ещё недостаточно: оно зависит от группы глагола.",
+    ],
     jlptLevel: "N5",
   },
 ];
@@ -76,7 +79,7 @@ export const lesson005Sentences: ExampleSentence[] = [
     type: "sentence",
     japanese: "私はパンを食べます。",
     reading: "わたしはパンをたべます。",
-    translationRu: "Я ем хлеб.",
+    translationRu: "Я ем хлеб / буду есть хлеб — в зависимости от контекста.",
     grammarIds: ["grammar-wa-topic", "grammar-o-object", "grammar-masu-polite"],
     vocabularyIds: ["word-watashi", "word-pan", "word-tabemasu"],
   },
@@ -85,7 +88,7 @@ export const lesson005Sentences: ExampleSentence[] = [
     type: "sentence",
     japanese: "私は水を飲みます。",
     reading: "わたしはみずをのみます。",
-    translationRu: "Я пью воду.",
+    translationRu: "Я пью воду / буду пить воду — в зависимости от контекста.",
     grammarIds: ["grammar-wa-topic", "grammar-o-object", "grammar-masu-polite"],
     vocabularyIds: ["word-watashi", "word-mizu", "word-nomimasu"],
   },
@@ -104,20 +107,29 @@ export const lesson005Exercises: Exercise[] = [
   {
     id: "exercise-mizu-builder",
     type: "sentence-builder",
-    prompt: "Собери предложение: Я пью воду.",
+    prompt: "Собери полную фразу: Я пью воду.",
     targetItemIds: ["grammar-o-object", "word-mizu", "word-nomimasu"],
     correctAnswers: ["私|は|水|を|飲みます"],
     distractors: ["食べます", "に"],
-    explanationRu: "Тема отмечается は, вода как объект — を, затем ставится глагол.",
+    explanationRu:
+      "В полной учебной фразе тема отмечается は, вода как объект — を, затем ставится глагол. В разговоре понятное 私は можно опустить.",
   },
   {
     id: "exercise-pan-input",
     type: "text-input",
-    prompt: "Напиши по-японски: Я ем хлеб.",
+    prompt: "Напиши по-японски: Я ем хлеб (как обычное действие).",
     targetItemIds: ["grammar-o-object", "grammar-masu-polite", "word-pan", "word-tabemasu"],
     correctAnswers: ["私はパンを食べます", "私はパンを食べます。"],
-    acceptableAnswers: ["わたしはパンをたべます", "わたしはパンをたべます。"],
-    explanationRu: "パン отмечается частицей を, а действие выражается формой 食べます.",
+    acceptableAnswers: [
+      "わたしはパンをたべます",
+      "わたしはパンをたべます。",
+      "パンを食べます",
+      "パンを食べます。",
+      "パンをたべます",
+      "パンをたべます。",
+    ],
+    explanationRu:
+      "パン отмечается частицей を, действие выражается формой 食べます. Если тема понятна, 私は естественно опустить.",
   },
 ];
 
@@ -134,7 +146,7 @@ export const lesson005: Lesson = {
     ...lesson005Sentences.map((item) => item.id),
   ],
   exerciseIds: lesson005Exercises.map((exercise) => exercise.id),
-  estimatedMinutes: 15,
+  estimatedMinutes: 16,
 };
 
 export const lesson005Bundle: LessonBundle = {
@@ -147,5 +159,6 @@ export const lesson005Bundle: LessonBundle = {
     "отмечать прямой объект частицей を",
     "строить простые предложения с глаголом",
     "использовать 食べます и 飲みます",
+    "понимать, что ～ます не означает действие только прямо сейчас",
   ],
 };
