@@ -126,10 +126,7 @@ export const lesson001: Lesson = {
   order: 1,
   title: "Я — студент",
   description: "Первое японское предложение: тема с は и вежливая связка です.",
-  theory: [
-    lesson001Grammar[0].explanationRu,
-    lesson001Grammar[1].explanationRu,
-  ],
+  theory: lesson001Grammar.map((grammar) => grammar.explanationRu),
   itemIds: [
     ...lesson001Vocabulary.map((item) => item.id),
     ...lesson001Grammar.map((item) => item.id),
