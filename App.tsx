@@ -150,7 +150,7 @@ export default function App() {
 
     const correct = currentExercise.correctAnswers[0];
     const coreTokens = correct ? correct.split("|") : [];
-    return Array.from(new Set([...coreTokens, ...(currentExercise.distractors ?? [])]));
+    return [...coreTokens, ...(currentExercise.distractors ?? [])];
   }, [currentExercise]);
 
   const availableBuilderTokens = sentenceBuilderTokens.filter((token) => {
@@ -173,11 +173,11 @@ export default function App() {
 
           <View style={styles.todayCard}>
             <View style={styles.todayHeader}>
-              <Text style={styles.sectionTitle}>Сегодня</Text>
+              <Text style={styles.todaySectionTitle}>Сегодня</Text>
               <Text style={styles.timeBadge}>{lesson001.estimatedMinutes} мин</Text>
             </View>
             <Text style={styles.todayTitle}>{lesson001.title}</Text>
-            <Text style={styles.body}>{lesson001.description}</Text>
+            <Text style={styles.todayBody}>{lesson001.description}</Text>
             <TouchableOpacity style={styles.primaryButton} onPress={startLesson}>
               <Text style={styles.primaryButtonText}>Начать урок</Text>
             </TouchableOpacity>
@@ -447,9 +447,9 @@ function PracticeCard({
               )}
             </View>
             <View style={styles.tokenList}>
-              {availableBuilderTokens.map((token) => (
+              {availableBuilderTokens.map((token, index) => (
                 <TouchableOpacity
-                  key={token}
+                  key={`${token}-${index}`}
                   disabled={Boolean(result)}
                   style={styles.tokenButton}
                   onPress={() => onToken(token)}
@@ -546,7 +546,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#26211D",
   },
   todayHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  todaySectionTitle: { fontSize: 20, fontWeight: "800", color: "#FFFFFF" },
   todayTitle: { marginTop: 16, fontSize: 28, fontWeight: "900", color: "#FFFFFF" },
+  todayBody: { marginTop: 10, fontSize: 16, lineHeight: 23, color: "#D9D2C9" },
   timeBadge: {
     paddingHorizontal: 10,
     paddingVertical: 5,
