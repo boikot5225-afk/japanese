@@ -1,4 +1,4 @@
-name: Validate project
+name: Validate Japanese tutor
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  typecheck:
+  validate:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -21,6 +21,9 @@ jobs:
 
       - name: Install dependencies
         run: npm install
+
+      - name: Test review scheduling
+        run: npm run test:review
 
       - name: TypeScript check
         run: npm run typecheck
