@@ -8,7 +8,7 @@
     "newArchEnabled": true,
     "android": {
       "package": "com.bulat.japanesetutor",
-      "versionCode": 1
+      "versionCode": 2
     }
   }
 }
