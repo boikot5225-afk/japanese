@@ -21,7 +21,7 @@ export const lesson001Vocabulary: VocabularyItem[] = [
     type: "vocabulary",
     writtenForm: "学生",
     reading: "がくせい",
-    meaningsRu: ["студент", "учащийся"],
+    meaningsRu: ["студент"],
     partOfSpeech: ["существительное"],
     jlptLevel: "N5",
   },
@@ -53,7 +53,7 @@ export const lesson001Grammar: GrammarPoint[] = [
     title: "Частица は",
     meaningRu: "отмечает тему высказывания",
     explanationRu:
-      "Частица は показывает, о ком или о чём дальше говорится. В роли частицы она пишется は, но произносится わ.",
+      "Частица は показывает, о ком или о чём дальше говорится. В роли частицы она пишется は, но произносится わ. Если тема понятна из ситуации, японцы часто её опускают.",
     formation: ["[тема] は [сообщение]"],
     cautions: ["Не путать с обычным чтением は как «ха»."],
     jlptLevel: "N5",
@@ -112,8 +112,16 @@ export const lesson001Exercises: Exercise[] = [
       "word-gakusei",
     ],
     correctAnswers: ["私は学生です", "私は学生です。"],
-    acceptableAnswers: ["わたしはがくせいです", "わたしはがくせいです。"],
-    explanationRu: "Тема 私 отмечается частицей は, а предложение завершается です.",
+    acceptableAnswers: [
+      "わたしはがくせいです",
+      "わたしはがくせいです。",
+      "学生です",
+      "学生です。",
+      "がくせいです",
+      "がくせいです。",
+    ],
+    explanationRu:
+      "Полная форма — 私は学生です. Если из разговора уже понятно, что речь о тебе, естественно сказать просто 学生です.",
   },
   {
     id: "exercise-build-sentence",
