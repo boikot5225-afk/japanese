@@ -9,15 +9,6 @@ import type { LessonBundle } from "./lessonBundle";
 
 export const lesson003Vocabulary: VocabularyItem[] = [
   {
-    id: "word-anata",
-    type: "vocabulary",
-    writtenForm: "あなた",
-    reading: "あなた",
-    meaningsRu: ["вы", "ты"],
-    partOfSpeech: ["местоимение"],
-    jlptLevel: "N5",
-  },
-  {
     id: "word-hai",
     type: "vocabulary",
     writtenForm: "はい",
@@ -40,7 +31,7 @@ export const lesson003Vocabulary: VocabularyItem[] = [
     type: "vocabulary",
     writtenForm: "会社員",
     reading: "かいしゃいん",
-    meaningsRu: ["служащий компании"],
+    meaningsRu: ["сотрудник компании"],
     partOfSpeech: ["существительное"],
     jlptLevel: "N5",
   },
@@ -53,9 +44,12 @@ export const lesson003Grammar: GrammarPoint[] = [
     title: "Вопросительная частица か",
     meaningRu: "превращает вежливое предложение в вопрос",
     explanationRu:
-      "Частица か ставится в самом конце вежливого предложения. Порядок слов не меняется: добавляется только か.",
+      "Частица か ставится в самом конце вежливого предложения. Порядок слов не меняется. Если из ситуации понятно, о ком спрашивают, тему обычно опускают: 会社員ですか — «Вы сотрудник компании?»",
     formation: ["[предложение] です か", "[предложение] ます か"],
-    cautions: ["После か в обычном японском тексте вопросительный знак необязателен."],
+    cautions: [
+      "После か в обычном японском тексте вопросительный знак необязателен.",
+      "Не вставляй あなた механически: имя, обращение или нулевая тема часто звучат естественнее.",
+    ],
     jlptLevel: "N5",
   },
   {
@@ -73,22 +67,31 @@ export const lesson003Grammar: GrammarPoint[] = [
 
 export const lesson003Sentences: ExampleSentence[] = [
   {
-    id: "sentence-anata-kaishain-question",
+    id: "sentence-kaishain-question",
     type: "sentence",
-    japanese: "あなたは会社員ですか。",
-    reading: "あなたはかいしゃいんですか。",
-    translationRu: "Вы служащий компании?",
-    grammarIds: ["grammar-wa-topic", "grammar-desu", "grammar-ka-question"],
-    vocabularyIds: ["word-anata", "word-kaishain"],
+    japanese: "会社員ですか。",
+    reading: "かいしゃいんですか。",
+    translationRu: "Вы сотрудник компании?",
+    grammarIds: ["grammar-desu", "grammar-ka-question"],
+    vocabularyIds: ["word-kaishain"],
   },
   {
     id: "sentence-hai-kaishain",
     type: "sentence",
     japanese: "はい、会社員です。",
     reading: "はい、かいしゃいんです。",
-    translationRu: "Да, я служащий компании.",
+    translationRu: "Да, я сотрудник компании.",
     grammarIds: ["grammar-desu"],
     vocabularyIds: ["word-hai", "word-kaishain"],
+  },
+  {
+    id: "sentence-iie-gakusei",
+    type: "sentence",
+    japanese: "いいえ、学生です。",
+    reading: "いいえ、がくせいです。",
+    translationRu: "Нет, я студент.",
+    grammarIds: ["grammar-desu"],
+    vocabularyIds: ["word-iie", "word-gakusei"],
   },
   {
     id: "sentence-watashi-mo-gakusei",
@@ -123,11 +126,19 @@ export const lesson003Exercises: Exercise[] = [
   {
     id: "exercise-kaishain-question-input",
     type: "text-input",
-    prompt: "Напиши по-японски: Вы служащий компании?",
-    targetItemIds: ["grammar-ka-question", "word-anata", "word-kaishain"],
-    correctAnswers: ["あなたは会社員ですか", "あなたは会社員ですか。"],
-    acceptableAnswers: ["あなたはかいしゃいんですか", "あなたはかいしゃいんですか。"],
-    explanationRu: "Сохраняем обычный порядок слов и добавляем か после です.",
+    prompt: "Напиши по-японски: Вы сотрудник компании?",
+    targetItemIds: ["grammar-ka-question", "word-kaishain"],
+    correctAnswers: ["会社員ですか", "会社員ですか。"],
+    acceptableAnswers: [
+      "かいしゃいんですか",
+      "かいしゃいんですか。",
+      "あなたは会社員ですか",
+      "あなたは会社員ですか。",
+      "あなたはかいしゃいんですか",
+      "あなたはかいしゃいんですか。",
+    ],
+    explanationRu:
+      "Вопрос 会社員ですか естественен без местоимения: собеседник понятен из ситуации. あなたは会社員ですか грамматически возможно, но не нужно вставлять あなた автоматически.",
   },
 ];
 
@@ -135,7 +146,7 @@ export const lesson003: Lesson = {
   id: "lesson-003",
   unitId: "unit-001",
   order: 3,
-  title: "Вы студент?",
+  title: "Вопросы и «тоже»",
   description: "Вежливые вопросы с か, ответы はい／いいえ и значение «тоже» с も.",
   theory: lesson003Grammar.map((grammar) => grammar.explanationRu),
   itemIds: [
@@ -157,5 +168,6 @@ export const lesson003Bundle: LessonBundle = {
     "задавать простые вежливые вопросы с か",
     "отвечать はい и いいえ",
     "говорить «я тоже» с частицей も",
+    "не злоупотреблять местоимением あなた",
   ],
 };
