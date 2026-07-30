@@ -1,47 +1,58 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { SafeAreaView, Text, TouchableOpacity, View } from "react-native";
 
-import {
-  courseUnits,
-  findLessonBundle,
-  lessonBundles,
-} from "./src/content/courseCatalog";
+import { findLessonBundle, lessonBundles } from "./src/content/courseCatalog";
 import type { LessonBundle } from "./src/content/lessonBundle";
 import type { Exercise } from "./src/domain/course";
 import { checkAnswer, type AnswerCheckResult } from "./src/engine/checkAnswer";
+import { calculateLessonResult, type ExerciseAttempt } from "./src/engine/lessonSession";
 import {
-  calculateLessonResult,
-  type ExerciseAttempt,
-} from "./src/engine/lessonSession";
+  createAttemptLogEntry,
+  getDueReviewItems,
+  getNextReviewAt,
+  getWeakTargetIds,
+  isSuccessfulStatus,
+  scheduleExerciseReview,
+  upsertReviewItem,
+  type AttemptLogEntry,
+  type AttemptSource,
+  type ReviewItem,
+} from "./src/engine/reviewEngine";
+import { CourseScreen } from "./src/screens/CourseScreen";
+import { LessonResultScreen, ReviewResultScreen } from "./src/screens/ResultScreens";
+import { LessonScreen, ReviewScreen, type LessonStage } from "./src/screens/TrainingScreens";
 import { loadCourseProgress, saveCourseProgress } from "./src/storage/progressStorage";
+import { styles } from "./src/theme/appStyles";
 
-type Screen = "course" | "lesson" | "result";
-type LessonStage = "theory" | "words" | "examples" | "practice";
-
+type Screen = "course" | "lesson" | "result" | "review" | "review-result";
 const lessonStages: LessonStage[] = ["theory", "words", "examples", "practice"];
+const initialBundle: LessonBundle = lessonBundles[0] ?? (() => {
+  throw new Error("В курсе нет ни одного урока.");
+})();
 
-const stageLabels: Record<LessonStage, string> = {
-  theory: "Грамматика",
-  words: "Слова",
-  examples: "Примеры",
-  practice: "Практика",
+const formatReviewDate = (value: string | null): string => {
+  if (!value) return "после первого пройденного задания";
+  const date = new Date(value);
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  const sameDay = (left: Date, right: Date): boolean =>
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate();
+  if (sameDay(date, today)) {
+    return `сегодня в ${date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`;
+  }
+  if (sameDay(date, tomorrow)) return "завтра";
+  return date.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
 };
-
-const lessonWord = (count: number): string => (count === 1 ? "урок" : "урока");
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("course");
-  const [activeBundle, setActiveBundle] = useState<LessonBundle>(lessonBundles[0]);
+  const [activeBundle, setActiveBundle] = useState<LessonBundle>(initialBundle);
   const [completedLessonIds, setCompletedLessonIds] = useState<string[]>([]);
+  const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
+  const [attemptHistory, setAttemptHistory] = useState<AttemptLogEntry[]>([]);
   const [progressHydrated, setProgressHydrated] = useState(false);
   const [stage, setStage] = useState<LessonStage>("theory");
   const [exerciseIndex, setExerciseIndex] = useState(0);
@@ -49,10 +60,20 @@ export default function App() {
   const [selectedTokens, setSelectedTokens] = useState<string[]>([]);
   const [result, setResult] = useState<AnswerCheckResult | null>(null);
   const [attempts, setAttempts] = useState<ExerciseAttempt[]>([]);
+  const [reviewQueue, setReviewQueue] = useState<ReviewItem[]>([]);
+  const [reviewIndex, setReviewIndex] = useState(0);
+  const [reviewAttempts, setReviewAttempts] = useState<ExerciseAttempt[]>([]);
+  const [requeuedExerciseIds, setRequeuedExerciseIds] = useState<string[]>([]);
 
-  const currentExercise = activeBundle.exercises[exerciseIndex];
-  const stageIndex = lessonStages.indexOf(stage);
+  const lessonExercise = activeBundle.exercises[exerciseIndex];
+  const activeReviewItem = reviewQueue[reviewIndex];
+  const activeReviewBundle = activeReviewItem ? findLessonBundle(activeReviewItem.lessonId) : undefined;
+  const reviewExercise = activeReviewBundle?.exercises.find(
+    (exercise) => exercise.id === activeReviewItem?.exerciseId,
+  );
+  const currentExercise = screen === "review" ? reviewExercise : lessonExercise;
   const lessonResult = useMemo(() => calculateLessonResult(attempts), [attempts]);
+  const reviewResult = useMemo(() => calculateLessonResult(reviewAttempts), [reviewAttempts]);
   const activeBundleIndex = lessonBundles.findIndex(
     (bundle) => bundle.lesson.id === activeBundle.lesson.id,
   );
@@ -60,66 +81,56 @@ export default function App() {
   const todayBundle =
     lessonBundles.find((bundle) => !completedLessonIds.includes(bundle.lesson.id)) ??
     lessonBundles[lessonBundles.length - 1];
+  const dueReviewItems = useMemo(() => getDueReviewItems(reviewItems, new Date()), [reviewItems]);
+  const weakTargetCount = useMemo(() => getWeakTargetIds(reviewItems).length, [reviewItems]);
+  const nextReviewLabel = useMemo(
+    () => formatReviewDate(getNextReviewAt(reviewItems)),
+    [reviewItems],
+  );
 
   useEffect(() => {
     let cancelled = false;
-
     const hydrateProgress = async () => {
       const snapshot = await loadCourseProgress();
-      if (cancelled) {
-        return;
-      }
-
+      if (cancelled) return;
       if (snapshot) {
-        const knownLessonIds = new Set(
-          lessonBundles.map((bundle) => bundle.lesson.id),
+        const knownLessonIds = new Set(lessonBundles.map((bundle) => bundle.lesson.id));
+        const knownExerciseIds = new Set(
+          lessonBundles.flatMap((bundle) => bundle.exercises.map((exercise) => exercise.id)),
         );
         setCompletedLessonIds(
           snapshot.completedLessonIds.filter((lessonId) => knownLessonIds.has(lessonId)),
         );
-
+        setReviewItems(
+          snapshot.reviewItems.filter(
+            (item) => knownLessonIds.has(item.lessonId) && knownExerciseIds.has(item.exerciseId),
+          ),
+        );
+        setAttemptHistory(
+          snapshot.attemptHistory.filter(
+            (item) => knownLessonIds.has(item.lessonId) && knownExerciseIds.has(item.exerciseId),
+          ),
+        );
         if (snapshot.lastLessonId) {
           const lastBundle = findLessonBundle(snapshot.lastLessonId);
-          if (lastBundle) {
-            setActiveBundle(lastBundle);
-          }
+          if (lastBundle) setActiveBundle(lastBundle);
         }
       }
-
       setProgressHydrated(true);
     };
-
     void hydrateProgress();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
-    if (!progressHydrated) {
-      return;
-    }
-
-    void saveCourseProgress(completedLessonIds, activeBundle.lesson.id);
-  }, [activeBundle.lesson.id, completedLessonIds, progressHydrated]);
-
-  const startLesson = (bundle: LessonBundle) => {
-    setActiveBundle(bundle);
-    setScreen("lesson");
-    setStage("theory");
-    setExerciseIndex(0);
-    setAnswer("");
-    setSelectedTokens([]);
-    setResult(null);
-    setAttempts([]);
-  };
-
-  const startLessonById = (lessonId: string) => {
-    const bundle = findLessonBundle(lessonId);
-    if (bundle) {
-      startLesson(bundle);
-    }
-  };
+    if (!progressHydrated) return;
+    void saveCourseProgress({
+      completedLessonIds,
+      lastLessonId: activeBundle.lesson.id,
+      reviewItems,
+      attemptHistory,
+    });
+  }, [activeBundle.lesson.id, attemptHistory, completedLessonIds, progressHydrated, reviewItems]);
 
   const resetExerciseInput = () => {
     setAnswer("");
@@ -127,48 +138,70 @@ export default function App() {
     setResult(null);
   };
 
-  const goToNextStage = () => {
-    const nextStage = lessonStages[stageIndex + 1];
-    if (nextStage) {
-      setStage(nextStage);
-      resetExerciseInput();
-    }
+  const startLesson = (bundle: LessonBundle) => {
+    setActiveBundle(bundle);
+    setScreen("lesson");
+    setStage("theory");
+    setExerciseIndex(0);
+    resetExerciseInput();
+    setAttempts([]);
   };
 
-  const goToPreviousStage = () => {
-    const previousStage = lessonStages[stageIndex - 1];
-    if (previousStage) {
-      setStage(previousStage);
-      resetExerciseInput();
-    }
+  const startReview = () => {
+    const queue = getDueReviewItems(reviewItems, new Date()).slice(0, 20);
+    if (queue.length === 0) return;
+    setReviewQueue(queue);
+    setReviewIndex(0);
+    setReviewAttempts([]);
+    setRequeuedExerciseIds([]);
+    resetExerciseInput();
+    setScreen("review");
+  };
+
+  const recordExerciseAttempt = (
+    exercise: Exercise,
+    bundle: LessonBundle,
+    checkResult: AnswerCheckResult,
+    source: AttemptSource,
+  ) => {
+    const now = new Date();
+    setReviewItems((previous) => {
+      const existing = previous.find((item) => item.exerciseId === exercise.id);
+      return upsertReviewItem(
+        previous,
+        scheduleExerciseReview(existing, exercise, bundle.lesson.id, checkResult.status, now),
+      );
+    });
+    setAttemptHistory((previous) => [
+      createAttemptLogEntry(exercise, bundle.lesson.id, checkResult.status, source, now),
+      ...previous,
+    ].slice(0, 200));
   };
 
   const finishExercise = (checkResult: AnswerCheckResult) => {
-    if (!currentExercise) {
-      return;
-    }
-
+    if (!currentExercise) return;
+    const bundle = screen === "review" ? activeReviewBundle : activeBundle;
+    if (!bundle) return;
     setResult(checkResult);
-    setAttempts((previous) => [
-      ...previous,
-      { exerciseId: currentExercise.id, status: checkResult.status },
-    ]);
+    recordExerciseAttempt(
+      currentExercise,
+      bundle,
+      checkResult,
+      screen === "review" ? "review" : "lesson",
+    );
+    const attempt = { exerciseId: currentExercise.id, status: checkResult.status };
+    if (screen === "review") {
+      setReviewAttempts((previous) => [...previous, attempt]);
+    } else {
+      setAttempts((previous) => [...previous, attempt]);
+    }
   };
 
   const submitAnswer = () => {
-    if (!currentExercise || result) {
-      return;
-    }
-
+    if (!currentExercise || result) return;
     const submittedAnswer =
-      currentExercise.type === "sentence-builder"
-        ? selectedTokens.join("|")
-        : answer;
-
-    if (submittedAnswer.trim().length === 0) {
-      return;
-    }
-
+      currentExercise.type === "sentence-builder" ? selectedTokens.join("|") : answer;
+    if (submittedAnswer.trim().length === 0) return;
     finishExercise(
       checkAnswer(
         submittedAnswer,
@@ -179,28 +212,19 @@ export default function App() {
   };
 
   const chooseMultipleChoice = (choice: string) => {
-    if (!currentExercise || result) {
-      return;
-    }
-
+    if (!currentExercise || result) return;
     setAnswer(choice);
     finishExercise(
-      checkAnswer(
-        choice,
-        currentExercise.correctAnswers,
-        currentExercise.acceptableAnswers,
-      ),
+      checkAnswer(choice, currentExercise.correctAnswers, currentExercise.acceptableAnswers),
     );
   };
 
   const continuePractice = () => {
-    const nextExercise = activeBundle.exercises[exerciseIndex + 1];
-    if (nextExercise) {
+    if (activeBundle.exercises[exerciseIndex + 1]) {
       setExerciseIndex((previous) => previous + 1);
       resetExerciseInput();
       return;
     }
-
     if (lessonResult.passed) {
       setCompletedLessonIds((previous) =>
         previous.includes(activeBundle.lesson.id)
@@ -211,14 +235,28 @@ export default function App() {
     setScreen("result");
   };
 
-  const sentenceBuilderTokens = useMemo(() => {
-    if (!currentExercise || currentExercise.type !== "sentence-builder") {
-      return [];
+  const continueReview = () => {
+    const item = reviewQueue[reviewIndex];
+    if (!item || !result) return;
+    const shouldRequeue =
+      !isSuccessfulStatus(result.status) && !requeuedExerciseIds.includes(item.exerciseId);
+    const nextQueue = shouldRequeue ? [...reviewQueue, item] : reviewQueue;
+    if (shouldRequeue) {
+      setReviewQueue(nextQueue);
+      setRequeuedExerciseIds((previous) => [...previous, item.exerciseId]);
     }
+    if (nextQueue[reviewIndex + 1]) {
+      setReviewIndex((previous) => previous + 1);
+      resetExerciseInput();
+      return;
+    }
+    setScreen("review-result");
+  };
 
+  const sentenceBuilderTokens = useMemo(() => {
+    if (!currentExercise || currentExercise.type !== "sentence-builder") return [];
     const correct = currentExercise.correctAnswers[0];
-    const coreTokens = correct ? correct.split("|") : [];
-    return [...coreTokens, ...(currentExercise.distractors ?? [])];
+    return [...(correct ? correct.split("|") : []), ...(currentExercise.distractors ?? [])];
   }, [currentExercise]);
 
   const availableBuilderTokens = useMemo(() => {
@@ -226,7 +264,6 @@ export default function App() {
     selectedTokens.forEach((token) => {
       remainingSelected.set(token, (remainingSelected.get(token) ?? 0) + 1);
     });
-
     return sentenceBuilderTokens.filter((token) => {
       const selectedCount = remainingSelected.get(token) ?? 0;
       if (selectedCount > 0) {
@@ -237,503 +274,133 @@ export default function App() {
     });
   }, [selectedTokens, sentenceBuilderTokens]);
 
+  const commonPracticeProps = currentExercise
+    ? {
+        currentExercise,
+        answer,
+        selectedTokens,
+        availableBuilderTokens,
+        result,
+        onAnswerChange: (value: string) => {
+          setAnswer(value);
+          setResult(null);
+        },
+        onChoice: chooseMultipleChoice,
+        onToken: (token: string) => setSelectedTokens((previous) => [...previous, token]),
+        onRemoveToken: (index: number) =>
+          setSelectedTokens((previous) =>
+            previous.filter((_, itemIndex) => itemIndex !== index),
+          ),
+        onClearTokens: () => setSelectedTokens([]),
+        onSubmit: submitAnswer,
+      }
+    : null;
+
   if (screen === "course") {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="dark-content" />
-        <ScrollView contentContainerStyle={styles.container}>
-          <Text style={styles.eyebrow}>日本語 · Japanese</Text>
-          <Text style={styles.heroTitle}>Японский с нуля до чтения</Text>
-          <Text style={styles.description}>
-            Последовательный курс с грамматикой, открытыми ответами и повторением,
-            а не бесконечная свалка карточек.
-          </Text>
-
-          {todayBundle && (
-            <View style={styles.todayCard}>
-              <View style={styles.todayHeader}>
-                <Text style={styles.todaySectionTitle}>
-                  {completedLessonIds.length === 0 ? "Начать сегодня" : "Продолжить"}
-                </Text>
-                <Text style={styles.timeBadge}>{todayBundle.lesson.estimatedMinutes} мин</Text>
-              </View>
-              <Text style={styles.todayTitle}>{todayBundle.lesson.title}</Text>
-              <Text style={styles.todayBody}>{todayBundle.lesson.description}</Text>
-              <TouchableOpacity
-                style={styles.primaryButton}
-                onPress={() => startLesson(todayBundle)}
-              >
-                <Text style={styles.primaryButtonText}>Открыть урок</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          <Text style={[styles.sectionTitle, styles.courseHeading]}>Курс</Text>
-          {courseUnits.map((unit) => (
-            <View key={unit.id} style={styles.unitCard}>
-              <View style={styles.unitHeader}>
-                <Text style={styles.unitLevel}>{unit.jlptLevel}</Text>
-                <Text style={styles.unitCount}>
-                  {unit.lessons.length} {lessonWord(unit.lessons.length)}
-                </Text>
-              </View>
-              <Text style={styles.unitTitle}>{unit.title}</Text>
-              <Text style={styles.body}>{unit.description}</Text>
-
-              {unit.lessons.map((lesson) => {
-                const bundle = findLessonBundle(lesson.id);
-                const completed = completedLessonIds.includes(lesson.id);
-                return (
-                  <TouchableOpacity
-                    key={lesson.id}
-                    style={styles.lessonRow}
-                    disabled={!bundle}
-                    onPress={() => startLessonById(lesson.id)}
-                  >
-                    <View style={[styles.lessonNumber, completed && styles.lessonNumberCompleted]}>
-                      <Text style={styles.lessonNumberText}>
-                        {completed ? "✓" : lesson.order}
-                      </Text>
-                    </View>
-                    <View style={styles.lessonInfo}>
-                      <Text style={styles.lessonTitle}>{lesson.title}</Text>
-                      <Text style={styles.lessonMeta}>
-                        {bundle
-                          ? `${bundle.grammar.length} темы · ${bundle.vocabulary.length} слова · ${bundle.exercises.length} упражнения`
-                          : "Материал готовится"}
-                      </Text>
-                    </View>
-                    <Text style={styles.lessonChevron}>›</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          ))}
-        </ScrollView>
-      </SafeAreaView>
+      <CourseScreen
+        completedLessonIds={completedLessonIds}
+        todayBundle={todayBundle}
+        dueReviewCount={dueReviewItems.length}
+        weakTargetCount={weakTargetCount}
+        attemptCount={attemptHistory.length}
+        nextReviewLabel={nextReviewLabel}
+        onStartLesson={startLesson}
+        onStartLessonById={(lessonId) => {
+          const bundle = findLessonBundle(lessonId);
+          if (bundle) startLesson(bundle);
+        }}
+        onStartReview={startReview}
+      />
     );
   }
 
   if (screen === "result") {
     return (
+      <LessonResultScreen
+        result={lessonResult}
+        activeBundle={activeBundle}
+        nextBundle={nextBundle}
+        onNextLesson={() => nextBundle && startLesson(nextBundle)}
+        onRetry={() => startLesson(activeBundle)}
+        onCourse={() => setScreen("course")}
+      />
+    );
+  }
+
+  if (screen === "review-result") {
+    return (
+      <ReviewResultScreen
+        result={reviewResult}
+        dueReviewCount={getDueReviewItems(reviewItems, new Date()).length}
+        onContinueReview={startReview}
+        onCourse={() => setScreen("course")}
+      />
+    );
+  }
+
+  if (!commonPracticeProps) {
+    return (
       <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="dark-content" />
-        <ScrollView contentContainerStyle={styles.resultContainer}>
-          <Text style={styles.resultEmoji}>{lessonResult.passed ? "合格" : "復習"}</Text>
-          <Text style={styles.resultTitle}>
-            {lessonResult.passed ? "Урок пройден" : "Нужно закрепить"}
-          </Text>
-          <Text style={styles.resultPercent}>{lessonResult.percent}%</Text>
-          <Text style={styles.resultSummary}>
-            Верных ответов: {lessonResult.correct} из {lessonResult.total}
-          </Text>
-          <View style={styles.resultCard}>
-            <Text style={styles.resultCardTitle}>Что изучено</Text>
-            {activeBundle.outcomes.map((outcome) => (
-              <Text key={outcome} style={styles.resultLine}>• {outcome}</Text>
-            ))}
-          </View>
-          {lessonResult.passed && nextBundle && (
-            <TouchableOpacity
-              style={styles.primaryButton}
-              onPress={() => startLesson(nextBundle)}
-            >
-              <Text style={styles.primaryButtonText}>Следующий урок</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            style={lessonResult.passed && nextBundle ? styles.secondaryWideButton : styles.primaryButton}
-            onPress={() => startLesson(activeBundle)}
-          >
-            <Text
-              style={lessonResult.passed && nextBundle
-                ? styles.secondaryButtonText
-                : styles.primaryButtonText}
-            >
-              Пройти ещё раз
-            </Text>
+        <View style={styles.resultContainer}>
+          <Text style={styles.resultTitle}>Не удалось открыть задание</Text>
+          <TouchableOpacity style={styles.primaryButton} onPress={() => setScreen("course")}>
+            <Text style={styles.primaryButtonText}>Вернуться к курсу</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.linkButton} onPress={() => setScreen("course")}>
-            <Text style={styles.linkButtonText}>Вернуться к курсу</Text>
-          </TouchableOpacity>
-        </ScrollView>
+        </View>
       </SafeAreaView>
     );
   }
 
+  if (screen === "review") {
+    if (!activeReviewBundle) {
+      return (
+        <SafeAreaView style={styles.safeArea}>
+          <View style={styles.resultContainer}>
+            <Text style={styles.resultTitle}>Очередь повторения повреждена</Text>
+            <TouchableOpacity style={styles.primaryButton} onPress={() => setScreen("course")}>
+              <Text style={styles.primaryButtonText}>Вернуться к курсу</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      );
+    }
+    return (
+      <ReviewScreen
+        {...commonPracticeProps}
+        lessonTitle={activeReviewBundle.lesson.title}
+        exerciseIndex={reviewIndex}
+        exerciseCount={reviewQueue.length}
+        onCourse={() => setScreen("course")}
+        onContinue={continueReview}
+      />
+    );
+  }
+
+  const stageIndex = lessonStages.indexOf(stage);
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" />
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <TouchableOpacity style={styles.backLink} onPress={() => setScreen("course")}>
-          <Text style={styles.backLinkText}>‹ К курсу</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.eyebrow}>Урок {activeBundle.lesson.order}</Text>
-        <Text style={styles.title}>{activeBundle.lesson.title}</Text>
-        <Text style={styles.description}>{activeBundle.lesson.description}</Text>
-
-        <View style={styles.stageRow}>
-          {lessonStages.map((item, index) => (
-            <View key={item} style={styles.stageItem}>
-              <View
-                style={[
-                  styles.stageDot,
-                  index <= stageIndex ? styles.stageDotActive : styles.stageDotInactive,
-                ]}
-              />
-              <Text
-                style={[
-                  styles.stageLabel,
-                  item === stage && styles.stageLabelActive,
-                ]}
-              >
-                {stageLabels[item]}
-              </Text>
-            </View>
-          ))}
-        </View>
-
-        {stage === "theory" && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Грамматика</Text>
-            {activeBundle.grammar.map((grammar) => (
-              <View key={grammar.id} style={styles.card}>
-                <Text style={styles.japaneseTitle}>{grammar.title}</Text>
-                <Text style={styles.meaning}>{grammar.meaningRu}</Text>
-                <Text style={styles.body}>{grammar.explanationRu}</Text>
-                <Text style={styles.formula}>{grammar.formation.join(" · ")}</Text>
-                {grammar.cautions?.map((caution) => (
-                  <Text key={caution} style={styles.caution}>⚠ {caution}</Text>
-                ))}
-              </View>
-            ))}
-          </View>
-        )}
-
-        {stage === "words" && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Новые слова</Text>
-            {activeBundle.vocabulary.map((word) => (
-              <View key={word.id} style={styles.wordRow}>
-                <View>
-                  <Text style={styles.wordWritten}>{word.writtenForm}</Text>
-                  <Text style={styles.wordReading}>{word.reading}</Text>
-                </View>
-                <Text style={styles.wordMeaning}>{word.meaningsRu.join(", ")}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {stage === "examples" && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Примеры</Text>
-            {activeBundle.sentences.map((sentence) => (
-              <View key={sentence.id} style={styles.card}>
-                <Text style={styles.exampleJapanese}>{sentence.japanese}</Text>
-                {sentence.reading && (
-                  <Text style={styles.exampleReading}>{sentence.reading}</Text>
-                )}
-                <Text style={styles.exampleTranslation}>{sentence.translationRu}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {stage === "practice" && currentExercise && (
-          <PracticeCard
-            exercise={currentExercise}
-            exerciseIndex={exerciseIndex}
-            exerciseCount={activeBundle.exercises.length}
-            answer={answer}
-            selectedTokens={selectedTokens}
-            availableBuilderTokens={availableBuilderTokens}
-            result={result}
-            onAnswerChange={(value) => {
-              setAnswer(value);
-              setResult(null);
-            }}
-            onChoice={chooseMultipleChoice}
-            onToken={(token) => setSelectedTokens((previous) => [...previous, token])}
-            onRemoveToken={(index) =>
-              setSelectedTokens((previous) =>
-                previous.filter((_, itemIndex) => itemIndex !== index),
-              )
-            }
-            onClearTokens={() => setSelectedTokens([])}
-            onSubmit={submitAnswer}
-            onContinue={continuePractice}
-          />
-        )}
-
-        {stage !== "practice" && (
-          <View style={styles.navigation}>
-            <TouchableOpacity
-              disabled={stageIndex === 0}
-              onPress={goToPreviousStage}
-              style={[styles.secondaryButton, stageIndex === 0 && styles.disabledButton]}
-            >
-              <Text style={styles.secondaryButtonText}>Назад</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.primaryButtonSmall} onPress={goToNextStage}>
-              <Text style={styles.primaryButtonText}>Дальше</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </ScrollView>
-    </SafeAreaView>
+    <LessonScreen
+      {...commonPracticeProps}
+      activeBundle={activeBundle}
+      stage={stage}
+      exerciseIndex={exerciseIndex}
+      exerciseCount={activeBundle.exercises.length}
+      onCourse={() => setScreen("course")}
+      onPreviousStage={() => {
+        const previous = lessonStages[stageIndex - 1];
+        if (previous) {
+          setStage(previous);
+          resetExerciseInput();
+        }
+      }}
+      onNextStage={() => {
+        const next = lessonStages[stageIndex + 1];
+        if (next) {
+          setStage(next);
+          resetExerciseInput();
+        }
+      }}
+      onContinue={continuePractice}
+    />
   );
 }
-
-interface PracticeCardProps {
-  exercise: Exercise;
-  exerciseIndex: number;
-  exerciseCount: number;
-  answer: string;
-  selectedTokens: string[];
-  availableBuilderTokens: string[];
-  result: AnswerCheckResult | null;
-  onAnswerChange: (value: string) => void;
-  onChoice: (choice: string) => void;
-  onToken: (token: string) => void;
-  onRemoveToken: (index: number) => void;
-  onClearTokens: () => void;
-  onSubmit: () => void;
-  onContinue: () => void;
-}
-
-function PracticeCard({
-  exercise,
-  exerciseIndex,
-  exerciseCount,
-  answer,
-  selectedTokens,
-  availableBuilderTokens,
-  result,
-  onAnswerChange,
-  onChoice,
-  onToken,
-  onRemoveToken,
-  onClearTokens,
-  onSubmit,
-  onContinue,
-}: PracticeCardProps) {
-  const choices = Array.from(
-    new Set([...exercise.correctAnswers, ...(exercise.distractors ?? [])]),
-  );
-  const isSuccess = result?.status === "correct" || result?.status === "acceptable";
-
-  return (
-    <View style={styles.section}>
-      <View style={styles.practiceHeader}>
-        <Text style={styles.sectionTitle}>Практика</Text>
-        <Text style={styles.exerciseCounter}>
-          {exerciseIndex + 1}/{exerciseCount}
-        </Text>
-      </View>
-      <View style={styles.card}>
-        <Text style={styles.prompt}>{exercise.prompt}</Text>
-
-        {exercise.type === "multiple-choice" && (
-          <View style={styles.choiceList}>
-            {choices.map((choice) => (
-              <TouchableOpacity
-                key={choice}
-                disabled={Boolean(result)}
-                style={[
-                  styles.choiceButton,
-                  answer === choice && styles.choiceButtonSelected,
-                ]}
-                onPress={() => onChoice(choice)}
-              >
-                <Text style={styles.choiceText}>{choice}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {exercise.type === "sentence-builder" && (
-          <>
-            <View style={styles.builderAnswer}>
-              {selectedTokens.length === 0 ? (
-                <Text style={styles.builderPlaceholder}>Нажимай слова в нужном порядке</Text>
-              ) : (
-                selectedTokens.map((token, index) => (
-                  <TouchableOpacity
-                    key={`${token}-${index}`}
-                    disabled={Boolean(result)}
-                    style={styles.selectedToken}
-                    onPress={() => onRemoveToken(index)}
-                  >
-                    <Text style={styles.selectedTokenText}>{token}</Text>
-                  </TouchableOpacity>
-                ))
-              )}
-            </View>
-            <View style={styles.tokenList}>
-              {availableBuilderTokens.map((token, index) => (
-                <TouchableOpacity
-                  key={`${token}-${index}`}
-                  disabled={Boolean(result)}
-                  style={styles.tokenButton}
-                  onPress={() => onToken(token)}
-                >
-                  <Text style={styles.tokenButtonText}>{token}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {!result && selectedTokens.length > 0 && (
-              <TouchableOpacity style={styles.clearButton} onPress={onClearTokens}>
-                <Text style={styles.clearButtonText}>Очистить</Text>
-              </TouchableOpacity>
-            )}
-          </>
-        )}
-
-        {exercise.type === "text-input" && (
-          <TextInput
-            value={answer}
-            editable={!result}
-            onChangeText={onAnswerChange}
-            placeholder="Введите ответ по-японски"
-            autoCapitalize="none"
-            autoCorrect={false}
-            style={styles.input}
-          />
-        )}
-
-        {!result && exercise.type !== "multiple-choice" && (
-          <TouchableOpacity style={styles.primaryButton} onPress={onSubmit}>
-            <Text style={styles.primaryButtonText}>Проверить</Text>
-          </TouchableOpacity>
-        )}
-
-        {result && (
-          <>
-            <View
-              style={[
-                styles.feedback,
-                isSuccess ? styles.feedbackCorrect : styles.feedbackIncorrect,
-              ]}
-            >
-              <Text style={styles.feedbackText}>{result.message}</Text>
-              {exercise.explanationRu && (
-                <Text style={styles.feedbackExplanation}>{exercise.explanationRu}</Text>
-              )}
-              {!isSuccess && (
-                <Text style={styles.correctAnswer}>
-                  Ответ: {exercise.correctAnswers[0] ?? "—"}
-                </Text>
-              )}
-            </View>
-            <TouchableOpacity style={styles.primaryButton} onPress={onContinue}>
-              <Text style={styles.primaryButtonText}>
-                {exerciseIndex + 1 === exerciseCount ? "Завершить урок" : "Следующее"}
-              </Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#F6F3EC" },
-  container: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 },
-  resultContainer: {
-    flexGrow: 1,
-    justifyContent: "center",
-    paddingHorizontal: 24,
-    paddingVertical: 40,
-  },
-  eyebrow: { fontSize: 13, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase", color: "#9A3D3D" },
-  heroTitle: { marginTop: 8, fontSize: 38, lineHeight: 44, fontWeight: "900", color: "#1C1A18" },
-  title: { marginTop: 8, fontSize: 34, lineHeight: 40, fontWeight: "800", color: "#1C1A18" },
-  description: { marginTop: 10, fontSize: 16, lineHeight: 23, color: "#5D5852" },
-  todayCard: { marginTop: 28, padding: 20, borderRadius: 22, backgroundColor: "#26211D" },
-  todayHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  todaySectionTitle: { fontSize: 20, fontWeight: "800", color: "#FFFFFF" },
-  todayTitle: { marginTop: 16, fontSize: 28, fontWeight: "900", color: "#FFFFFF" },
-  todayBody: { marginTop: 10, fontSize: 16, lineHeight: 23, color: "#D9D2C9" },
-  timeBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 99, fontSize: 13, fontWeight: "800", color: "#2D2824", backgroundColor: "#F2D9A2" },
-  courseHeading: { marginTop: 30 },
-  unitCard: { marginTop: 12, padding: 18, borderRadius: 20, borderWidth: 1, borderColor: "#E5DED4", backgroundColor: "#FFFFFF" },
-  unitHeader: { flexDirection: "row", justifyContent: "space-between" },
-  unitLevel: { fontSize: 13, fontWeight: "900", color: "#9A3D3D" },
-  unitCount: { fontSize: 13, fontWeight: "700", color: "#746D65" },
-  unitTitle: { marginTop: 10, fontSize: 23, fontWeight: "900", color: "#1C1A18" },
-  lessonRow: { flexDirection: "row", alignItems: "center", marginTop: 18, paddingTop: 16, borderTopWidth: 1, borderTopColor: "#EEE8DF" },
-  lessonNumber: { width: 42, height: 42, alignItems: "center", justifyContent: "center", borderRadius: 14, backgroundColor: "#F0E2DE" },
-  lessonNumberCompleted: { backgroundColor: "#E4F2E8" },
-  lessonNumberText: { fontSize: 17, fontWeight: "900", color: "#9A3D3D" },
-  lessonInfo: { flex: 1, marginLeft: 13 },
-  lessonTitle: { fontSize: 17, fontWeight: "800", color: "#1C1A18" },
-  lessonMeta: { marginTop: 3, fontSize: 13, color: "#746D65" },
-  lessonChevron: { marginLeft: 8, fontSize: 28, color: "#A39A90" },
-  backLink: { alignSelf: "flex-start", marginBottom: 18, paddingVertical: 4 },
-  backLinkText: { fontSize: 15, fontWeight: "800", color: "#9A3D3D" },
-  stageRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 24 },
-  stageItem: { flex: 1, alignItems: "center" },
-  stageDot: { width: 9, height: 9, borderRadius: 99 },
-  stageDotActive: { backgroundColor: "#B54444" },
-  stageDotInactive: { backgroundColor: "#D8D0C6" },
-  stageLabel: { marginTop: 6, fontSize: 11, color: "#8A8279" },
-  stageLabelActive: { fontWeight: "800", color: "#433D37" },
-  section: { marginTop: 28 },
-  sectionTitle: { fontSize: 20, fontWeight: "800", color: "#1C1A18" },
-  card: { marginTop: 12, padding: 18, borderRadius: 18, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5DED4" },
-  japaneseTitle: { fontSize: 24, fontWeight: "800", color: "#1C1A18" },
-  meaning: { marginTop: 4, fontSize: 14, fontWeight: "700", color: "#9A3D3D" },
-  body: { marginTop: 10, fontSize: 16, lineHeight: 23, color: "#5D5852" },
-  formula: { marginTop: 14, padding: 12, borderRadius: 12, fontSize: 16, fontWeight: "700", color: "#25211E", backgroundColor: "#F0ECE5" },
-  caution: { marginTop: 10, fontSize: 14, lineHeight: 20, color: "#795A25" },
-  wordRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 10, padding: 16, borderRadius: 16, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E5DED4" },
-  wordWritten: { fontSize: 29, fontWeight: "800", color: "#1C1A18" },
-  wordReading: { marginTop: 2, fontSize: 14, color: "#746D65" },
-  wordMeaning: { flexShrink: 1, marginLeft: 16, fontSize: 16, fontWeight: "700", textAlign: "right", color: "#443F3A" },
-  exampleJapanese: { fontSize: 25, fontWeight: "800", color: "#1C1A18" },
-  exampleReading: { marginTop: 5, fontSize: 14, color: "#746D65" },
-  exampleTranslation: { marginTop: 12, fontSize: 16, fontWeight: "700", color: "#9A3D3D" },
-  navigation: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 24 },
-  secondaryButton: { minWidth: 100, alignItems: "center", paddingHorizontal: 18, paddingVertical: 13, borderRadius: 14, borderWidth: 1, borderColor: "#CFC7BC", backgroundColor: "#FFFFFF" },
-  secondaryWideButton: { alignItems: "center", marginTop: 12, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: "#CFC7BC", backgroundColor: "#FFFFFF" },
-  secondaryButtonText: { fontSize: 16, fontWeight: "800", color: "#38332E" },
-  disabledButton: { opacity: 0.35 },
-  primaryButton: { alignItems: "center", marginTop: 16, paddingVertical: 14, borderRadius: 14, backgroundColor: "#B54444" },
-  primaryButtonSmall: { minWidth: 120, alignItems: "center", paddingHorizontal: 20, paddingVertical: 14, borderRadius: 14, backgroundColor: "#B54444" },
-  primaryButtonText: { fontSize: 16, fontWeight: "800", color: "#FFFFFF" },
-  practiceHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  exerciseCounter: { fontSize: 14, fontWeight: "800", color: "#9A3D3D" },
-  prompt: { fontSize: 19, lineHeight: 26, fontWeight: "800", color: "#1C1A18" },
-  choiceList: { marginTop: 16 },
-  choiceButton: { alignItems: "center", marginTop: 9, paddingVertical: 15, borderRadius: 14, borderWidth: 1, borderColor: "#D6CEC3", backgroundColor: "#FCFBF8" },
-  choiceButtonSelected: { borderColor: "#B54444", backgroundColor: "#F6E8E5" },
-  choiceText: { fontSize: 22, fontWeight: "800", color: "#28231F" },
-  builderAnswer: { minHeight: 74, flexDirection: "row", flexWrap: "wrap", alignItems: "center", marginTop: 16, padding: 10, borderRadius: 14, borderWidth: 1, borderColor: "#D6CEC3", backgroundColor: "#FCFBF8" },
-  builderPlaceholder: { fontSize: 14, color: "#8A8279" },
-  selectedToken: { margin: 4, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10, backgroundColor: "#B54444" },
-  selectedTokenText: { fontSize: 18, fontWeight: "800", color: "#FFFFFF" },
-  tokenList: { flexDirection: "row", flexWrap: "wrap", marginTop: 12 },
-  tokenButton: { marginRight: 8, marginBottom: 8, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 11, backgroundColor: "#EEE8DF" },
-  tokenButtonText: { fontSize: 18, fontWeight: "800", color: "#302B27" },
-  clearButton: { alignSelf: "flex-start", paddingVertical: 5 },
-  clearButtonText: { fontSize: 14, fontWeight: "700", color: "#9A3D3D" },
-  input: { marginTop: 18, paddingHorizontal: 15, paddingVertical: 14, borderWidth: 1, borderColor: "#CFC7BC", borderRadius: 14, fontSize: 18, backgroundColor: "#FCFBF8", color: "#1C1A18" },
-  feedback: { marginTop: 14, padding: 14, borderRadius: 14 },
-  feedbackCorrect: { backgroundColor: "#E4F2E8" },
-  feedbackIncorrect: { backgroundColor: "#F7E2E0" },
-  feedbackText: { fontSize: 16, fontWeight: "800", color: "#2C2824" },
-  feedbackExplanation: { marginTop: 6, fontSize: 14, lineHeight: 20, color: "#514B45" },
-  correctAnswer: { marginTop: 8, fontSize: 15, fontWeight: "800", color: "#7A302D" },
-  resultEmoji: { fontSize: 24, fontWeight: "900", textAlign: "center", color: "#9A3D3D" },
-  resultTitle: { marginTop: 12, fontSize: 35, fontWeight: "900", textAlign: "center", color: "#1C1A18" },
-  resultPercent: { marginTop: 18, fontSize: 68, fontWeight: "900", textAlign: "center", color: "#B54444" },
-  resultSummary: { marginTop: 4, fontSize: 17, textAlign: "center", color: "#5D5852" },
-  resultCard: { marginTop: 28, padding: 18, borderRadius: 18, backgroundColor: "#FFFFFF" },
-  resultCardTitle: { fontSize: 18, fontWeight: "900", color: "#1C1A18" },
-  resultLine: { marginTop: 9, fontSize: 15, lineHeight: 21, color: "#514B45" },
-  linkButton: { alignItems: "center", marginTop: 14, paddingVertical: 10 },
-  linkButtonText: { fontSize: 15, fontWeight: "800", color: "#9A3D3D" },
-});
