@@ -1,5 +1,6 @@
 import { SafeAreaView, ScrollView, StatusBar, Text, TouchableOpacity, View } from "react-native";
 
+import { speakJapanese } from "../audio/japaneseSpeech";
 import { PracticeCard } from "../components/PracticeCard";
 import type { LessonBundle } from "../content/lessonBundle";
 import type { Exercise } from "../domain/course";
@@ -88,7 +89,16 @@ export function LessonScreen({
             <Text style={styles.sectionTitle}>Грамматика</Text>
             {activeBundle.grammar.map((grammar) => (
               <View key={grammar.id} style={styles.card}>
-                <Text style={styles.japaneseTitle}>{grammar.title}</Text>
+                <View style={styles.audioHeaderRow}>
+                  <Text style={styles.japaneseTitle}>{grammar.title}</Text>
+                  <TouchableOpacity
+                    accessibilityLabel={`Прослушать ${grammar.title}`}
+                    style={styles.soundButton}
+                    onPress={() => void speakJapanese(grammar.formation[0] ?? grammar.title)}
+                  >
+                    <Text style={styles.soundButtonText}>🔊</Text>
+                  </TouchableOpacity>
+                </View>
                 <Text style={styles.meaning}>{grammar.meaningRu}</Text>
                 <Text style={styles.body}>{grammar.explanationRu}</Text>
                 <Text style={styles.formula}>{grammar.formation.join(" · ")}</Text>
@@ -105,11 +115,20 @@ export function LessonScreen({
             <Text style={styles.sectionTitle}>Новые слова</Text>
             {activeBundle.vocabulary.map((word) => (
               <View key={word.id} style={styles.wordRow}>
-                <View>
+                <View style={styles.wordTextBlock}>
                   <Text style={styles.wordWritten}>{word.writtenForm}</Text>
                   <Text style={styles.wordReading}>{word.reading}</Text>
                 </View>
-                <Text style={styles.wordMeaning}>{word.meaningsRu.join(", ")}</Text>
+                <View style={styles.wordActions}>
+                  <Text style={styles.wordMeaning}>{word.meaningsRu.join(", ")}</Text>
+                  <TouchableOpacity
+                    accessibilityLabel={`Прослушать ${word.writtenForm}`}
+                    style={styles.soundButton}
+                    onPress={() => void speakJapanese(word.writtenForm)}
+                  >
+                    <Text style={styles.soundButtonText}>🔊</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             ))}
           </View>
@@ -120,7 +139,16 @@ export function LessonScreen({
             <Text style={styles.sectionTitle}>Примеры</Text>
             {activeBundle.sentences.map((sentence) => (
               <View key={sentence.id} style={styles.card}>
-                <Text style={styles.exampleJapanese}>{sentence.japanese}</Text>
+                <View style={styles.audioHeaderRow}>
+                  <Text style={styles.exampleJapanese}>{sentence.japanese}</Text>
+                  <TouchableOpacity
+                    accessibilityLabel="Прослушать пример"
+                    style={styles.soundButton}
+                    onPress={() => void speakJapanese(sentence.japanese)}
+                  >
+                    <Text style={styles.soundButtonText}>🔊</Text>
+                  </TouchableOpacity>
+                </View>
                 {sentence.reading && <Text style={styles.exampleReading}>{sentence.reading}</Text>}
                 <Text style={styles.exampleTranslation}>{sentence.translationRu}</Text>
               </View>
