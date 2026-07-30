@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { Text, TextInput, TouchableOpacity, View } from "react-native";
 
+import { speakJapanese } from "../audio/japaneseSpeech";
 import type { Exercise } from "../domain/course";
 import type { AnswerCheckResult } from "../engine/checkAnswer";
 import { styles } from "../theme/appStyles";
@@ -45,6 +47,13 @@ export function PracticeCard({
     new Set([...exercise.correctAnswers, ...(exercise.distractors ?? [])]),
   );
   const isSuccess = result?.status === "correct" || result?.status === "acceptable";
+  const spokenAnswer = exercise.correctAnswers[0] ?? "";
+
+  useEffect(() => {
+    if (result && isSuccess && spokenAnswer) {
+      void speakJapanese(spokenAnswer);
+    }
+  }, [isSuccess, result, spokenAnswer]);
 
   return (
     <View style={styles.section}>
@@ -145,8 +154,16 @@ export function PracticeCard({
               )}
               {!isSuccess && (
                 <Text style={styles.correctAnswer}>
-                  Ответ: {exercise.correctAnswers[0] ?? "—"}
+                  Ответ: {spokenAnswer || "—"}
                 </Text>
+              )}
+              {spokenAnswer && (
+                <TouchableOpacity
+                  style={styles.listenAnswerButton}
+                  onPress={() => void speakJapanese(spokenAnswer)}
+                >
+                  <Text style={styles.listenAnswerText}>🔊 Прослушать ответ</Text>
+                </TouchableOpacity>
               )}
             </View>
             <TouchableOpacity style={styles.primaryButton} onPress={onContinue}>
