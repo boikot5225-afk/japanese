@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -22,6 +22,7 @@ import {
   calculateLessonResult,
   type ExerciseAttempt,
 } from "./src/engine/lessonSession";
+import { loadCourseProgress, saveCourseProgress } from "./src/storage/progressStorage";
 
 type Screen = "course" | "lesson" | "result";
 type LessonStage = "theory" | "words" | "examples" | "practice";
@@ -41,6 +42,7 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>("course");
   const [activeBundle, setActiveBundle] = useState<LessonBundle>(lessonBundles[0]);
   const [completedLessonIds, setCompletedLessonIds] = useState<string[]>([]);
+  const [progressHydrated, setProgressHydrated] = useState(false);
   const [stage, setStage] = useState<LessonStage>("theory");
   const [exerciseIndex, setExerciseIndex] = useState(0);
   const [answer, setAnswer] = useState("");
@@ -58,6 +60,48 @@ export default function App() {
   const todayBundle =
     lessonBundles.find((bundle) => !completedLessonIds.includes(bundle.lesson.id)) ??
     lessonBundles[lessonBundles.length - 1];
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const hydrateProgress = async () => {
+      const snapshot = await loadCourseProgress();
+      if (cancelled) {
+        return;
+      }
+
+      if (snapshot) {
+        const knownLessonIds = new Set(
+          lessonBundles.map((bundle) => bundle.lesson.id),
+        );
+        setCompletedLessonIds(
+          snapshot.completedLessonIds.filter((lessonId) => knownLessonIds.has(lessonId)),
+        );
+
+        if (snapshot.lastLessonId) {
+          const lastBundle = findLessonBundle(snapshot.lastLessonId);
+          if (lastBundle) {
+            setActiveBundle(lastBundle);
+          }
+        }
+      }
+
+      setProgressHydrated(true);
+    };
+
+    void hydrateProgress();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!progressHydrated) {
+      return;
+    }
+
+    void saveCourseProgress(completedLessonIds, activeBundle.lesson.id);
+  }, [activeBundle.lesson.id, completedLessonIds, progressHydrated]);
 
   const startLesson = (bundle: LessonBundle) => {
     setActiveBundle(bundle);
@@ -598,7 +642,12 @@ function PracticeCard({
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#F6F3EC" },
   container: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 },
-  resultContainer: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 24, paddingVertical: 40 },
+  resultContainer: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    paddingVertical: 40,
+  },
   eyebrow: { fontSize: 13, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase", color: "#9A3D3D" },
   heroTitle: { marginTop: 8, fontSize: 38, lineHeight: 44, fontWeight: "900", color: "#1C1A18" },
   title: { marginTop: 8, fontSize: 34, lineHeight: 40, fontWeight: "800", color: "#1C1A18" },
