@@ -91,14 +91,38 @@ test("sentence and exercise references resolve to real course items", () => {
       exercise.targetItemIds.forEach((id) => {
         assert.ok(addressableTargetIds.has(id), `${exercise.id} references missing target ${id}`);
       });
-      if (exercise.type === "multiple-choice") {
+      (exercise.confusionItemIds ?? []).forEach((id) => {
+        assert.ok(addressableTargetIds.has(id), `${exercise.id} references missing confusion ${id}`);
+      });
+      if (exercise.type === "multiple-choice" || exercise.type === "listening") {
         const correct = new Set(exercise.correctAnswers);
         (exercise.distractors ?? []).forEach((distractor) => {
           assert.ok(!correct.has(distractor), `${exercise.id} repeats a correct answer as distractor`);
         });
       }
+      if (exercise.type === "listening") {
+        assert.ok(exercise.audioText?.trim(), `${exercise.id} has no listening audio text`);
+      }
     });
   });
+});
+
+test("lesson six pilots mixed practice and confusion training", () => {
+  const lessonSix = lessonBundles.find((bundle) => bundle.lesson.id === "lesson-006");
+  assert.ok(lessonSix);
+  assert.equal(lessonSix.exercises.length, 12);
+  assert.equal(lessonSix.lesson.estimatedMinutes, 12);
+
+  const exerciseTypes = new Set(lessonSix.exercises.map((exercise) => exercise.type));
+  assert.ok(exerciseTypes.has("multiple-choice"));
+  assert.ok(exerciseTypes.has("listening"));
+  assert.ok(exerciseTypes.has("sentence-builder"));
+  assert.ok(exerciseTypes.has("particle-gap"));
+  assert.ok(exerciseTypes.has("text-input"));
+  assert.ok(
+    lessonSix.exercises.filter((exercise) => exercise.variantGroup === "location-particles").length >= 4,
+  );
+  assert.ok(lessonSix.exercises.some((exercise) => exercise.difficulty === 4));
 });
 
 test("new content block has substantial practice rather than demo-only lessons", () => {
