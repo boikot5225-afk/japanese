@@ -17,6 +17,15 @@ const stageLabels: Record<LessonStage, string> = {
   practice: "Практика",
 };
 
+const getGrammarSpeechText = (
+  bundle: LessonBundle,
+  grammarId: string,
+  fallbackTitle: string,
+): string => {
+  const example = bundle.sentences.find((sentence) => sentence.grammarIds.includes(grammarId));
+  return example?.reading ?? example?.japanese ?? fallbackTitle;
+};
+
 interface CommonPracticeProps {
   currentExercise: Exercise;
   exerciseIndex: number;
@@ -78,8 +87,15 @@ export function LessonScreen({
         <View style={styles.stageRow}>
           {lessonStages.map((item, index) => (
             <View key={item} style={styles.stageItem}>
-              <View style={[styles.stageDot, index <= stageIndex ? styles.stageDotActive : styles.stageDotInactive]} />
-              <Text style={[styles.stageLabel, item === stage && styles.stageLabelActive]}>{stageLabels[item]}</Text>
+              <View
+                style={[
+                  styles.stageDot,
+                  index <= stageIndex ? styles.stageDotActive : styles.stageDotInactive,
+                ]}
+              />
+              <Text style={[styles.stageLabel, item === stage && styles.stageLabelActive]}>
+                {stageLabels[item]}
+              </Text>
             </View>
           ))}
         </View>
@@ -92,9 +108,13 @@ export function LessonScreen({
                 <View style={styles.audioHeaderRow}>
                   <Text style={styles.japaneseTitle}>{grammar.title}</Text>
                   <TouchableOpacity
-                    accessibilityLabel={`Прослушать ${grammar.title}`}
+                    accessibilityLabel={`Прослушать пример для ${grammar.title}`}
                     style={styles.soundButton}
-                    onPress={() => void speakJapanese(grammar.formation[0] ?? grammar.title)}
+                    onPress={() =>
+                      void speakJapanese(
+                        getGrammarSpeechText(activeBundle, grammar.id, grammar.title),
+                      )
+                    }
                   >
                     <Text style={styles.soundButtonText}>🔊</Text>
                   </TouchableOpacity>
@@ -103,7 +123,9 @@ export function LessonScreen({
                 <Text style={styles.body}>{grammar.explanationRu}</Text>
                 <Text style={styles.formula}>{grammar.formation.join(" · ")}</Text>
                 {grammar.cautions?.map((caution) => (
-                  <Text key={caution} style={styles.caution}>⚠ {caution}</Text>
+                  <Text key={caution} style={styles.caution}>
+                    ⚠ {caution}
+                  </Text>
                 ))}
               </View>
             ))}
@@ -124,7 +146,7 @@ export function LessonScreen({
                   <TouchableOpacity
                     accessibilityLabel={`Прослушать ${word.writtenForm}`}
                     style={styles.soundButton}
-                    onPress={() => void speakJapanese(word.writtenForm)}
+                    onPress={() => void speakJapanese(word.reading || word.writtenForm)}
                   >
                     <Text style={styles.soundButtonText}>🔊</Text>
                   </TouchableOpacity>
@@ -144,12 +166,16 @@ export function LessonScreen({
                   <TouchableOpacity
                     accessibilityLabel="Прослушать пример"
                     style={styles.soundButton}
-                    onPress={() => void speakJapanese(sentence.japanese)}
+                    onPress={() =>
+                      void speakJapanese(sentence.reading ?? sentence.japanese)
+                    }
                   >
                     <Text style={styles.soundButtonText}>🔊</Text>
                   </TouchableOpacity>
                 </View>
-                {sentence.reading && <Text style={styles.exampleReading}>{sentence.reading}</Text>}
+                {sentence.reading && (
+                  <Text style={styles.exampleReading}>{sentence.reading}</Text>
+                )}
                 <Text style={styles.exampleTranslation}>{sentence.translationRu}</Text>
               </View>
             ))}
@@ -228,7 +254,9 @@ export function ReviewScreen({
         </TouchableOpacity>
         <Text style={styles.eyebrow}>Повторение</Text>
         <Text style={styles.title}>{lessonTitle}</Text>
-        <Text style={styles.description}>Задание выбрано по сроку повторения и истории твоих ошибок.</Text>
+        <Text style={styles.description}>
+          Задание выбрано по сроку повторения и истории твоих ошибок.
+        </Text>
         <PracticeCard
           title="Повторить сегодня"
           finishLabel="Завершить повторение"
