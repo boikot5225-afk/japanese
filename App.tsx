@@ -6,6 +6,10 @@ import type { LessonBundle } from "./src/content/lessonBundle";
 import type { Exercise } from "./src/domain/course";
 import { checkAnswer, type AnswerCheckResult } from "./src/engine/checkAnswer";
 import { createKnownHiraganaProgress } from "./src/engine/kanaEngine";
+import {
+  commitLessonReviewItems,
+  type LessonRunMode,
+} from "./src/engine/lessonReview";
 import { calculateLessonResult, type ExerciseAttempt } from "./src/engine/lessonSession";
 import {
   createAttemptLogEntry,
@@ -41,7 +45,7 @@ const initialBundle: LessonBundle = lessonBundles[0] ?? (() => {
 })();
 
 const formatReviewDate = (value: string | null): string => {
-  if (!value) return "после первого пройденного задания";
+  if (!value) return "после первого пройденного урока";
   const date = new Date(value);
   const today = new Date();
   const tomorrow = new Date(today);
@@ -67,6 +71,7 @@ export default function App() {
   const [profileHydrated, setProfileHydrated] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [stage, setStage] = useState<LessonStage>("theory");
+  const [lessonRunMode, setLessonRunMode] = useState<LessonRunMode>("learning");
   const [exerciseIndex, setExerciseIndex] = useState(0);
   const [answer, setAnswer] = useState("");
   const [selectedTokens, setSelectedTokens] = useState<string[]>([]);
@@ -110,12 +115,16 @@ export default function App() {
         const knownExerciseIds = new Set(
           lessonBundles.flatMap((bundle) => bundle.exercises.map((exercise) => exercise.id)),
         );
-        setCompletedLessonIds(
-          snapshot.completedLessonIds.filter((lessonId) => knownLessonIds.has(lessonId)),
+        const validCompletedLessonIds = snapshot.completedLessonIds.filter((lessonId) =>
+          knownLessonIds.has(lessonId),
         );
+        const completedLessonIdSet = new Set(validCompletedLessonIds);
+        setCompletedLessonIds(validCompletedLessonIds);
         setReviewItems(
           snapshot.reviewItems.filter(
-            (item) => knownLessonIds.has(item.lessonId) && knownExerciseIds.has(item.exerciseId),
+            (item) =>
+              completedLessonIdSet.has(item.lessonId) &&
+              knownExerciseIds.has(item.exerciseId),
           ),
         );
         setAttemptHistory(
@@ -176,13 +185,21 @@ export default function App() {
     setResult(null);
   };
 
-  const startLesson = (bundle: LessonBundle) => {
+  const startLesson = (bundle: LessonBundle, mode: LessonRunMode) => {
     setActiveBundle(bundle);
+    setLessonRunMode(mode);
     setScreen("lesson");
     setStage("theory");
     setExerciseIndex(0);
     resetExerciseInput();
     setAttempts([]);
+  };
+
+  const openCourseLesson = (bundle: LessonBundle) => {
+    const mode: LessonRunMode = completedLessonIds.includes(bundle.lesson.id)
+      ? "practice"
+      : "learning";
+    startLesson(bundle, mode);
   };
 
   const startReview = () => {
@@ -203,13 +220,15 @@ export default function App() {
     source: AttemptSource,
   ) => {
     const now = new Date();
-    setReviewItems((previous) => {
-      const existing = previous.find((item) => item.exerciseId === exercise.id);
-      return upsertReviewItem(
-        previous,
-        scheduleExerciseReview(existing, exercise, bundle.lesson.id, checkResult.status, now),
-      );
-    });
+    if (source === "review") {
+      setReviewItems((previous) => {
+        const existing = previous.find((item) => item.exerciseId === exercise.id);
+        return upsertReviewItem(
+          previous,
+          scheduleExerciseReview(existing, exercise, bundle.lesson.id, checkResult.status, now),
+        );
+      });
+    }
     setAttemptHistory((previous) => [
       createAttemptLogEntry(exercise, bundle.lesson.id, checkResult.status, source, now),
       ...previous,
@@ -221,12 +240,12 @@ export default function App() {
     const bundle = screen === "review" ? activeReviewBundle : activeBundle;
     if (!bundle) return;
     setResult(checkResult);
-    recordExerciseAttempt(
-      currentExercise,
-      bundle,
-      checkResult,
-      screen === "review" ? "review" : "lesson",
-    );
+    const source: AttemptSource = screen === "review"
+      ? "review"
+      : lessonRunMode === "practice"
+        ? "practice"
+        : "lesson";
+    recordExerciseAttempt(currentExercise, bundle, checkResult, source);
     const attempt = { exerciseId: currentExercise.id, status: checkResult.status };
     if (screen === "review") {
       setReviewAttempts((previous) => [...previous, attempt]);
@@ -263,7 +282,20 @@ export default function App() {
       resetExerciseInput();
       return;
     }
-    if (lessonResult.passed) {
+
+    setReviewItems((previous) =>
+      commitLessonReviewItems({
+        items: previous,
+        exercises: activeBundle.exercises,
+        attempts,
+        lessonId: activeBundle.lesson.id,
+        mode: lessonRunMode,
+        passed: lessonResult.passed,
+        now: new Date(),
+      }),
+    );
+
+    if (lessonRunMode === "learning" && lessonResult.passed) {
       setCompletedLessonIds((previous) =>
         previous.includes(activeBundle.lesson.id)
           ? previous
@@ -359,12 +391,11 @@ export default function App() {
         todayBundle={todayBundle}
         dueReviewCount={dueReviewItems.length}
         weakTargetCount={weakTargetCount}
-        attemptCount={attemptHistory.length}
         nextReviewLabel={nextReviewLabel}
-        onStartLesson={startLesson}
+        onStartLesson={openCourseLesson}
         onStartLessonById={(lessonId) => {
           const bundle = findLessonBundle(lessonId);
-          if (bundle) startLesson(bundle);
+          if (bundle) openCourseLesson(bundle);
         }}
         onStartReview={startReview}
         onOpenKana={() => setScreen("kana")}
@@ -373,13 +404,16 @@ export default function App() {
   }
 
   if (screen === "result") {
+    const retryMode: LessonRunMode =
+      lessonRunMode === "learning" && !lessonResult.passed ? "learning" : "practice";
     return (
       <LessonResultScreen
         result={lessonResult}
         activeBundle={activeBundle}
         nextBundle={nextBundle}
-        onNextLesson={() => nextBundle && startLesson(nextBundle)}
-        onRetry={() => startLesson(activeBundle)}
+        mode={lessonRunMode}
+        onNextLesson={() => nextBundle && startLesson(nextBundle, "learning")}
+        onRetry={() => startLesson(activeBundle, retryMode)}
         onCourse={() => setScreen("course")}
       />
     );
@@ -440,6 +474,7 @@ export default function App() {
       {...commonPracticeProps}
       activeBundle={activeBundle}
       stage={stage}
+      practiceMode={lessonRunMode === "practice"}
       exerciseIndex={exerciseIndex}
       exerciseCount={activeBundle.exercises.length}
       onCourse={() => setScreen("course")}

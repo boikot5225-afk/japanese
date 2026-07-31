@@ -49,7 +49,7 @@ const isAttemptLogEntry = (value: unknown): value is AttemptLogEntry => {
     typeof item.lessonId === "string" &&
     isStringArray(item.targetItemIds) &&
     typeof item.status === "string" &&
-    (item.source === "lesson" || item.source === "review") &&
+    (item.source === "lesson" || item.source === "review" || item.source === "practice") &&
     typeof item.answeredAt === "string"
   );
 };

@@ -10,7 +10,6 @@ interface CourseScreenProps {
   todayBundle: LessonBundle | undefined;
   dueReviewCount: number;
   weakTargetCount: number;
-  attemptCount: number;
   nextReviewLabel: string;
   onStartLesson: (bundle: LessonBundle) => void;
   onStartLessonById: (lessonId: string) => void;
@@ -37,6 +36,10 @@ export function CourseScreen({
   onStartReview,
   onOpenKana,
 }: CourseScreenProps) {
+  const todayCompleted = todayBundle
+    ? completedLessonIds.includes(todayBundle.lesson.id)
+    : false;
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
@@ -52,14 +55,20 @@ export function CourseScreen({
           <View style={styles.todayCard}>
             <View style={styles.todayHeader}>
               <Text style={styles.todaySectionTitle}>
-                {completedLessonIds.length === 0 ? "Начать сегодня" : "Продолжить"}
+                {todayCompleted
+                  ? "Повторить пройденное"
+                  : completedLessonIds.length === 0
+                    ? "Начать сегодня"
+                    : "Продолжить"}
               </Text>
               <Text style={styles.timeBadge}>{todayBundle.lesson.estimatedMinutes} мин</Text>
             </View>
             <Text style={styles.todayTitle}>{todayBundle.lesson.title}</Text>
             <Text style={styles.todayBody}>{todayBundle.lesson.description}</Text>
             <TouchableOpacity style={styles.primaryButton} onPress={() => onStartLesson(todayBundle)}>
-              <Text style={styles.primaryButtonText}>Открыть урок</Text>
+              <Text style={styles.primaryButtonText}>
+                {todayCompleted ? "Повторить урок" : "Открыть урок"}
+              </Text>
             </TouchableOpacity>
           </View>
         )}
@@ -134,7 +143,7 @@ export function CourseScreen({
                     <Text style={styles.lessonTitle}>{lesson.title}</Text>
                     <Text style={styles.lessonMeta}>
                       {bundle
-                        ? `${bundle.grammar.length} ${russianForm(bundle.grammar.length, "тема", "темы", "тем")} · ${bundle.vocabulary.length} ${russianForm(bundle.vocabulary.length, "слово", "слова", "слов")} · ${bundle.exercises.length} ${russianForm(bundle.exercises.length, "упражнение", "упражнения", "упражнений")}`
+                        ? `${bundle.grammar.length} ${russianForm(bundle.grammar.length, "тема", "темы", "тем")} · ${bundle.vocabulary.length} ${russianForm(bundle.vocabulary.length, "слово", "слова", "слов")} · ${bundle.exercises.length} ${russianForm(bundle.exercises.length, "упражнение", "упражнения", "упражнений")}${completed ? " · свободное повторение" : ""}`
                         : "Материал готовится"}
                     </Text>
                   </View>
