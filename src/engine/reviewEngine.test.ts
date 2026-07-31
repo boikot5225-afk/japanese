@@ -4,6 +4,7 @@ import test from "node:test";
 import type { Exercise } from "../domain/course.ts";
 import {
   getDueReviewItems,
+  getWeakTargetIds,
   scheduleExerciseReview,
 } from "./reviewEngine.ts";
 
@@ -63,4 +64,34 @@ test("при одинаковом сроке более слабое задан�
 
   const queue = getDueReviewItems([strong, weak], now);
   assert.equal(queue[0]?.exerciseId, "weak");
+});
+
+test("ошибочный элемент перестаёт считаться слабым после трёх уверенных ответов", () => {
+  const failed = scheduleExerciseReview(undefined, exercise, "lesson-test", "incorrect", now);
+  assert.deepEqual(getWeakTargetIds([failed]), ["grammar-test"]);
+
+  const firstRecovery = scheduleExerciseReview(
+    failed,
+    exercise,
+    "lesson-test",
+    "correct",
+    new Date("2026-07-31T18:00:00.000Z"),
+  );
+  const secondRecovery = scheduleExerciseReview(
+    firstRecovery,
+    exercise,
+    "lesson-test",
+    "correct",
+    new Date("2026-08-03T18:00:00.000Z"),
+  );
+  assert.deepEqual(getWeakTargetIds([secondRecovery]), ["grammar-test"]);
+
+  const thirdRecovery = scheduleExerciseReview(
+    secondRecovery,
+    exercise,
+    "lesson-test",
+    "correct",
+    new Date("2026-08-10T18:00:00.000Z"),
+  );
+  assert.deepEqual(getWeakTargetIds([thirdRecovery]), []);
 });
