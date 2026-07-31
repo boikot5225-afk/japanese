@@ -107,7 +107,7 @@ test("sentence and exercise references resolve to real course items", () => {
   });
 });
 
-test("lesson six pilots mixed practice and confusion training", () => {
+test("lesson six remains the mixed-practice reference lesson", () => {
   const lessonSix = lessonBundles.find((bundle) => bundle.lesson.id === "lesson-006");
   assert.ok(lessonSix);
   assert.equal(lessonSix.exercises.length, 12);
@@ -125,16 +125,66 @@ test("lesson six pilots mixed practice and confusion training", () => {
   assert.ok(lessonSix.exercises.some((exercise) => exercise.difficulty === 4));
 });
 
-test("new content block has substantial practice rather than demo-only lessons", () => {
-  const expandedLessons = lessonBundles.filter((bundle) => bundle.lesson.order >= 7);
-  assert.equal(expandedLessons.length, 4);
-  expandedLessons.forEach((bundle) => {
+test("every lesson now has substantial mixed practice and remediation partners", () => {
+  lessonBundles.forEach((bundle) => {
     assert.ok(
-      bundle.exercises.length >= 8,
+      bundle.exercises.length >= 12,
       `${bundle.lesson.id} has only ${bundle.exercises.length} exercises`,
     );
-    assert.ok(bundle.sentences.length >= 4, `${bundle.lesson.id} needs more example sentences`);
+
+    const exerciseTypes = new Set(bundle.exercises.map((exercise) => exercise.type));
+    assert.ok(exerciseTypes.has("multiple-choice"), `${bundle.lesson.id} lacks recognition practice`);
+    assert.ok(exerciseTypes.has("listening"), `${bundle.lesson.id} lacks listening practice`);
+    assert.ok(exerciseTypes.has("text-input"), `${bundle.lesson.id} lacks active recall`);
+
+    assert.ok(
+      bundle.exercises.every((exercise) => Boolean(exercise.variantGroup)),
+      `${bundle.lesson.id} has exercises without a remediation group`,
+    );
+    assert.ok(
+      bundle.exercises.every((exercise) => Boolean(exercise.difficulty)),
+      `${bundle.lesson.id} has exercises without difficulty`,
+    );
+
+    const groupCounts = new Map<string, number>();
+    bundle.exercises.forEach((exercise) => {
+      const group = exercise.variantGroup as string;
+      groupCounts.set(group, (groupCounts.get(group) ?? 0) + 1);
+    });
+    assert.ok(
+      [...groupCounts.values()].some((count) => count >= 2),
+      `${bundle.lesson.id} has no linked exercise pair for error remediation`,
+    );
+
+    if (bundle.lesson.id !== "lesson-006") {
+      assert.ok(
+        bundle.exercises.some((exercise) => exercise.id.includes("-auto-")),
+        `${bundle.lesson.id} did not receive expanded practice`,
+      );
+    }
   });
+});
+
+test("generated listening uses full sentences and generated recall accepts readings", () => {
+  const generatedExercises = lessonBundles.flatMap((bundle) =>
+    bundle.exercises.filter((exercise) => exercise.id.includes("-auto-")),
+  );
+  assert.ok(generatedExercises.length > 0);
+
+  generatedExercises
+    .filter((exercise) => exercise.type === "listening")
+    .forEach((exercise) => {
+      assert.ok((exercise.audioText?.trim().length ?? 0) >= 4, `${exercise.id} audio is too short`);
+    });
+
+  generatedExercises
+    .filter((exercise) => exercise.type === "text-input")
+    .forEach((exercise) => {
+      assert.ok(
+        (exercise.acceptableAnswers?.length ?? 0) > 0,
+        `${exercise.id} does not accept a kana reading`,
+      );
+    });
 });
 
 test("new time and tense lessons keep noun and verb paradigms separate", () => {

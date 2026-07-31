@@ -5,11 +5,9 @@ const TARGET_EXERCISE_COUNT = 12;
 
 type GeneratedKind = "listening" | "text-input" | "meaning-choice" | "japanese-choice";
 
-const generatedKinds: GeneratedKind[] = [
-  "listening",
-  "text-input",
-  "meaning-choice",
-  "japanese-choice",
+const generatedKindRounds: readonly GeneratedKind[][] = [
+  ["listening", "text-input"],
+  ["meaning-choice", "japanese-choice"],
 ];
 
 const unique = (values: readonly string[]): string[] =>
@@ -188,23 +186,21 @@ const buildGeneratedCandidates = (
   );
 
   const candidates: Exercise[] = [];
-  for (let round = 0; round < bundle.sentences.length; round += 1) {
-    generatedKinds.forEach((kind, kindIndex) => {
-      const sentence = bundle.sentences[
-        (round + kindIndex) % bundle.sentences.length
-      ];
-      if (!sentence) return;
-      candidates.push(
-        createGeneratedExercise(
-          bundle,
-          sentence,
-          kind,
-          translationPool,
-          japanesePool,
-        ),
-      );
+  generatedKindRounds.forEach((kindRound) => {
+    bundle.sentences.forEach((sentence) => {
+      kindRound.forEach((kind) => {
+        candidates.push(
+          createGeneratedExercise(
+            bundle,
+            sentence,
+            kind,
+            translationPool,
+            japanesePool,
+          ),
+        );
+      });
     });
-  }
+  });
   return candidates;
 };
 
