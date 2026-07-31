@@ -46,6 +46,7 @@ interface CommonPracticeProps {
 interface LessonScreenProps extends CommonPracticeProps {
   activeBundle: LessonBundle;
   stage: LessonStage;
+  practiceMode: boolean;
   onCourse: () => void;
   onPreviousStage: () => void;
   onNextStage: () => void;
@@ -54,6 +55,7 @@ interface LessonScreenProps extends CommonPracticeProps {
 export function LessonScreen({
   activeBundle,
   stage,
+  practiceMode,
   currentExercise,
   exerciseIndex,
   exerciseCount,
@@ -83,6 +85,11 @@ export function LessonScreen({
         <Text style={styles.eyebrow}>Урок {activeBundle.lesson.order}</Text>
         <Text style={styles.title}>{activeBundle.lesson.title}</Text>
         <Text style={styles.description}>{activeBundle.lesson.description}</Text>
+        {practiceMode && (
+          <Text style={styles.caution}>
+            Свободное повторение: ответы здесь не меняют интервальное расписание.
+          </Text>
+        )}
 
         <View style={styles.stageRow}>
           {lessonStages.map((item, index) => (
