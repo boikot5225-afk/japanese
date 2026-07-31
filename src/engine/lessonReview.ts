@@ -1,7 +1,9 @@
 import type { Exercise } from "../domain/course";
 import type { AnswerStatus } from "./checkAnswer";
 import {
-  scheduleExerciseReview,
+  inferExerciseSkill,
+  reviewItemKey,
+  scheduleItemReview,
   upsertReviewItem,
   type ReviewItem,
 } from "./reviewEngine";
@@ -39,10 +41,23 @@ export function commitLessonReviewItems({
   return attempts.reduce((currentItems, attempt) => {
     const exercise = exerciseById.get(attempt.exerciseId);
     if (!exercise) return currentItems;
-    const existing = currentItems.find((item) => item.exerciseId === exercise.id);
-    return upsertReviewItem(
-      currentItems,
-      scheduleExerciseReview(existing, exercise, lessonId, attempt.status, now),
-    );
+    const skill = inferExerciseSkill(exercise);
+
+    return [...new Set(exercise.targetItemIds)].reduce((targetItems, itemId) => {
+      const key = reviewItemKey({ itemId, skill });
+      const existing = targetItems.find((item) => reviewItemKey(item) === key);
+      return upsertReviewItem(
+        targetItems,
+        scheduleItemReview(
+          existing,
+          itemId,
+          skill,
+          exercise,
+          lessonId,
+          attempt.status,
+          now,
+        ),
+      );
+    }, currentItems);
   }, items);
 }
