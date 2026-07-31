@@ -5,6 +5,7 @@ import { findLessonBundle, lessonBundles } from "./src/content/courseCatalog";
 import type { LessonBundle } from "./src/content/lessonBundle";
 import type { Exercise } from "./src/domain/course";
 import { checkAnswer, type AnswerCheckResult } from "./src/engine/checkAnswer";
+import { createKnownHiraganaProgress } from "./src/engine/kanaEngine";
 import { calculateLessonResult, type ExerciseAttempt } from "./src/engine/lessonSession";
 import {
   createAttemptLogEntry,
@@ -19,12 +20,21 @@ import {
   type ReviewItem,
 } from "./src/engine/reviewEngine";
 import { CourseScreen } from "./src/screens/CourseScreen";
+import { KanaScreen } from "./src/screens/KanaScreen";
+import { OnboardingScreen } from "./src/screens/OnboardingScreen";
 import { LessonResultScreen, ReviewResultScreen } from "./src/screens/ResultScreens";
 import { LessonScreen, ReviewScreen, type LessonStage } from "./src/screens/TrainingScreens";
+import {
+  loadKanaProgress,
+  loadLearnerProfile,
+  saveKanaProgress,
+  saveLearnerProfile,
+  type LearnerStartLevel,
+} from "./src/storage/learnerStorage";
 import { loadCourseProgress, saveCourseProgress } from "./src/storage/progressStorage";
 import { styles } from "./src/theme/appStyles";
 
-type Screen = "course" | "lesson" | "result" | "review" | "review-result";
+type Screen = "course" | "kana" | "lesson" | "result" | "review" | "review-result";
 const lessonStages: LessonStage[] = ["theory", "words", "examples", "practice"];
 const initialBundle: LessonBundle = lessonBundles[0] ?? (() => {
   throw new Error("В курсе нет ни одного урока.");
@@ -54,6 +64,8 @@ export default function App() {
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
   const [attemptHistory, setAttemptHistory] = useState<AttemptLogEntry[]>([]);
   const [progressHydrated, setProgressHydrated] = useState(false);
+  const [profileHydrated, setProfileHydrated] = useState(false);
+  const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [stage, setStage] = useState<LessonStage>("theory");
   const [exerciseIndex, setExerciseIndex] = useState(0);
   const [answer, setAnswer] = useState("");
@@ -119,7 +131,23 @@ export default function App() {
       setProgressHydrated(true);
     };
     void hydrateProgress();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const hydrateProfile = async () => {
+      const profile = await loadLearnerProfile();
+      if (cancelled) return;
+      setOnboardingComplete(profile?.onboardingComplete === true);
+      setProfileHydrated(true);
+    };
+    void hydrateProfile();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -131,6 +159,16 @@ export default function App() {
       attemptHistory,
     });
   }, [activeBundle.lesson.id, attemptHistory, completedLessonIds, progressHydrated, reviewItems]);
+
+  const completeOnboarding = async (level: LearnerStartLevel) => {
+    await saveLearnerProfile(level);
+    if (level !== "zero") {
+      const existing = await loadKanaProgress();
+      await saveKanaProgress({ ...existing, ...createKnownHiraganaProgress() });
+    }
+    setOnboardingComplete(true);
+    setScreen(level === "zero" ? "kana" : "course");
+  };
 
   const resetExerciseInput = () => {
     setAnswer("");
@@ -296,6 +334,24 @@ export default function App() {
       }
     : null;
 
+  if (!progressHydrated || !profileHydrated) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.resultContainer}>
+          <Text style={styles.resultSummary}>Загружаю курс и прогресс…</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!onboardingComplete) {
+    return <OnboardingScreen onComplete={(level) => void completeOnboarding(level)} />;
+  }
+
+  if (screen === "kana") {
+    return <KanaScreen onCourse={() => setScreen("course")} />;
+  }
+
   if (screen === "course") {
     return (
       <CourseScreen
@@ -311,6 +367,7 @@ export default function App() {
           if (bundle) startLesson(bundle);
         }}
         onStartReview={startReview}
+        onOpenKana={() => setScreen("kana")}
       />
     );
   }

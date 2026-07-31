@@ -1,6 +1,6 @@
 {
   "name": "japanese-tutor",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "main": "expo/AppEntry.js",
   "scripts": {
@@ -8,6 +8,8 @@
     "android": "expo run:android",
     "web": "expo start --web",
     "test:review": "node --experimental-strip-types --test src/engine/reviewEngine.test.ts",
+    "test:kana": "node --experimental-strip-types --test src/engine/kanaEngine.test.ts",
+    "test": "npm run test:review && npm run test:kana",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
