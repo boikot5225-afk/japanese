@@ -1,4 +1,5 @@
 import type { Exercise, Skill } from "../domain/course";
+import { getExerciseContentKey } from "./exerciseIdentity";
 import type { AnswerStatus } from "./checkAnswer";
 
 export type AttemptSource = "lesson" | "review" | "practice";
@@ -37,6 +38,7 @@ export interface LegacyReviewItemV2 {
 export interface AttemptLogEntry {
   id: string;
   exerciseId: string;
+  contentKey?: string;
   lessonId: string;
   targetItemIds: string[];
   status: AnswerStatus;
@@ -44,9 +46,23 @@ export interface AttemptLogEntry {
   answeredAt: string;
 }
 
+export interface ReviewSessionQuestion {
+  id: string;
+  lessonId: string;
+  exercise: Exercise;
+  items: ReviewItem[];
+  remediation?: boolean;
+}
+
+export interface ReviewSessionOptions {
+  excludedContentKeys?: ReadonlySet<string>;
+  recentAttemptLimit?: number;
+}
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 const successfulStatuses: AnswerStatus[] = ["correct", "acceptable"];
 const WEAKNESS_THRESHOLD = 5;
+const DEFAULT_RECENT_ATTEMPT_LIMIT = 40;
 
 export const isSuccessfulStatus = (status: AnswerStatus): boolean =>
   successfulStatuses.includes(status);
@@ -72,6 +88,10 @@ export const inferExerciseSkill = (exercise: Exercise): Skill => {
 
 export const reviewItemKey = (item: Pick<ReviewItem, "itemId" | "skill">): string =>
   `${item.itemId}:${item.skill}`;
+
+export const reviewQuestionCoverageKey = (
+  question: Pick<ReviewSessionQuestion, "items">,
+): string => question.items.map(reviewItemKey).sort().join("|");
 
 const addDays = (date: Date, days: number): string =>
   new Date(date.getTime() + days * DAY_MS).toISOString();
@@ -188,22 +208,134 @@ export function getWeakTargetIds(items: ReviewItem[]): string[] {
   return [...weakIds];
 }
 
+const stableHash = (value: string): number => {
+  let hash = 2166136261;
+  for (const character of value) {
+    hash ^= character.codePointAt(0) ?? 0;
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+};
+
+const exactSkillCandidates = (
+  item: ReviewItem,
+  exercises: readonly Exercise[],
+): Exercise[] => exercises.filter(
+  (exercise) =>
+    exercise.targetItemIds.includes(item.itemId) &&
+    inferExerciseSkill(exercise) === item.skill,
+);
+
+const recentContentRanks = (
+  attempts: readonly AttemptLogEntry[],
+  exerciseById: ReadonlyMap<string, Exercise>,
+  limit: number,
+): Map<string, number> => {
+  const ranks = new Map<string, number>();
+  attempts
+    .filter((attempt) => attempt.source === "review")
+    .slice(0, limit)
+    .forEach((attempt, index) => {
+      const contentKey =
+        attempt.contentKey ??
+        (exerciseById.get(attempt.exerciseId)
+          ? getExerciseContentKey(exerciseById.get(attempt.exerciseId) as Exercise)
+          : `exercise:${attempt.exerciseId}`);
+      if (!ranks.has(contentKey)) ranks.set(contentKey, index);
+    });
+  return ranks;
+};
+
 export function selectExerciseForReview(
   item: ReviewItem,
-  exercises: Exercise[],
+  exercises: readonly Exercise[],
+  excludedContentKeys: ReadonlySet<string> = new Set<string>(),
+  recentRanks: ReadonlyMap<string, number> = new Map<string, number>(),
 ): Exercise | undefined {
-  const matchingItem = exercises.filter((exercise) =>
-    exercise.targetItemIds.includes(item.itemId),
+  const candidates = exactSkillCandidates(item, exercises).filter(
+    (exercise) => !excludedContentKeys.has(getExerciseContentKey(exercise)),
   );
-  const matchingSkill = matchingItem.filter(
-    (exercise) => inferExerciseSkill(exercise) === item.skill,
+  if (candidates.length === 0) return undefined;
+
+  const attempts = item.correctCount + item.incorrectCount;
+  const rotationOffset = stableHash(reviewItemKey(item)) % candidates.length;
+  const ordered = candidates
+    .map((exercise, index) => {
+      const contentKey = getExerciseContentKey(exercise);
+      const recentRank = recentRanks.get(contentKey);
+      const recentPenalty = recentRank === undefined
+        ? 0
+        : 1000 - Math.min(recentRank, 999);
+      const sameExercisePenalty = exercise.id === item.exerciseId ? 100 : 0;
+      const rotationPenalty =
+        (index - ((attempts + rotationOffset) % candidates.length) + candidates.length) %
+        candidates.length;
+      return {
+        exercise,
+        score: recentPenalty + sameExercisePenalty + rotationPenalty,
+      };
+    })
+    .sort((left, right) => left.score - right.score || left.exercise.id.localeCompare(right.exercise.id));
+
+  return ordered[0]?.exercise;
+}
+
+export function buildReviewSession(
+  dueItems: readonly ReviewItem[],
+  exercisesByLesson: ReadonlyMap<string, readonly Exercise[]>,
+  attemptHistory: readonly AttemptLogEntry[],
+  limit = 20,
+  options: ReviewSessionOptions = {},
+): ReviewSessionQuestion[] {
+  if (limit <= 0) return [];
+
+  const allExercises = [...exercisesByLesson.values()].flatMap((items) => [...items]);
+  const exerciseById = new Map(allExercises.map((exercise) => [exercise.id, exercise]));
+  const recentRanks = recentContentRanks(
+    attemptHistory,
+    exerciseById,
+    options.recentAttemptLimit ?? DEFAULT_RECENT_ATTEMPT_LIMIT,
   );
-  const candidates = matchingSkill.length > 0 ? matchingSkill : matchingItem;
-  if (candidates.length === 0) {
-    return exercises.find((exercise) => exercise.id === item.exerciseId);
+  const usedContentKeys = new Set(options.excludedContentKeys ?? []);
+  const assignedItemKeys = new Set<string>();
+  const questions: ReviewSessionQuestion[] = [];
+
+  for (const item of dueItems) {
+    const itemKey = reviewItemKey(item);
+    if (assignedItemKeys.has(itemKey)) continue;
+
+    const lessonExercises = exercisesByLesson.get(item.lessonId) ?? [];
+    const exercise = selectExerciseForReview(
+      item,
+      lessonExercises,
+      usedContentKeys,
+      recentRanks,
+    );
+    if (!exercise) continue;
+
+    const skill = inferExerciseSkill(exercise);
+    const coveredItems = dueItems.filter(
+      (candidate) =>
+        !assignedItemKeys.has(reviewItemKey(candidate)) &&
+        candidate.lessonId === item.lessonId &&
+        candidate.skill === skill &&
+        exercise.targetItemIds.includes(candidate.itemId),
+    );
+    if (coveredItems.length === 0) continue;
+
+    const contentKey = getExerciseContentKey(exercise);
+    coveredItems.forEach((covered) => assignedItemKeys.add(reviewItemKey(covered)));
+    usedContentKeys.add(contentKey);
+    questions.push({
+      id: `${contentKey}:${reviewQuestionCoverageKey({ items: coveredItems })}`,
+      lessonId: item.lessonId,
+      exercise,
+      items: coveredItems,
+    });
+    if (questions.length >= limit) break;
   }
-  const completedAttempts = item.correctCount + item.incorrectCount;
-  return candidates[completedAttempts % candidates.length];
+
+  return questions;
 }
 
 export function migrateLegacyReviewItems(
@@ -244,6 +376,7 @@ export function createAttemptLogEntry(
   return {
     id: `${now.getTime()}-${exercise.id}-${source}`,
     exerciseId: exercise.id,
+    contentKey: getExerciseContentKey(exercise),
     lessonId,
     targetItemIds: exercise.targetItemIds,
     status,
