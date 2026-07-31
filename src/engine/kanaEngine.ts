@@ -19,8 +19,10 @@ export interface KanaQuestion {
   skill: KanaSkill;
   prompt: string;
   correctAnswer: string;
+  acceptableAnswers: string[];
   options: string[];
   speakText?: string;
+  noteRu?: string;
 }
 
 export interface KanaMasterySummary {
@@ -87,23 +89,27 @@ export function createKanaQuestion(
     uniqueOptions(pool, targetIndex, (item) => item.romaji),
     targetIndex + 1,
   );
+  const shared = {
+    id: `${skill}-${symbol.id}`,
+    symbolId: symbol.id,
+    skill,
+    acceptableAnswers: symbol.acceptableRomaji ?? [],
+    noteRu: symbol.noteRu,
+  };
 
   if (skill === "recognition") {
     return {
-      id: `${skill}-${symbol.id}`,
-      symbolId: symbol.id,
-      skill,
+      ...shared,
       prompt: `Найди знак для «${symbol.romaji}»`,
       correctAnswer: symbol.kana,
+      acceptableAnswers: [],
       options: kanaOptions,
     };
   }
 
   if (skill === "reading") {
     return {
-      id: `${skill}-${symbol.id}`,
-      symbolId: symbol.id,
-      skill,
+      ...shared,
       prompt: `Как читается ${symbol.kana}?`,
       correctAnswer: symbol.romaji,
       options: romajiOptions,
@@ -112,20 +118,17 @@ export function createKanaQuestion(
 
   if (skill === "listening") {
     return {
-      id: `${skill}-${symbol.id}`,
-      symbolId: symbol.id,
-      skill,
-      prompt: "Какой знак прозвучал?",
+      ...shared,
+      prompt: "Какой знак или сочетание прозвучало?",
       correctAnswer: symbol.kana,
+      acceptableAnswers: [],
       options: kanaOptions,
       speakText: symbol.kana,
     };
   }
 
   return {
-    id: `${skill}-${symbol.id}`,
-    symbolId: symbol.id,
-    skill,
+    ...shared,
     prompt: `Введи ромадзи для ${symbol.kana}`,
     correctAnswer: symbol.romaji,
     options: [],
@@ -136,8 +139,9 @@ export function createKanaSession(
   skill: KanaSkill,
   progress: KanaProgressMap,
   limit = 10,
+  pool: readonly KanaSymbol[] = basicHiragana,
 ): KanaQuestion[] {
-  return [...basicHiragana]
+  return [...pool]
     .sort((left, right) => {
       const leftProgress = progress[left.id];
       const rightProgress = progress[right.id];
@@ -148,25 +152,16 @@ export function createKanaSession(
       return totalSkillScore(leftProgress) - totalSkillScore(rightProgress);
     })
     .slice(0, Math.max(1, limit))
-    .map((symbol) => createKanaQuestion(symbol, skill));
+    .map((symbol) => createKanaQuestion(symbol, skill, pool));
 }
-
-const romajiAliases: Record<string, string[]> = {
-  shi: ["shi", "si"],
-  chi: ["chi", "ti"],
-  tsu: ["tsu", "tu"],
-  fu: ["fu", "hu"],
-};
 
 const normalize = (value: string): string =>
   value.trim().toLowerCase().normalize("NFKC").replace(/\s+/g, "");
 
 export function isKanaAnswerCorrect(answer: string, question: KanaQuestion): boolean {
   const normalizedAnswer = normalize(answer);
-  const normalizedCorrect = normalize(question.correctAnswer);
-  if (normalizedAnswer === normalizedCorrect) return true;
-  const aliases = romajiAliases[normalizedCorrect];
-  return aliases ? aliases.includes(normalizedAnswer) : false;
+  const expected = [question.correctAnswer, ...question.acceptableAnswers].map(normalize);
+  return expected.includes(normalizedAnswer);
 }
 
 export function updateKanaProgress(
@@ -207,12 +202,15 @@ export function createKnownHiraganaProgress(): KanaProgressMap {
   );
 }
 
-export function getKanaMasterySummary(progress: KanaProgressMap): KanaMasterySummary {
+export function getKanaMasterySummary(
+  progress: KanaProgressMap,
+  pool: readonly KanaSymbol[] = basicHiragana,
+): KanaMasterySummary {
   let started = 0;
   let mastered = 0;
   let totalScore = 0;
 
-  basicHiragana.forEach((symbol) => {
+  pool.forEach((symbol) => {
     const item = progress[symbol.id];
     if (!item) return;
     const scores = [item.recognition, item.reading, item.listening, item.typing];
@@ -221,19 +219,25 @@ export function getKanaMasterySummary(progress: KanaProgressMap): KanaMasterySum
     if (scores.every((score) => score >= MASTERY_THRESHOLD)) mastered += 1;
   });
 
-  const maximumScore = basicHiragana.length * 4 * MAX_SKILL_SCORE;
+  const maximumScore = pool.length * 4 * MAX_SKILL_SCORE;
   return {
-    total: basicHiragana.length,
+    total: pool.length,
     started,
     mastered,
     averagePercent: maximumScore === 0 ? 0 : Math.round((totalScore / maximumScore) * 100),
   };
 }
 
-export function getSkillAverage(progress: KanaProgressMap, skill: KanaSkill): number {
-  const total = basicHiragana.reduce(
+export function getSkillAverage(
+  progress: KanaProgressMap,
+  skill: KanaSkill,
+  pool: readonly KanaSymbol[] = basicHiragana,
+): number {
+  const total = pool.reduce(
     (sum, symbol) => sum + skillScore(progress[symbol.id], skill),
     0,
   );
-  return Math.round((total / (basicHiragana.length * MAX_SKILL_SCORE)) * 100);
+  return pool.length === 0
+    ? 0
+    : Math.round((total / (pool.length * MAX_SKILL_SCORE)) * 100);
 }
