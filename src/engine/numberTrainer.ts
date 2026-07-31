@@ -189,7 +189,6 @@ const underTenThousandToKana = (value: number): string => {
     else if (thousands === 8) parts.push("はっせん");
     else parts.push(`${digitReadings[thousands]}せん`);
   }
-
   if (hundreds > 0) {
     if (hundreds === 1) parts.push("ひゃく");
     else if (hundreds === 3) parts.push("さんびゃく");
@@ -197,10 +196,7 @@ const underTenThousandToKana = (value: number): string => {
     else if (hundreds === 8) parts.push("はっぴゃく");
     else parts.push(`${digitReadings[hundreds]}ひゃく`);
   }
-
-  if (tens > 0) {
-    parts.push(tens === 1 ? "じゅう" : `${digitReadings[tens]}じゅう`);
-  }
+  if (tens > 0) parts.push(tens === 1 ? "じゅう" : `${digitReadings[tens]}じゅう`);
   if (ones > 0) parts.push(digitReadings[ones]);
   return parts.join("");
 };
@@ -216,7 +212,8 @@ export function numberToKana(value: number): string {
   return `${manPart}${underTenThousandToKana(remainder)}`;
 }
 
-const tensPrefix = (value: number): string => {
+const decadePrefix = (value: number): string => {
+  if (value < 10) return "";
   const last = value % 10;
   return last === 0 ? "" : numberToKana(value - last);
 };
@@ -227,10 +224,8 @@ const counterEnding = (
   tenEnding: string,
 ): string => {
   const last = value % 10;
-  if (last === 0) {
-    return numberToKana(value).replace(/じゅう$/u, tenEnding);
-  }
-  return `${tensPrefix(value)}${forms[last]}`;
+  if (last === 0) return numberToKana(value).replace(/じゅう$/u, tenEnding);
+  return `${decadePrefix(value)}${forms[last]}`;
 };
 
 export function counterToKana(setId: NumberSetId, value: number): string {
@@ -253,94 +248,61 @@ export function counterToKana(setId: NumberSetId, value: number): string {
       9: "きゅうにん",
     };
     const last = value % 10;
-    return last === 0 ? `${numberToKana(value)}にん` : `${tensPrefix(value)}${forms[last]}`;
+    return last === 0 ? `${numberToKana(value)}にん` : `${decadePrefix(value)}${forms[last]}`;
   }
 
   if (setId === "long") {
-    return counterEnding(
-      value,
-      {
-        1: "いっぽん",
-        2: "にほん",
-        3: "さんぼん",
-        4: "よんほん",
-        5: "ごほん",
-        6: "ろっぽん",
-        7: "ななほん",
-        8: "はっぽん",
-        9: "きゅうほん",
-      },
-      "じゅっぽん",
-    );
+    return counterEnding(value, {
+      1: "いっぽん", 2: "にほん", 3: "さんぼん", 4: "よんほん", 5: "ごほん",
+      6: "ろっぽん", 7: "ななほん", 8: "はっぽん", 9: "きゅうほん",
+    }, "じゅっぽん");
   }
 
   if (setId === "general") {
-    return counterEnding(
-      value,
-      {
-        1: "いっこ",
-        2: "にこ",
-        3: "さんこ",
-        4: "よんこ",
-        5: "ごこ",
-        6: "ろっこ",
-        7: "ななこ",
-        8: "はっこ",
-        9: "きゅうこ",
-      },
-      "じゅっこ",
-    );
+    return counterEnding(value, {
+      1: "いっこ", 2: "にこ", 3: "さんこ", 4: "よんこ", 5: "ごこ",
+      6: "ろっこ", 7: "ななこ", 8: "はっこ", 9: "きゅうこ",
+    }, "じゅっこ");
   }
 
   if (setId === "minutes") {
-    return counterEnding(
-      value,
-      {
-        1: "いっぷん",
-        2: "にふん",
-        3: "さんぷん",
-        4: "よんぷん",
-        5: "ごふん",
-        6: "ろっぷん",
-        7: "ななふん",
-        8: "はっぷん",
-        9: "きゅうふん",
-      },
-      "じゅっぷん",
-    );
+    return counterEnding(value, {
+      1: "いっぷん", 2: "にふん", 3: "さんぷん", 4: "よんぷん", 5: "ごふん",
+      6: "ろっぷん", 7: "ななふん", 8: "はっぷん", 9: "きゅうふん",
+    }, "じゅっぷん");
   }
 
   if (setId === "hours") {
     const last = value % 10;
     if (last === 0) return `${numberToKana(value)}じ`;
     const forms: Record<number, string> = {
-      1: "いちじ",
-      2: "にじ",
-      3: "さんじ",
-      4: "よじ",
-      5: "ごじ",
-      6: "ろくじ",
-      7: "しちじ",
-      8: "はちじ",
-      9: "くじ",
+      1: "いちじ", 2: "にじ", 3: "さんじ", 4: "よじ", 5: "ごじ",
+      6: "ろくじ", 7: "しちじ", 8: "はちじ", 9: "くじ",
     };
-    return `${tensPrefix(value)}${forms[last]}`;
+    return `${decadePrefix(value)}${forms[last]}`;
   }
 
   if (setId === "flat") return `${numberToKana(value)}まい`;
   throw new Error(`${setId} is not a counter set`);
 }
 
-const readingAlternatives = (setId: NumberSetId, value: number): string[] => {
+const isCounterSet = (setId: NumberSetId): boolean =>
+  setById.get(setId)?.section === "counters";
+
+const readingFor = (setId: NumberSetId, value: number): string =>
+  isCounterSet(setId) ? counterToKana(setId, value) : numberToKana(value);
+
+const acceptableReadings = (setId: NumberSetId, value: number): string[] => {
+  if (!isCounterSet(setId)) return value === 0 ? ["れい", "ぜろ"] : [numberToKana(value)];
   const canonical = counterToKana(setId, value);
-  const alternatives = [canonical];
+  const variants = [canonical];
   if (["long", "general", "minutes"].includes(setId) && value % 10 === 0) {
-    alternatives.push(canonical.replace(/じゅっ/u, "じっ"));
+    variants.push(canonical.replace(/じゅっ/u, "じっ"));
   }
   if (setId === "people" && value % 10 === 7) {
-    alternatives.push(canonical.replace(/ななにん$/u, "しちにん"));
+    variants.push(canonical.replace(/ななにん$/u, "しちにん"));
   }
-  return [...new Set(alternatives)];
+  return [...new Set(variants)];
 };
 
 const normalizeKana = (value: string): string =>
@@ -359,19 +321,6 @@ const normalizeDigits = (value: string): string =>
       String.fromCharCode(character.charCodeAt(0) - 0xfee0),
     )
     .replace(/[\s　,，._]/gu, "");
-
-const isCounterSet = (setId: NumberSetId): boolean =>
-  setById.get(setId)?.section === "counters";
-
-const readingFor = (setId: NumberSetId, value: number): string =>
-  isCounterSet(setId) ? counterToKana(setId, value) : numberToKana(value);
-
-const acceptableReadings = (setId: NumberSetId, value: number): string[] =>
-  isCounterSet(setId)
-    ? readingAlternatives(setId, value)
-    : value === 0
-      ? ["れい", "ぜろ"]
-      : [numberToKana(value)];
 
 const seededRandom = (seed: number): (() => number) => {
   let state = seed >>> 0 || 0x9e3779b9;
@@ -404,27 +353,13 @@ const fixedValues: Record<NumberSetId, number[]> = {
   flat: Array.from({ length: 20 }, (_, index) => index + 1),
   general: Array.from({ length: 20 }, (_, index) => index + 1),
   hours: Array.from({ length: 24 }, (_, index) => index + 1),
-  minutes: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 14, 16, 18, 20, 21, 24, 30, 35,  fortySafe(), 45,  FiftySafe(), 59],
+  minutes: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 14, 16, 18, 20, 21, 24, 30, 35, 40, 45, 50, 59],
 };
-
-function fortySafe(): number {
-  return 40;
-}
-
-function FiftySafe(): number {
-  return 50;
-}
 
 export const numberSkillKey = (
   setId: NumberSetId,
   mode: NumberQuestionMode,
 ): string => `${setId}:${mode}`;
-
-const modeMastery = (
-  progress: NumberProgressMap,
-  setId: NumberSetId,
-  mode: NumberQuestionMode,
-): number => progress[numberSkillKey(setId, mode)]?.mastery ?? 0;
 
 const modes: readonly NumberQuestionMode[] = [
   "digits-to-kana",
@@ -432,6 +367,12 @@ const modes: readonly NumberQuestionMode[] = [
   "listening-to-digits",
   "choice-reading",
 ];
+
+const modeMastery = (
+  progress: NumberProgressMap,
+  setId: NumberSetId,
+  mode: NumberQuestionMode,
+): number => progress[numberSkillKey(setId, mode)]?.mastery ?? 0;
 
 const orderedModes = (
   progress: NumberProgressMap,
@@ -442,22 +383,18 @@ const orderedModes = (
     (left, right) => modeMastery(progress, setId, left) - modeMastery(progress, setId, right),
   );
 
-const nearbyChoices = (
-  setId: NumberSetId,
-  value: number,
-  seed: number,
-): string[] => {
-  const pool = fixedValues[setId].filter((candidate) => candidate !== value);
-  const distractors = shuffle(pool, seed)
+const nearbyChoices = (setId: NumberSetId, value: number, seed: number): string[] => {
+  const distractors = shuffle(
+    fixedValues[setId].filter((candidate) => candidate !== value),
+    seed,
+  )
     .slice(0, 3)
     .map((candidate) => readingFor(setId, candidate));
   return shuffle([readingFor(setId, value), ...distractors], seed + 91);
 };
 
-const quantityLabel = (setId: NumberSetId, value: number): string => {
-  const suffix = setById.get(setId)?.suffix ?? "";
-  return `${value}${suffix}`;
-};
+const quantityLabel = (setId: NumberSetId, value: number): string =>
+  `${value}${setById.get(setId)?.suffix ?? ""}`;
 
 export function createNumberQuestion(
   setId: NumberSetId,
@@ -470,126 +407,112 @@ export function createNumberQuestion(
   const reading = readingFor(setId, value);
   const label = quantityLabel(setId, value);
   const semanticKey = `${setId}:value:${value}`;
-  const id = `${semanticKey}:${mode}`;
-  const exceptionHint = set.section === "counters"
-    ? "Следи за изменением звука у счётного слова."
-    : setId === "hundreds" || setId === "thousands"
-      ? "Проверь особые чтения сотен и тысяч."
-      : setId === "man"
-        ? "Сначала выдели разряд まん — десять тысяч."
-        : "Собирай число слева направо по разрядам.";
-
-  if (mode === "digits-to-kana") {
-    return {
-      id,
-      semanticKey,
-      sourceSetId: setId,
-      mode,
-      value,
-      prompt: set.section === "counters"
-        ? `Напиши чтение количества ${label}.`
-        : `Напиши число ${value.toLocaleString("ru-RU")} хираганой.`,
-      displayText: label,
-      speechText: reading,
-      keyboard: "default",
-      correctAnswers: acceptableReadings(setId, value),
-      explanation: `${label} — ${reading}. ${exceptionHint}`,
-    };
-  }
-
-  if (mode === "kana-to-digits") {
-    return {
-      id,
-      semanticKey,
-      sourceSetId: setId,
-      mode,
-      value,
-      prompt: set.section === "counters"
-        ? `Сколько предметов или единиц обозначает ${reading}? Введи только число.`
-        : `Какое число записано: ${reading}?`,
-      displayText: reading,
-      speechText: reading,
-      keyboard: "numeric",
-      correctAnswers: [String(value)],
-      explanation: `${reading} — ${label}. ${exceptionHint}`,
-    };
-  }
-
-  if (mode === "listening-to-digits") {
-    return {
-      id,
-      semanticKey,
-      sourceSetId: setId,
-      mode,
-      value,
-      prompt: set.section === "counters"
-        ? "Прослушай количество и введи только число."
-        : "Прослушай число и введи его цифрами.",
-      speechText: reading,
-      keyboard: "numeric",
-      correctAnswers: [String(value)],
-      explanation: `${reading} — ${label}. ${exceptionHint}`,
-    };
-  }
-
-  return {
-    id,
+  const common = {
+    id: `${semanticKey}:${mode}`,
     semanticKey,
     sourceSetId: setId,
     mode,
     value,
+    speechText: reading,
+    explanation: `${label} — ${reading}. ${
+      set.section === "counters"
+        ? "Следи за изменением звука у счётного слова."
+        : setId === "hundreds" || setId === "thousands"
+          ? "Проверь особые чтения сотен и тысяч."
+          : setId === "man"
+            ? "Сначала выдели разряд まん — десять тысяч."
+            : "Собирай число слева направо по разрядам."
+    }`,
+  } as const;
+
+  if (mode === "digits-to-kana") {
+    return {
+      ...common,
+      prompt: set.section === "counters"
+        ? `Напиши чтение количества ${label}.`
+        : `Напиши число ${value.toLocaleString("ru-RU")} хираганой.`,
+      displayText: label,
+      keyboard: "default",
+      correctAnswers: acceptableReadings(setId, value),
+    };
+  }
+  if (mode === "kana-to-digits") {
+    return {
+      ...common,
+      prompt: set.section === "counters"
+        ? `Сколько предметов или единиц обозначает ${reading}? Введи только число.`
+        : `Какое число записано: ${reading}?`,
+      displayText: reading,
+      keyboard: "numeric",
+      correctAnswers: [String(value)],
+    };
+  }
+  if (mode === "listening-to-digits") {
+    return {
+      ...common,
+      prompt: set.section === "counters"
+        ? "Прослушай количество и введи только число."
+        : "Прослушай число и введи его цифрами.",
+      keyboard: "numeric",
+      correctAnswers: [String(value)],
+    };
+  }
+  return {
+    ...common,
     prompt: set.section === "counters"
       ? `Выбери правильное чтение ${label}.`
       : `Выбери правильное чтение числа ${value.toLocaleString("ru-RU")}.`,
     displayText: label,
-    speechText: reading,
     keyboard: "default",
     correctAnswers: acceptableReadings(setId, value),
     choices: nearbyChoices(setId, value, seed),
-    explanation: `${label} — ${reading}. ${exceptionHint}`,
   };
 }
-
-const sessionCount = (sessionId: NumberSessionId): number =>
-  sessionId === "mixed" ? 15 : 12;
 
 export function buildNumberSession(
   sessionId: NumberSessionId,
   progress: NumberProgressMap,
   seed = Date.now(),
 ): NumberQuestion[] {
-  if (sessionId === "mixed") {
-    const selectedSets = shuffle(numberTrainingSets.map((set) => set.id), seed);
-    const questions: NumberQuestion[] = [];
-    let round = 0;
-    while (questions.length < sessionCount(sessionId)) {
-      const setId = selectedSets[round % selectedSets.length] as NumberSetId;
-      const values = shuffle(fixedValues[setId], seed + round * 17);
-      const used = new Set(
-        questions
-          .filter((question) => question.sourceSetId === setId)
-          .map((question) => question.value),
-      );
-      const value = values.find((candidate) => !used.has(candidate));
-      if (value === undefined) break;
-      const modeOrder = orderedModes(progress, setId, seed + round * 31);
-      const mode = modeOrder[round % modeOrder.length] as NumberQuestionMode;
-      questions.push(createNumberQuestion(setId, value, mode, seed + round * 43));
-      round += 1;
-    }
-    return questions;
+  const count = sessionId === "mixed" ? 15 : 12;
+  if (sessionId !== "mixed") {
+    const values = shuffle(fixedValues[sessionId], seed).slice(0, count);
+    const modeOrder = orderedModes(progress, sessionId, seed + 13);
+    return values.map((value, index) =>
+      createNumberQuestion(
+        sessionId,
+        value,
+        modeOrder[index % modeOrder.length] as NumberQuestionMode,
+        seed + index * 29,
+      ),
+    );
   }
 
-  const values = shuffle(fixedValues[sessionId], seed);
-  const modeOrder = orderedModes(progress, sessionId, seed + 13);
-  return values.slice(0, sessionCount(sessionId)).map((value, index) =>
-    createNumberQuestion(
-      sessionId,
-      value,
-      modeOrder[index % modeOrder.length] as NumberQuestionMode,
-      seed + index * 29,
-    ),
-  );
+  const selectedSets = shuffle(numberTrainingSets.map((set) => set.id), seed);
+  const questions: NumberQuestion[] = [];
+  let round = 0;
+  while (questions.length < count) {
+    const setId = selectedSets[round % selectedSets.length] as NumberSetId;
+    const usedValues = new Set(
+      questions
+        .filter((question) => question.sourceSetId === setId)
+        .map((question) => question.value),
+    );
+    const value = shuffle(fixedValues[setId], seed + round * 17)
+      .find((candidate) => !usedValues.has(candidate));
+    if (value === undefined) break;
+    const modeOrder = orderedModes(progress, setId, seed + round * 31);
+    questions.push(
+      createNumberQuestion(
+        setId,
+        value,
+        modeOrder[round % modeOrder.length] as NumberQuestionMode,
+        seed + round * 43,
+      ),
+    );
+    round += 1;
+  }
+  return questions;
 }
 
 export function buildNumberRemediation(
@@ -597,9 +520,8 @@ export function buildNumberRemediation(
   usedSemanticKeys: readonly string[],
   seed = Date.now(),
 ): NumberQuestion | null {
-  const values = shuffle(fixedValues[failedQuestion.sourceSetId], seed);
   const used = new Set(usedSemanticKeys);
-  const value = values.find(
+  const value = shuffle(fixedValues[failedQuestion.sourceSetId], seed).find(
     (candidate) =>
       candidate !== failedQuestion.value &&
       !used.has(`${failedQuestion.sourceSetId}:value:${candidate}`),
@@ -622,11 +544,9 @@ export function checkNumberAnswer(
 ): NumberAnswerResult {
   const expectsDigits =
     question.mode === "kana-to-digits" || question.mode === "listening-to-digits";
-  const normalizedAnswer = expectsDigits ? normalizeDigits(answer) : normalizeKana(answer);
-  const normalizedCorrect = question.correctAnswers.map((candidate) =>
-    expectsDigits ? normalizeDigits(candidate) : normalizeKana(candidate),
-  );
-  const correct = normalizedCorrect.includes(normalizedAnswer);
+  const normalize = expectsDigits ? normalizeDigits : normalizeKana;
+  const normalizedAnswer = normalize(answer);
+  const correct = question.correctAnswers.map(normalize).includes(normalizedAnswer);
   if (correct) {
     return {
       correct: true,
@@ -637,13 +557,10 @@ export function checkNumberAnswer(
 
   let feedback = "Получилось другое значение.";
   if (expectsDigits) {
-    if (!/^\d+$/u.test(normalizedAnswer)) {
-      feedback = "Здесь нужны только арабские цифры.";
-    } else if (normalizedAnswer.length !== String(question.value).length) {
+    if (!/^\d+$/u.test(normalizedAnswer)) feedback = "Здесь нужны только арабские цифры.";
+    else if (normalizedAnswer.length !== String(question.value).length) {
       feedback = "Проверь разрядность: возможно, потерян или добавлен ноль.";
-    } else {
-      feedback = "Проверь порядок разрядов числа.";
-    }
+    } else feedback = "Проверь порядок разрядов числа.";
   } else if (isCounterSet(question.sourceSetId)) {
     feedback = "Основа числа узнаваема, но проверь изменение звука у счётного слова.";
   } else if (["hundreds", "thousands"].includes(question.sourceSetId)) {
@@ -651,7 +568,6 @@ export function checkNumberAnswer(
   } else if (question.sourceSetId === "man") {
     feedback = "Раздели число на блок まん и остаток меньше 10 000.";
   }
-
   return {
     correct: false,
     correctAnswer: question.correctAnswers[0] ?? "",
@@ -676,18 +592,18 @@ export function updateNumberProgress(
     lastPracticedAt: new Date(0).toISOString(),
   };
   const streak = correct ? previous.streak + 1 : 0;
-  const updated: NumberSkillProgress = {
-    mastery: correct
-      ? Math.min(5, previous.mastery + 1)
-      : Math.max(0, previous.mastery - 2),
-    attempts: previous.attempts + 1,
-    correct: previous.correct + (correct ? 1 : 0),
-    lapses: previous.lapses + (correct ? 0 : 1),
-    streak,
-    bestStreak: Math.max(previous.bestStreak, streak),
-    lastPracticedAt: now.toISOString(),
+  return {
+    ...progress,
+    [key]: {
+      mastery: correct ? Math.min(5, previous.mastery + 1) : Math.max(0, previous.mastery - 2),
+      attempts: previous.attempts + 1,
+      correct: previous.correct + (correct ? 1 : 0),
+      lapses: previous.lapses + (correct ? 0 : 1),
+      streak,
+      bestStreak: Math.max(previous.bestStreak, streak),
+      lastPracticedAt: now.toISOString(),
+    },
   };
-  return { ...progress, [key]: updated };
 }
 
 export function getNumberSetMastery(
