@@ -12,9 +12,11 @@ import {
 import { speakJapanese } from "../audio/japaneseSpeech";
 import {
   createKanaSession,
+  getKanaDisplayRomaji,
   getKanaMasterySummary,
   getSkillAverage,
   isKanaAnswerCorrect,
+  isKanaSymbolMastered,
   updateKanaProgress,
   type KanaProgressMap,
   type KanaQuestion,
@@ -56,20 +58,20 @@ type KanaView =
 
 const skillMeta: Record<KanaSkill, { title: string; body: string }> = {
   recognition: {
-    title: "Узнавание знака",
-    body: "Увидь ромадзи и выбери соответствующий знак или сочетание.",
+    title: "Узнавание записи",
+    body: "Увидь чтение или точный код ввода и выбери соответствующую японскую запись.",
   },
   reading: {
     title: "Чтение",
-    body: "Увидь японскую запись и выбери её чтение.",
+    body: "Увидь японскую запись и выбери, как она произносится.",
   },
   listening: {
     title: "Аудирование",
-    body: "Услышь слог и найди правильную запись.",
+    body: "Услышь мору и найди возможную запись. Неоднозначные пары здесь не проверяются.",
   },
   typing: {
-    title: "Самостоятельный ответ",
-    body: "Увидь запись и введи ромадзи без вариантов.",
+    title: "Самостоятельный ввод",
+    body: "Увидь запись и введи ромадзи или точный код японской клавиатуры без вариантов.",
   },
 };
 
@@ -80,26 +82,26 @@ const setMeta: Record<
   basic: {
     title: "Базовая хирагана",
     shortTitle: "46 базовых",
-    body: "Основные знаки от あ до ん.",
+    body: "Основные записи от あ до ん.",
     hero: "あいうえお",
     chartDescription:
-      "Нажми на знак, чтобы услышать его. Зелёным отмечены записи, освоенные во всех четырёх навыках.",
+      "Нажми на запись, чтобы услышать её. Зелёным отмечены элементы, освоенные во всех применимых навыках. を не проверяется на слух отдельно от お.",
   },
   voiced: {
     title: "Дакутэн и хандакутэн",
-    shortTitle: "Звонкие",
-    body: "が／ざ／だ／ば и ряд ぱ с кружком.",
+    shortTitle: "Дакутэн и P",
+    body: "Ряды が／ざ／だ／ば и ряд ぱ с кружком.",
     hero: "がざだばぱ",
     chartDescription:
-      "Две черты ゛ делают согласный звонким, а кружок ゜ превращает ряд H в ряд P. ぢ и づ редки и отдельно помечены.",
+      "Знак ゛ обычно создаёт звонкий ряд, а ゜ образует ряд P. В стандартной речи ぢ звучит как じ, а づ — как ず, поэтому эти пары нельзя честно различать в изолированном аудировании.",
   },
   contracted: {
     title: "Сочетания с маленькой каной",
     shortTitle: "ゃゅょ",
-    body: "きゃ, しゅ, ちょ и другие слитные слоги.",
+    body: "きゃ, しゅ, ちょ и другие сочетания ёон.",
     hero: "きゃしゅちょ",
     chartDescription:
-      "Маленькие ゃ／ゅ／ょ соединяются с предыдущим знаком в один слог. Это не два самостоятельных слога.",
+      "Маленькие ゃ／ゅ／ょ соединяются с предыдущей каной в одну мору — ритмическую единицу японского слова. Большая や／ゆ／よ читалась бы отдельно.",
   },
 };
 
@@ -176,13 +178,11 @@ export function KanaScreen({ onCourse }: KanaScreenProps) {
   }, []);
 
   useEffect(() => {
-    if (!hydrated) return;
-    void saveKanaProgress(progress);
+    if (hydrated) void saveKanaProgress(progress);
   }, [hydrated, progress]);
 
   useEffect(() => {
-    if (!hydrated) return;
-    void saveKanaWordProgress(wordProgress);
+    if (hydrated) void saveKanaWordProgress(wordProgress);
   }, [hydrated, wordProgress]);
 
   useEffect(() => {
@@ -230,9 +230,9 @@ export function KanaScreen({ onCourse }: KanaScreenProps) {
     if (questions[questionIndex + 1]) {
       setQuestionIndex((previous) => previous + 1);
       resetQuestion();
-      return;
+    } else {
+      setView("result");
     }
-    setView("result");
   };
 
   const startWordPractice = () => {
@@ -264,9 +264,9 @@ export function KanaScreen({ onCourse }: KanaScreenProps) {
     if (nextQueue[wordIndex + 1]) {
       setWordIndex((previous) => previous + 1);
       resetWordQuestion();
-      return;
+    } else {
+      setView("word-result");
     }
-    setView("word-result");
   };
 
   if (!hydrated) {
@@ -292,7 +292,7 @@ export function KanaScreen({ onCourse }: KanaScreenProps) {
             {percent >= 80 ? "Слова складываются" : "Нужно ещё закрепить"}
           </Text>
           <Text style={kanaStyles.resultBody}>
-            Правильных сборок: {wordCorrectCount} из {wordQueue.length}. Ошибочные слова один раз
+            Правильных попыток: {wordCorrectCount} из {wordQueue.length}. Ошибочные слова один раз
             возвращались в конец этой же сессии.
           </Text>
           <TouchableOpacity style={kanaStyles.primaryButton} onPress={startWordPractice}>
@@ -314,11 +314,9 @@ export function KanaScreen({ onCourse }: KanaScreenProps) {
           <TouchableOpacity style={kanaStyles.backButton} onPress={() => setView("home")}>
             <Text style={kanaStyles.backButtonText}>‹ Закончить сборку слов</Text>
           </TouchableOpacity>
-          <Text style={kanaStyles.eyebrow}>Маленькая кана в словах</Text>
+          <Text style={kanaStyles.eyebrow}>Орфография в словах</Text>
           <View style={kanaStyles.questionCard}>
-            <Text style={kanaStyles.counter}>
-              {wordIndex + 1} / {wordQueue.length}
-            </Text>
+            <Text style={kanaStyles.counter}>{wordIndex + 1} / {wordQueue.length}</Text>
             <Text style={kanaStyles.wordMeaningPrompt}>Собери: {currentWord.meaningRu}</Text>
             <TouchableOpacity
               accessibilityLabel="Прослушать слово"
@@ -445,9 +443,7 @@ export function KanaScreen({ onCourse }: KanaScreenProps) {
             {setMeta[activeSet].shortTitle} · {skillMeta[activeSkill].title}
           </Text>
           <View style={kanaStyles.questionCard}>
-            <Text style={kanaStyles.counter}>
-              {questionIndex + 1} / {questions.length}
-            </Text>
+            <Text style={kanaStyles.counter}>{questionIndex + 1} / {questions.length}</Text>
             <Text style={kanaStyles.questionPrompt}>{currentQuestion.prompt}</Text>
 
             {currentQuestion.skill === "listening" && currentQuestion.speakText && (
@@ -541,25 +537,19 @@ export function KanaScreen({ onCourse }: KanaScreenProps) {
             <View key={row.id} style={kanaStyles.chartRow}>
               <Text style={kanaStyles.chartRowTitle}>{row.label}</Text>
               <View style={kanaStyles.chartGrid}>
-                {row.symbols.map((symbol) => {
-                  const item = progress[symbol.id];
-                  const known =
-                    !!item &&
-                    item.recognition >= 3 &&
-                    item.reading >= 3 &&
-                    item.listening >= 3 &&
-                    item.typing >= 3;
-                  return (
-                    <TouchableOpacity
-                      key={symbol.id}
-                      style={[kanaStyles.kanaCell, known && kanaStyles.kanaCellKnown]}
-                      onPress={() => void speakJapanese(symbol.kana)}
-                    >
-                      <Text style={kanaStyles.kanaGlyph}>{symbol.kana}</Text>
-                      <Text style={kanaStyles.kanaRomaji}>{symbol.romaji}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
+                {row.symbols.map((symbol) => (
+                  <TouchableOpacity
+                    key={symbol.id}
+                    style={[
+                      kanaStyles.kanaCell,
+                      isKanaSymbolMastered(progress[symbol.id], symbol) && kanaStyles.kanaCellKnown,
+                    ]}
+                    onPress={() => void speakJapanese(symbol.kana)}
+                  >
+                    <Text style={kanaStyles.kanaGlyph}>{symbol.kana}</Text>
+                    <Text style={kanaStyles.kanaRomaji}>{getKanaDisplayRomaji(symbol)}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
               {row.symbols
                 .filter((symbol) => symbol.noteRu)
@@ -585,8 +575,8 @@ export function KanaScreen({ onCourse }: KanaScreenProps) {
         <Text style={kanaStyles.eyebrow}>Азбука</Text>
         <Text style={kanaStyles.title}>Хирагана</Text>
         <Text style={kanaStyles.description}>
-          Теперь здесь есть базовые знаки, звонкие ряды, слитные сочетания и сборка настоящих
-          слов.
+          Базовые записи, дакутэн, хандакутэн, сочетания ёон и орфография настоящих слов.
+          Произношение и код клавиатурного ввода отслеживаются отдельно там, где они расходятся.
         </Text>
 
         <Text style={kanaStyles.sectionTitle}>Набор для тренировки</Text>
@@ -615,11 +605,9 @@ export function KanaScreen({ onCourse }: KanaScreenProps) {
 
         <View style={kanaStyles.heroCard}>
           <Text style={kanaStyles.heroKana}>{setMeta[activeSet].hero}</Text>
-          <Text style={kanaStyles.heroTitle}>
-            {summary.mastered} из {summary.total} освоено
-          </Text>
+          <Text style={kanaStyles.heroTitle}>{summary.mastered} из {summary.total} освоено</Text>
           <Text style={kanaStyles.heroBody}>
-            Начато записей: {summary.started}. Общая наполненность навыков: {summary.averagePercent}%.
+            Начато записей: {summary.started}. Общая наполненность применимых навыков: {summary.averagePercent}%.
           </Text>
           <View style={kanaStyles.progressRow}>
             <Text style={kanaStyles.progressLabel}>{setMeta[activeSet].title}</Text>
@@ -631,9 +619,7 @@ export function KanaScreen({ onCourse }: KanaScreenProps) {
         </View>
 
         <TouchableOpacity style={kanaStyles.secondaryButton} onPress={() => setView("chart")}>
-          <Text style={kanaStyles.secondaryButtonText}>
-            Открыть таблицу · {summary.total} записей
-          </Text>
+          <Text style={kanaStyles.secondaryButtonText}>Открыть таблицу · {summary.total} записей</Text>
         </TouchableOpacity>
 
         <Text style={kanaStyles.sectionTitle}>Тренировки набора</Text>
@@ -641,9 +627,7 @@ export function KanaScreen({ onCourse }: KanaScreenProps) {
           <TouchableOpacity key={skill} style={kanaStyles.skillCard} onPress={() => startPractice(skill)}>
             <View style={kanaStyles.skillHeader}>
               <Text style={kanaStyles.skillTitle}>{skillMeta[skill].title}</Text>
-              <Text style={kanaStyles.skillPercent}>
-                {getSkillAverage(progress, skill, activePool)}%
-              </Text>
+              <Text style={kanaStyles.skillPercent}>{getSkillAverage(progress, skill, activePool)}%</Text>
             </View>
             <Text style={kanaStyles.skillBody}>{skillMeta[skill].body}</Text>
           </TouchableOpacity>
@@ -656,8 +640,8 @@ export function KanaScreen({ onCourse }: KanaScreenProps) {
             {wordSummary.mastered} из {wordSummary.total} слов освоено
           </Text>
           <Text style={kanaStyles.wordCourseBody}>
-            Собирай слова из отдельных знаков. Большая и маленькая кана специально смешиваются,
-            чтобы нельзя было угадать форму по силуэту.
+            Собирай слова из отдельных знаков. Большие и маленькие варианты специально
+            перемешиваются, а готовый ответ больше не появляется в начале набора.
           </Text>
           <Text style={kanaStyles.wordCourseMeta}>
             Начато: {wordSummary.started} · общий прогресс: {wordSummary.averagePercent}%
@@ -672,32 +656,31 @@ export function KanaScreen({ onCourse }: KanaScreenProps) {
           <Text style={kanaStyles.ruleKana}>か → が · は → ば／ぱ</Text>
           <Text style={kanaStyles.ruleTitle}>Дакутэн и хандакутэн</Text>
           <Text style={kanaStyles.ruleBody}>
-            Две черты ゛ озвончают согласный. Кружок ゜ используется только с рядом H и создаёт
-            звуки P.
+            Знак ゛ обычно образует звонкий ряд. Кружок ゜ ставится на кане ряда H и создаёт ряд P.
           </Text>
         </View>
         <View style={kanaStyles.ruleCard}>
           <Text style={kanaStyles.ruleKana}>き + ゃ = きゃ</Text>
           <Text style={kanaStyles.ruleTitle}>Маленькие ゃ／ゅ／ょ</Text>
           <Text style={kanaStyles.ruleBody}>
-            Они не читаются отдельно, а соединяются с предыдущим знаком в один слог: kya, shu,
-            cho.
+            Они соединяются с предыдущей каной в одну мору: kya, shu, cho. Большая や／ゆ／よ
+            образовала бы отдельную мору.
           </Text>
         </View>
         <View style={kanaStyles.ruleCard}>
           <Text style={kanaStyles.ruleKana}>きて ≠ きって</Text>
           <Text style={kanaStyles.ruleTitle}>Маленькая っ</Text>
           <Text style={kanaStyles.ruleBody}>
-            Она создаёт короткую паузу и обычно удваивает следующий согласный: kite и kitte —
-            разные слова.
+            Она обозначает краткую задержку перед следующим согласным. В ромадзи это обычно
+            показывают удвоением: kite и kitte — разные слова.
           </Text>
         </View>
         <View style={kanaStyles.ruleCard}>
           <Text style={kanaStyles.ruleKana}>こう · きょう</Text>
-          <Text style={kanaStyles.ruleTitle}>Долгие гласные</Text>
+          <Text style={kanaStyles.ruleTitle}>Долгий звук о</Text>
           <Text style={kanaStyles.ruleBody}>
-            После слога на o буква う часто удлиняет гласный. В ромадзи это можно увидеть как ou
-            или как ō.
+            После моры с о следующая う часто удлиняет гласный. Для клавиатурного ввода пишут ou,
+            а в учебной ромадзи долготу также могут показывать как ō.
           </Text>
         </View>
       </ScrollView>

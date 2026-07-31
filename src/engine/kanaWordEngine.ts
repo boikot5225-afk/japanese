@@ -44,11 +44,43 @@ export function createKanaWordSession(
     .slice(0, Math.max(1, limit));
 }
 
+const hashString = (value: string): number => {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+};
+
+const seededShuffle = (values: string[], seedText: string): string[] => {
+  const shuffled = [...values];
+  let seed = hashString(seedText);
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    const swapIndex = seed % (index + 1);
+    const temporary = shuffled[index];
+    shuffled[index] = shuffled[swapIndex] ?? shuffled[index] ?? "";
+    shuffled[swapIndex] = temporary ?? shuffled[swapIndex] ?? "";
+  }
+  return shuffled;
+};
+
+const startsWithReadyAnswer = (pool: string[], word: KanaWord): boolean =>
+  pool.slice(0, word.tokens.length).join("") === word.kana;
+
 export function createWordTokenPool(word: KanaWord): string[] {
-  const tokens = [...word.tokens, ...word.distractors];
-  if (tokens.length < 2) return tokens;
-  const shift = word.id.length % tokens.length;
-  return [...tokens.slice(shift), ...tokens.slice(0, shift)];
+  let pool = seededShuffle(
+    [...word.tokens, ...word.distractors],
+    `${word.id}:${word.kana}:${word.tokens.length}`,
+  );
+
+  let rotations = 0;
+  while (startsWithReadyAnswer(pool, word) && rotations < pool.length) {
+    pool = [...pool.slice(1), ...(pool[0] ? [pool[0]] : [])];
+    rotations += 1;
+  }
+  return pool;
 }
 
 export function isKanaWordAnswerCorrect(selectedTokens: string[], word: KanaWord): boolean {

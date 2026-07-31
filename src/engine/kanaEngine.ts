@@ -34,6 +34,7 @@ export interface KanaMasterySummary {
 
 const MAX_SKILL_SCORE = 5;
 const MASTERY_THRESHOLD = 3;
+const allSkills: readonly KanaSkill[] = ["recognition", "reading", "listening", "typing"];
 
 export const emptyKanaSkillProgress = (): KanaSkillProgress => ({
   recognition: 0,
@@ -47,10 +48,34 @@ export const emptyKanaSkillProgress = (): KanaSkillProgress => ({
 const skillScore = (progress: KanaSkillProgress | undefined, skill: KanaSkill): number =>
   progress?.[skill] ?? 0;
 
-const totalSkillScore = (progress: KanaSkillProgress | undefined): number =>
-  progress
-    ? progress.recognition + progress.reading + progress.listening + progress.typing
-    : 0;
+const applicableSkills = (symbol: KanaSymbol): readonly KanaSkill[] =>
+  symbol.listeningEligible === false
+    ? allSkills.filter((skill) => skill !== "listening")
+    : allSkills;
+
+export const isKanaListeningEligible = (symbol: KanaSymbol): boolean =>
+  symbol.listeningEligible !== false;
+
+export const getKanaInputRomaji = (symbol: KanaSymbol): string =>
+  symbol.inputRomaji ?? symbol.romaji;
+
+export const getKanaDisplayRomaji = (symbol: KanaSymbol): string => {
+  const input = getKanaInputRomaji(symbol);
+  return input === symbol.romaji ? symbol.romaji : `${symbol.romaji} · ввод ${input}`;
+};
+
+export function isKanaSymbolMastered(
+  progress: KanaSkillProgress | undefined,
+  symbol: KanaSymbol,
+): boolean {
+  if (!progress) return false;
+  return applicableSkills(symbol).every((skill) => progress[skill] >= MASTERY_THRESHOLD);
+}
+
+const totalSkillScore = (
+  progress: KanaSkillProgress | undefined,
+  symbol: KanaSymbol,
+): number => applicableSkills(symbol).reduce((sum, skill) => sum + skillScore(progress, skill), 0);
 
 const uniqueOptions = (
   pool: readonly KanaSymbol[],
@@ -83,24 +108,32 @@ export function createKanaQuestion(
   skill: KanaSkill,
   pool: readonly KanaSymbol[] = basicHiragana,
 ): KanaQuestion {
-  const targetIndex = Math.max(0, pool.findIndex((item) => item.id === symbol.id));
-  const kanaOptions = rotateOptions(uniqueOptions(pool, targetIndex, (item) => item.kana), targetIndex);
+  const eligiblePool =
+    skill === "listening" ? pool.filter(isKanaListeningEligible) : pool;
+  const targetIndex = Math.max(0, eligiblePool.findIndex((item) => item.id === symbol.id));
+  const kanaOptions = rotateOptions(
+    uniqueOptions(eligiblePool, targetIndex, (item) => item.kana),
+    targetIndex,
+  );
   const romajiOptions = rotateOptions(
-    uniqueOptions(pool, targetIndex, (item) => item.romaji),
+    uniqueOptions(eligiblePool, targetIndex, (item) => item.romaji),
     targetIndex + 1,
   );
   const shared = {
     id: `${skill}-${symbol.id}`,
     symbolId: symbol.id,
     skill,
-    acceptableAnswers: symbol.acceptableRomaji ?? [],
     noteRu: symbol.noteRu,
   };
 
   if (skill === "recognition") {
+    const input = getKanaInputRomaji(symbol);
     return {
       ...shared,
-      prompt: `Найди знак для «${symbol.romaji}»`,
+      prompt:
+        input === symbol.romaji
+          ? `Найди запись для «${symbol.romaji}»`
+          : `Найди знак, который вводится кодом «${input}»`,
       correctAnswer: symbol.kana,
       acceptableAnswers: [],
       options: kanaOptions,
@@ -112,6 +145,7 @@ export function createKanaQuestion(
       ...shared,
       prompt: `Как читается ${symbol.kana}?`,
       correctAnswer: symbol.romaji,
+      acceptableAnswers: symbol.acceptableRomaji ?? [],
       options: romajiOptions,
     };
   }
@@ -119,7 +153,7 @@ export function createKanaQuestion(
   if (skill === "listening") {
     return {
       ...shared,
-      prompt: "Какой знак или сочетание прозвучало?",
+      prompt: "Какая запись прозвучала?",
       correctAnswer: symbol.kana,
       acceptableAnswers: [],
       options: kanaOptions,
@@ -127,10 +161,15 @@ export function createKanaQuestion(
     };
   }
 
+  const input = getKanaInputRomaji(symbol);
   return {
     ...shared,
-    prompt: `Введи ромадзи для ${symbol.kana}`,
-    correctAnswer: symbol.romaji,
+    prompt:
+      input === symbol.romaji
+        ? `Введи ромадзи для ${symbol.kana}`
+        : `Введи код, который набирает именно ${symbol.kana}`,
+    correctAnswer: input,
+    acceptableAnswers: symbol.acceptableInput ?? symbol.acceptableRomaji ?? [],
     options: [],
   };
 }
@@ -141,7 +180,8 @@ export function createKanaSession(
   limit = 10,
   pool: readonly KanaSymbol[] = basicHiragana,
 ): KanaQuestion[] {
-  return [...pool]
+  const eligiblePool = skill === "listening" ? pool.filter(isKanaListeningEligible) : [...pool];
+  return [...eligiblePool]
     .sort((left, right) => {
       const leftProgress = progress[left.id];
       const rightProgress = progress[right.id];
@@ -149,10 +189,10 @@ export function createKanaSession(
       if (skillDifference !== 0) return skillDifference;
       const attemptDifference = (leftProgress?.attempts ?? 0) - (rightProgress?.attempts ?? 0);
       if (attemptDifference !== 0) return attemptDifference;
-      return totalSkillScore(leftProgress) - totalSkillScore(rightProgress);
+      return totalSkillScore(leftProgress, left) - totalSkillScore(rightProgress, right);
     })
     .slice(0, Math.max(1, limit))
-    .map((symbol) => createKanaQuestion(symbol, skill, pool));
+    .map((symbol) => createKanaQuestion(symbol, skill, eligiblePool));
 }
 
 const normalize = (value: string): string =>
@@ -193,7 +233,7 @@ export function createKnownHiraganaProgress(): KanaProgressMap {
       {
         recognition: MAX_SKILL_SCORE,
         reading: MAX_SKILL_SCORE,
-        listening: MASTERY_THRESHOLD,
+        listening: isKanaListeningEligible(symbol) ? MASTERY_THRESHOLD : 0,
         typing: MASTERY_THRESHOLD,
         attempts: 0,
         correct: 0,
@@ -209,17 +249,19 @@ export function getKanaMasterySummary(
   let started = 0;
   let mastered = 0;
   let totalScore = 0;
+  let maximumScore = 0;
 
   pool.forEach((symbol) => {
+    const skills = applicableSkills(symbol);
+    maximumScore += skills.length * MAX_SKILL_SCORE;
     const item = progress[symbol.id];
     if (!item) return;
-    const scores = [item.recognition, item.reading, item.listening, item.typing];
+    const scores = skills.map((skill) => item[skill]);
     totalScore += scores.reduce((sum, score) => sum + score, 0);
     if (scores.some((score) => score > 0)) started += 1;
-    if (scores.every((score) => score >= MASTERY_THRESHOLD)) mastered += 1;
+    if (isKanaSymbolMastered(item, symbol)) mastered += 1;
   });
 
-  const maximumScore = pool.length * 4 * MAX_SKILL_SCORE;
   return {
     total: pool.length,
     started,
@@ -233,11 +275,13 @@ export function getSkillAverage(
   skill: KanaSkill,
   pool: readonly KanaSymbol[] = basicHiragana,
 ): number {
-  const total = pool.reduce(
+  const eligiblePool =
+    skill === "listening" ? pool.filter(isKanaListeningEligible) : [...pool];
+  const total = eligiblePool.reduce(
     (sum, symbol) => sum + skillScore(progress[symbol.id], skill),
     0,
   );
-  return pool.length === 0
+  return eligiblePool.length === 0
     ? 0
-    : Math.round((total / (pool.length * MAX_SKILL_SCORE)) * 100);
+    : Math.round((total / (eligiblePool.length * MAX_SKILL_SCORE)) * 100);
 }

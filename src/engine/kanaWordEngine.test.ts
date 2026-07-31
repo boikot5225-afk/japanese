@@ -10,10 +10,14 @@ import {
 } from "./kanaWordEngine.ts";
 import { kanaWords } from "../kana/kanaWords.ts";
 
-test("word practice contains unique curated words", () => {
+test("word practice contains unique and internally consistent words", () => {
   assert.equal(kanaWords.length, 12);
   assert.equal(new Set(kanaWords.map((word) => word.id)).size, kanaWords.length);
   assert.equal(new Set(kanaWords.map((word) => word.kana)).size, kanaWords.length);
+  kanaWords.forEach((word) => {
+    assert.equal(word.tokens.join(""), word.kana, `${word.id} tokens must reproduce its kana`);
+    assert.ok(word.explanationRu.length >= 40, `${word.id} needs a useful explanation`);
+  });
 });
 
 test("word token pool preserves repeated kana", () => {
@@ -22,6 +26,17 @@ test("word token pool preserves repeated kana", () => {
   const pool = createWordTokenPool(milk);
   assert.equal(pool.filter((token) => token === "ゅ").length, 2);
   assert.equal(pool.filter((token) => token === "う").length, 2);
+});
+
+test("no word builder opens with the complete answer already laid out", () => {
+  kanaWords.forEach((word) => {
+    const pool = createWordTokenPool(word);
+    assert.notEqual(
+      pool.slice(0, word.tokens.length).join(""),
+      word.kana,
+      `${word.id} must not reveal its answer`,
+    );
+  });
 });
 
 test("builder checks the complete kana sequence", () => {

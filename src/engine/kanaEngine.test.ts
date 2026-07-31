@@ -7,7 +7,9 @@ import {
   createKnownHiraganaProgress,
   emptyKanaSkillProgress,
   getKanaMasterySummary,
+  getSkillAverage,
   isKanaAnswerCorrect,
+  isKanaSymbolMastered,
   updateKanaProgress,
 } from "./kanaEngine.ts";
 import {
@@ -62,29 +64,75 @@ test("session prioritizes unseen or weaker symbols inside the selected set", () 
   assert.equal(session[0]?.symbolId, second.id);
 });
 
-test("common and input-oriented alternative romaji spellings are accepted", () => {
-  const shi = basicHiragana.find((item) => item.romaji === "shi");
-  const tsu = basicHiragana.find((item) => item.romaji === "tsu");
+test("standard reading and keyboard input are not confused", () => {
+  const wo = basicHiragana.find((item) => item.kana === "を");
   const di = voicedHiragana.find((item) => item.kana === "ぢ");
   const du = voicedHiragana.find((item) => item.kana === "づ");
+  assert.ok(wo);
+  assert.ok(di);
+  assert.ok(du);
+
+  const woReading = createKanaQuestion(wo, "reading", basicHiragana);
+  const woTyping = createKanaQuestion(wo, "typing", basicHiragana);
+  assert.equal(woReading.correctAnswer, "o");
+  assert.equal(isKanaAnswerCorrect("wo", woReading), true);
+  assert.equal(woTyping.correctAnswer, "wo");
+
+  const diReading = createKanaQuestion(di, "reading", voicedHiragana);
+  const diTyping = createKanaQuestion(di, "typing", voicedHiragana);
+  assert.equal(diReading.correctAnswer, "ji");
+  assert.equal(diTyping.correctAnswer, "di");
+  assert.equal(isKanaAnswerCorrect("ji", diTyping), false);
+
+  const duReading = createKanaQuestion(du, "reading", voicedHiragana);
+  const duTyping = createKanaQuestion(du, "typing", voicedHiragana);
+  assert.equal(duReading.correctAnswer, "zu");
+  assert.equal(duTyping.correctAnswer, "du");
+});
+
+test("indistinguishable spellings are excluded from isolated listening", () => {
+  const basicListening = createKanaSession("listening", {}, 100, basicHiragana);
+  const voicedListening = createKanaSession("listening", {}, 100, voicedHiragana);
+
+  assert.equal(basicListening.some((question) => question.symbolId === "hiragana-wo"), false);
+  assert.equal(voicedListening.some((question) => question.symbolId.endsWith("-di")), false);
+  assert.equal(voicedListening.some((question) => question.symbolId.endsWith("-du")), false);
+  assert.equal(basicListening.length, 45);
+  assert.equal(voicedListening.length, 23);
+});
+
+test("common alternative romanizations remain accepted where appropriate", () => {
+  const shi = basicHiragana.find((item) => item.romaji === "shi");
+  const tsu = basicHiragana.find((item) => item.romaji === "tsu");
   const sha = contractedHiragana.find((item) => item.kana === "しゃ");
   assert.ok(shi);
   assert.ok(tsu);
-  assert.ok(di);
-  assert.ok(du);
   assert.ok(sha);
 
   assert.equal(isKanaAnswerCorrect("si", createKanaQuestion(shi, "typing")), true);
   assert.equal(isKanaAnswerCorrect("tu", createKanaQuestion(tsu, "typing")), true);
-  assert.equal(isKanaAnswerCorrect("ji", createKanaQuestion(di, "typing", voicedHiragana)), true);
-  assert.equal(isKanaAnswerCorrect("zu", createKanaQuestion(du, "typing", voicedHiragana)), true);
   assert.equal(
     isKanaAnswerCorrect("sya", createKanaQuestion(sha, "typing", contractedHiragana)),
     true,
   );
 });
 
-test("known-hiragana profile marks only the 46 basic symbols mastered", () => {
+test("mastery ignores an impossible isolated-listening requirement", () => {
+  const di = voicedHiragana.find((item) => item.kana === "ぢ");
+  assert.ok(di);
+  const progress = {
+    recognition: 3,
+    reading: 3,
+    listening: 0,
+    typing: 3,
+    attempts: 9,
+    correct: 9,
+  };
+  assert.equal(isKanaSymbolMastered(progress, di), true);
+  assert.equal(getSkillAverage({ [di.id]: progress }, "listening", [di]), 0);
+});
+
+test("known-hiragana profile marks the basic set mastered", () => {
   const known = createKnownHiraganaProgress();
   const basicSummary = getKanaMasterySummary(known, basicHiragana);
   const voicedSummary = getKanaMasterySummary(known, voicedHiragana);
