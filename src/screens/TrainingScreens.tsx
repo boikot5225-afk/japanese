@@ -231,11 +231,13 @@ export function LessonScreen({
 
 interface ReviewScreenProps extends CommonPracticeProps {
   lessonTitle: string;
+  focusLabel: string;
   onCourse: () => void;
 }
 
 export function ReviewScreen({
   lessonTitle,
+  focusLabel,
   currentExercise,
   exerciseIndex,
   exerciseCount,
@@ -261,8 +263,9 @@ export function ReviewScreen({
         </TouchableOpacity>
         <Text style={styles.eyebrow}>Повторение</Text>
         <Text style={styles.title}>{lessonTitle}</Text>
+        <Text style={styles.meaning}>Сейчас проверяем: {focusLabel}</Text>
         <Text style={styles.description}>
-          Задание выбрано по сроку повторения и истории твоих ошибок.
+          Задание выбрано по сроку именно этого знания и навыка, а не всего упражнения целиком.
         </Text>
         <PracticeCard
           title="Повторить сегодня"
