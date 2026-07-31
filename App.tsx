@@ -3,7 +3,7 @@ import { SafeAreaView, Text, TouchableOpacity, View } from "react-native";
 
 import { findLessonBundle, lessonBundles } from "./src/content/courseCatalog";
 import type { LessonBundle } from "./src/content/lessonBundle";
-import type { Exercise } from "./src/domain/course";
+import type { Exercise, Skill } from "./src/domain/course";
 import { checkAnswer, type AnswerCheckResult } from "./src/engine/checkAnswer";
 import { createKnownHiraganaProgress } from "./src/engine/kanaEngine";
 import {
@@ -17,7 +17,9 @@ import {
   getNextReviewAt,
   getWeakTargetIds,
   isSuccessfulStatus,
-  scheduleExerciseReview,
+  reviewItemKey,
+  scheduleItemReview,
+  selectExerciseForReview,
   upsertReviewItem,
   type AttemptLogEntry,
   type AttemptSource,
@@ -43,6 +45,25 @@ const lessonStages: LessonStage[] = ["theory", "words", "examples", "practice"];
 const initialBundle: LessonBundle = lessonBundles[0] ?? (() => {
   throw new Error("В курсе нет ни одного урока.");
 })();
+
+const skillLabels: Record<Skill, string> = {
+  recognition: "узнавание",
+  recall: "воспроизведение",
+  reading: "чтение",
+  listening: "аудирование",
+  writing: "письмо",
+  usage: "употребление",
+};
+
+const getLearningItemLabel = (bundle: LessonBundle, itemId: string): string => {
+  const vocabulary = bundle.vocabulary.find((item) => item.id === itemId);
+  if (vocabulary) return `${vocabulary.writtenForm} — ${vocabulary.meaningsRu[0] ?? "слово"}`;
+  const grammar = bundle.grammar.find((item) => item.id === itemId);
+  if (grammar) return grammar.title;
+  const sentence = bundle.sentences.find((item) => item.id === itemId);
+  if (sentence) return sentence.japanese;
+  return "Материал урока";
+};
 
 const formatReviewDate = (value: string | null): string => {
   if (!value) return "после первого пройденного урока";
@@ -80,15 +101,18 @@ export default function App() {
   const [reviewQueue, setReviewQueue] = useState<ReviewItem[]>([]);
   const [reviewIndex, setReviewIndex] = useState(0);
   const [reviewAttempts, setReviewAttempts] = useState<ExerciseAttempt[]>([]);
-  const [requeuedExerciseIds, setRequeuedExerciseIds] = useState<string[]>([]);
+  const [requeuedReviewKeys, setRequeuedReviewKeys] = useState<string[]>([]);
 
   const lessonExercise = activeBundle.exercises[exerciseIndex];
   const activeReviewItem = reviewQueue[reviewIndex];
   const activeReviewBundle = activeReviewItem ? findLessonBundle(activeReviewItem.lessonId) : undefined;
-  const reviewExercise = activeReviewBundle?.exercises.find(
-    (exercise) => exercise.id === activeReviewItem?.exerciseId,
-  );
+  const reviewExercise = activeReviewItem && activeReviewBundle
+    ? selectExerciseForReview(activeReviewItem, activeReviewBundle.exercises)
+    : undefined;
   const currentExercise = screen === "review" ? reviewExercise : lessonExercise;
+  const reviewFocusLabel = activeReviewItem && activeReviewBundle
+    ? `${getLearningItemLabel(activeReviewBundle, activeReviewItem.itemId)} · ${skillLabels[activeReviewItem.skill]}`
+    : "Материал урока";
   const lessonResult = useMemo(() => calculateLessonResult(attempts), [attempts]);
   const reviewResult = useMemo(() => calculateLessonResult(reviewAttempts), [reviewAttempts]);
   const activeBundleIndex = lessonBundles.findIndex(
@@ -115,6 +139,9 @@ export default function App() {
         const knownExerciseIds = new Set(
           lessonBundles.flatMap((bundle) => bundle.exercises.map((exercise) => exercise.id)),
         );
+        const knownItemIds = new Set(
+          lessonBundles.flatMap((bundle) => bundle.lesson.itemIds),
+        );
         const validCompletedLessonIds = snapshot.completedLessonIds.filter((lessonId) =>
           knownLessonIds.has(lessonId),
         );
@@ -124,7 +151,8 @@ export default function App() {
           snapshot.reviewItems.filter(
             (item) =>
               completedLessonIdSet.has(item.lessonId) &&
-              knownExerciseIds.has(item.exerciseId),
+              knownExerciseIds.has(item.exerciseId) &&
+              knownItemIds.has(item.itemId),
           ),
         );
         setAttemptHistory(
@@ -208,7 +236,7 @@ export default function App() {
     setReviewQueue(queue);
     setReviewIndex(0);
     setReviewAttempts([]);
-    setRequeuedExerciseIds([]);
+    setRequeuedReviewKeys([]);
     resetExerciseInput();
     setScreen("review");
   };
@@ -218,14 +246,24 @@ export default function App() {
     bundle: LessonBundle,
     checkResult: AnswerCheckResult,
     source: AttemptSource,
+    reviewItem?: ReviewItem,
   ) => {
     const now = new Date();
-    if (source === "review") {
+    if (source === "review" && reviewItem) {
       setReviewItems((previous) => {
-        const existing = previous.find((item) => item.exerciseId === exercise.id);
+        const key = reviewItemKey(reviewItem);
+        const existing = previous.find((item) => reviewItemKey(item) === key);
         return upsertReviewItem(
           previous,
-          scheduleExerciseReview(existing, exercise, bundle.lesson.id, checkResult.status, now),
+          scheduleItemReview(
+            existing,
+            reviewItem.itemId,
+            reviewItem.skill,
+            exercise,
+            reviewItem.lessonId,
+            checkResult.status,
+            now,
+          ),
         );
       });
     }
@@ -245,7 +283,7 @@ export default function App() {
       : lessonRunMode === "practice"
         ? "practice"
         : "lesson";
-    recordExerciseAttempt(currentExercise, bundle, checkResult, source);
+    recordExerciseAttempt(currentExercise, bundle, checkResult, source, activeReviewItem);
     const attempt = { exerciseId: currentExercise.id, status: checkResult.status };
     if (screen === "review") {
       setReviewAttempts((previous) => [...previous, attempt]);
@@ -308,12 +346,24 @@ export default function App() {
   const continueReview = () => {
     const item = reviewQueue[reviewIndex];
     if (!item || !result) return;
+    const key = reviewItemKey(item);
     const shouldRequeue =
-      !isSuccessfulStatus(result.status) && !requeuedExerciseIds.includes(item.exerciseId);
-    const nextQueue = shouldRequeue ? [...reviewQueue, item] : reviewQueue;
+      !isSuccessfulStatus(result.status) && !requeuedReviewKeys.includes(key);
+    const repeatedItem = currentExercise
+      ? scheduleItemReview(
+          item,
+          item.itemId,
+          item.skill,
+          currentExercise,
+          item.lessonId,
+          result.status,
+          new Date(),
+        )
+      : item;
+    const nextQueue = shouldRequeue ? [...reviewQueue, repeatedItem] : reviewQueue;
     if (shouldRequeue) {
       setReviewQueue(nextQueue);
-      setRequeuedExerciseIds((previous) => [...previous, item.exerciseId]);
+      setRequeuedReviewKeys((previous) => [...previous, key]);
     }
     if (nextQueue[reviewIndex + 1]) {
       setReviewIndex((previous) => previous + 1);
@@ -444,7 +494,7 @@ export default function App() {
   }
 
   if (screen === "review") {
-    if (!activeReviewBundle) {
+    if (!activeReviewBundle || !activeReviewItem) {
       return (
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.resultContainer}>
@@ -460,6 +510,7 @@ export default function App() {
       <ReviewScreen
         {...commonPracticeProps}
         lessonTitle={activeReviewBundle.lesson.title}
+        focusLabel={reviewFocusLabel}
         exerciseIndex={reviewIndex}
         exerciseCount={reviewQueue.length}
         onCourse={() => setScreen("course")}

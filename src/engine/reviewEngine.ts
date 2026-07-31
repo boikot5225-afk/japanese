@@ -1,9 +1,25 @@
-import type { Exercise } from "../domain/course";
+import type { Exercise, Skill } from "../domain/course";
 import type { AnswerStatus } from "./checkAnswer";
 
 export type AttemptSource = "lesson" | "review" | "practice";
 
 export interface ReviewItem {
+  itemId: string;
+  skill: Skill;
+  exerciseId: string;
+  lessonId: string;
+  dueAt: string;
+  intervalDays: number;
+  ease: number;
+  streak: number;
+  correctCount: number;
+  incorrectCount: number;
+  lapseCount: number;
+  lastStatus: AnswerStatus;
+  lastAnsweredAt: string;
+}
+
+export interface LegacyReviewItemV2 {
   exerciseId: string;
   lessonId: string;
   targetItemIds: string[];
@@ -35,6 +51,28 @@ const WEAKNESS_THRESHOLD = 5;
 export const isSuccessfulStatus = (status: AnswerStatus): boolean =>
   successfulStatuses.includes(status);
 
+export const inferExerciseSkill = (exercise: Exercise): Skill => {
+  switch (exercise.type) {
+    case "listening":
+      return "listening";
+    case "handwriting":
+      return "writing";
+    case "multiple-choice":
+      return "recognition";
+    case "text-input":
+      return "recall";
+    case "sentence-builder":
+    case "particle-gap":
+    case "conjugation":
+      return "usage";
+    default:
+      return "recall";
+  }
+};
+
+export const reviewItemKey = (item: Pick<ReviewItem, "itemId" | "skill">): string =>
+  `${item.itemId}:${item.skill}`;
+
 const addDays = (date: Date, days: number): string =>
   new Date(date.getTime() + days * DAY_MS).toISOString();
 
@@ -47,8 +85,10 @@ export const isWeakReviewItem = (item: ReviewItem): boolean => {
   return item.streak < 3 && weaknessScore(item) >= WEAKNESS_THRESHOLD;
 };
 
-export function scheduleExerciseReview(
+export function scheduleItemReview(
   existing: ReviewItem | undefined,
+  itemId: string,
+  skill: Skill,
   exercise: Exercise,
   lessonId: string,
   status: AnswerStatus,
@@ -77,9 +117,10 @@ export function scheduleExerciseReview(
   }
 
   return {
+    itemId,
+    skill,
     exerciseId: exercise.id,
     lessonId,
-    targetItemIds: exercise.targetItemIds,
     dueAt: success ? addDays(now, intervalDays) : now.toISOString(),
     intervalDays,
     ease,
@@ -92,11 +133,24 @@ export function scheduleExerciseReview(
   };
 }
 
+export function scheduleExerciseReview(
+  existing: ReviewItem | undefined,
+  exercise: Exercise,
+  lessonId: string,
+  status: AnswerStatus,
+  now: Date,
+): ReviewItem {
+  const itemId = existing?.itemId ?? exercise.targetItemIds[0] ?? exercise.id;
+  const skill = existing?.skill ?? inferExerciseSkill(exercise);
+  return scheduleItemReview(existing, itemId, skill, exercise, lessonId, status, now);
+}
+
 export function upsertReviewItem(
   items: ReviewItem[],
   updated: ReviewItem,
 ): ReviewItem[] {
-  return [updated, ...items.filter((item) => item.exerciseId !== updated.exerciseId)];
+  const updatedKey = reviewItemKey(updated);
+  return [updated, ...items.filter((item) => reviewItemKey(item) !== updatedKey)];
 }
 
 export function getDueReviewItems(items: ReviewItem[], now: Date): ReviewItem[] {
@@ -130,8 +184,54 @@ export function getWeakTargetIds(items: ReviewItem[]): string[] {
   items
     .filter(isWeakReviewItem)
     .sort((left, right) => weaknessScore(right) - weaknessScore(left))
-    .forEach((item) => item.targetItemIds.forEach((id) => weakIds.add(id)));
+    .forEach((item) => weakIds.add(item.itemId));
   return [...weakIds];
+}
+
+export function selectExerciseForReview(
+  item: ReviewItem,
+  exercises: Exercise[],
+): Exercise | undefined {
+  const matchingItem = exercises.filter((exercise) =>
+    exercise.targetItemIds.includes(item.itemId),
+  );
+  const matchingSkill = matchingItem.filter(
+    (exercise) => inferExerciseSkill(exercise) === item.skill,
+  );
+  const candidates = matchingSkill.length > 0 ? matchingSkill : matchingItem;
+  if (candidates.length === 0) {
+    return exercises.find((exercise) => exercise.id === item.exerciseId);
+  }
+  const completedAttempts = item.correctCount + item.incorrectCount;
+  return candidates[completedAttempts % candidates.length];
+}
+
+export function migrateLegacyReviewItems(
+  legacyItems: LegacyReviewItemV2[],
+  exercises: Exercise[],
+): ReviewItem[] {
+  const exerciseById = new Map(exercises.map((exercise) => [exercise.id, exercise]));
+  return [...legacyItems].reverse().reduce<ReviewItem[]>((items, legacy) => {
+    const exercise = exerciseById.get(legacy.exerciseId);
+    if (!exercise) return items;
+    const skill = inferExerciseSkill(exercise);
+    return legacy.targetItemIds.reduce((current, itemId) =>
+      upsertReviewItem(current, {
+        itemId,
+        skill,
+        exerciseId: legacy.exerciseId,
+        lessonId: legacy.lessonId,
+        dueAt: legacy.dueAt,
+        intervalDays: legacy.intervalDays,
+        ease: legacy.ease,
+        streak: legacy.streak,
+        correctCount: legacy.correctCount,
+        incorrectCount: legacy.incorrectCount,
+        lapseCount: legacy.lapseCount,
+        lastStatus: legacy.lastStatus,
+        lastAnsweredAt: legacy.lastAnsweredAt,
+      }), items);
+  }, []);
 }
 
 export function createAttemptLogEntry(
