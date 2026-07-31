@@ -16,7 +16,7 @@ const exercises: Exercise[] = [
     id: "exercise-two",
     type: "text-input",
     prompt: "Второе",
-    targetItemIds: ["word-two"],
+    targetItemIds: ["word-two", "grammar-counter"],
     correctAnswers: ["二"],
   },
 ];
@@ -27,7 +27,7 @@ const attempts = [
 ];
 const now = new Date("2026-07-31T10:00:00.000Z");
 
-test("успешно завершённый новый урок добавляет задания в SRS", () => {
+test("успешно завершённый новый урок добавляет знания и навыки в SRS", () => {
   const items = commitLessonReviewItems({
     items: [],
     exercises,
@@ -38,9 +38,14 @@ test("успешно завершённый новый урок добавляе
     now,
   });
 
-  assert.equal(items.length, 2);
+  assert.equal(items.length, 3);
   assert.ok(items.every((item) => item.lessonId === "lesson-test"));
   assert.ok(items.every((item) => item.intervalDays === 1));
+  assert.ok(items.every((item) => item.skill === "recall"));
+  assert.deepEqual(
+    new Set(items.map((item) => item.itemId)),
+    new Set(["word-one", "word-two", "grammar-counter"]),
+  );
 });
 
 test("незавершённый урок не засоряет долгосрочную очередь", () => {
