@@ -54,11 +54,11 @@ const inferSentenceContentKey = (
   if (explicitSentenceId) return `sentence:${explicitSentenceId}`;
 
   const fields = exerciseTextFields(exercise);
-  const matchedSentence = bundle.sentences.find((sentence) => {
+  const sentence = bundle.sentences.find((item) => {
     const needles = unique([
-      sentence.japanese,
-      sentence.reading ?? "",
-      sentence.translationRu,
+      item.japanese,
+      item.reading ?? "",
+      item.translationRu,
     ])
       .map(normalizeText)
       .filter((value) => value.length >= 4);
@@ -67,7 +67,7 @@ const inferSentenceContentKey = (
     );
   });
 
-  return matchedSentence ? `sentence:${matchedSentence.id}` : undefined;
+  return sentence ? `sentence:${sentence.id}` : undefined;
 };
 
 const normalizeExistingExercise = (
@@ -140,7 +140,7 @@ const createVocabularyExercises = (
   const readingPool = words.map((item) => item.reading);
   const writtenPool = words.map((item) => item.writtenForm);
   const confusions = vocabularyConfusions(bundle, word.id);
-
+  const variantGroup = `vocabulary:${word.id}:practice`;
   const meaningKey = `vocabulary:${word.id}:meaning`;
   const readingKey = `vocabulary:${word.id}:reading`;
   const writtenKey = `vocabulary:${word.id}:written`;
@@ -155,7 +155,7 @@ const createVocabularyExercises = (
       acceptableAnswers: word.meaningsRu.slice(1),
       distractors: takeDistractors(meaningPool, word.meaningsRu),
       explanationRu: `${word.writtenForm}（${word.reading}）— ${word.meaningsRu.join(", ")}.`,
-      variantGroup: meaningKey,
+      variantGroup,
       contentKey: meaningKey,
       difficulty: 1,
       confusionItemIds: confusions,
@@ -170,7 +170,7 @@ const createVocabularyExercises = (
       acceptableAnswers: word.meaningsRu.slice(1),
       distractors: takeDistractors(meaningPool, word.meaningsRu),
       explanationRu: `${word.writtenForm}（${word.reading}）— ${word.meaningsRu.join(", ")}.`,
-      variantGroup: meaningKey,
+      variantGroup,
       contentKey: meaningKey,
       difficulty: 2,
       confusionItemIds: confusions,
@@ -183,7 +183,7 @@ const createVocabularyExercises = (
       correctAnswers: [word.reading],
       distractors: takeDistractors(readingPool, [word.reading]),
       explanationRu: `${word.writtenForm} читается ${word.reading}.`,
-      variantGroup: readingKey,
+      variantGroup,
       contentKey: readingKey,
       difficulty: 2,
       confusionItemIds: confusions,
@@ -195,7 +195,7 @@ const createVocabularyExercises = (
       targetItemIds: [word.id],
       correctAnswers: [word.reading],
       explanationRu: `${word.writtenForm} читается ${word.reading}.`,
-      variantGroup: readingKey,
+      variantGroup,
       contentKey: readingKey,
       difficulty: 3,
       confusionItemIds: confusions,
@@ -208,7 +208,7 @@ const createVocabularyExercises = (
       correctAnswers: [word.writtenForm],
       distractors: takeDistractors(writtenPool, [word.writtenForm]),
       explanationRu: `${meaning} — ${word.writtenForm}（${word.reading}）.`,
-      variantGroup: writtenKey,
+      variantGroup,
       contentKey: writtenKey,
       difficulty: 2,
       confusionItemIds: confusions,
@@ -222,7 +222,7 @@ const createVocabularyExercises = (
       correctAnswers: [word.writtenForm],
       distractors: takeDistractors(writtenPool, [word.writtenForm]),
       explanationRu: `${word.reading} — ${word.writtenForm}.`,
-      variantGroup: writtenKey,
+      variantGroup,
       contentKey: writtenKey,
       difficulty: 2,
       confusionItemIds: confusions,
@@ -241,6 +241,7 @@ const createGrammarExercises = (
   const formationPool = grammarPool.flatMap((item) => item.formation);
   const formation = grammar.formation[0] ?? grammar.title;
   const confusions = grammarConfusions(bundle, grammar.id);
+  const variantGroup = `grammar:${grammar.id}:practice`;
   const meaningKey = `grammar:${grammar.id}:meaning`;
   const formationKey = `grammar:${grammar.id}:formation`;
 
@@ -253,7 +254,7 @@ const createGrammarExercises = (
       correctAnswers: [grammar.meaningRu],
       distractors: takeDistractors(meaningPool, [grammar.meaningRu]),
       explanationRu: grammar.explanationRu,
-      variantGroup: meaningKey,
+      variantGroup,
       contentKey: meaningKey,
       difficulty: 1,
       confusionItemIds: confusions,
@@ -266,7 +267,7 @@ const createGrammarExercises = (
       correctAnswers: [grammar.title],
       distractors: takeDistractors(titlePool, [grammar.title]),
       explanationRu: grammar.explanationRu,
-      variantGroup: meaningKey,
+      variantGroup,
       contentKey: meaningKey,
       difficulty: 2,
       confusionItemIds: confusions,
@@ -279,7 +280,7 @@ const createGrammarExercises = (
       correctAnswers: [formation],
       distractors: takeDistractors(formationPool, [formation]),
       explanationRu: `Основная схема: ${formation}`,
-      variantGroup: formationKey,
+      variantGroup,
       contentKey: formationKey,
       difficulty: 2,
       confusionItemIds: confusions,
@@ -292,7 +293,7 @@ const createGrammarExercises = (
       correctAnswers: [grammar.title],
       distractors: takeDistractors(titlePool, [grammar.title]),
       explanationRu: `${formation} — схема темы «${grammar.title}».`,
-      variantGroup: formationKey,
+      variantGroup,
       contentKey: formationKey,
       difficulty: 2,
       confusionItemIds: confusions,
@@ -305,7 +306,6 @@ const createGrammarExercises = (
       ...(item.cautions ?? []),
       item.meaningRu,
     ]);
-    const cautionKey = `grammar:${grammar.id}:caution`;
     exercises.push({
       id: grammarExerciseId(bundle, grammar, "caution-choice"),
       type: "multiple-choice",
@@ -314,8 +314,8 @@ const createGrammarExercises = (
       correctAnswers: [caution],
       distractors: takeDistractors(cautionPool, [caution]),
       explanationRu: caution,
-      variantGroup: cautionKey,
-      contentKey: cautionKey,
+      variantGroup,
+      contentKey: `grammar:${grammar.id}:caution`,
       difficulty: 3,
       confusionItemIds: confusions,
     });
@@ -337,22 +337,19 @@ export function diversifyLessonPractice(
   bundle: LessonBundle,
   allBundles: readonly LessonBundle[],
 ): LessonBundle {
-  const normalizedExisting = bundle.exercises.map((exercise) =>
-    normalizeExistingExercise(bundle, exercise),
-  );
-  const generatedVocabulary = bundle.vocabulary.flatMap((word) =>
-    createVocabularyExercises(bundle, word, allBundles),
-  );
-  const generatedGrammar = bundle.grammar.flatMap((grammar) =>
-    createGrammarExercises(bundle, grammar, allBundles),
-  );
-  const exercises = deduplicateById([
-    ...normalizedExisting,
-    ...generatedVocabulary,
-    ...generatedGrammar,
+  const pool = deduplicateById([
+    ...bundle.exercises.map((exercise) =>
+      normalizeExistingExercise(bundle, exercise),
+    ),
+    ...bundle.vocabulary.flatMap((word) =>
+      createVocabularyExercises(bundle, word, allBundles),
+    ),
+    ...bundle.grammar.flatMap((grammar) =>
+      createGrammarExercises(bundle, grammar, allBundles),
+    ),
   ]);
-  const sessionQueue = buildUniqueExerciseQueue(
-    exercises,
+  const exercises = buildUniqueExerciseQueue(
+    pool,
     SESSION_EXERCISE_COUNT,
   );
 
@@ -361,10 +358,6 @@ export function diversifyLessonPractice(
     lesson: {
       ...bundle.lesson,
       exerciseIds: exercises.map((exercise) => exercise.id),
-      estimatedMinutes:
-        sessionQueue.length >= SESSION_EXERCISE_COUNT
-          ? bundle.lesson.estimatedMinutes
-          : Math.max(8, bundle.lesson.estimatedMinutes - 2),
     },
     exercises,
   };
