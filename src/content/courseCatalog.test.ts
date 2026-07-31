@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { getExerciseContentKey } from "../engine/exerciseIdentity";
 import { courseUnits, lessonBundles } from "./courseCatalog.ts";
 
 const duplicates = (values: string[]): string[] => {
@@ -119,24 +120,35 @@ test("lesson six remains the mixed-practice reference lesson", () => {
   assert.ok(exerciseTypes.has("sentence-builder"));
   assert.ok(exerciseTypes.has("particle-gap"));
   assert.ok(exerciseTypes.has("text-input"));
-  assert.ok(
-    lessonSix.exercises.filter((exercise) => exercise.variantGroup === "location-particles").length >= 4,
-  );
   assert.ok(lessonSix.exercises.some((exercise) => exercise.difficulty === 4));
 });
 
-test("every lesson now has substantial mixed practice and remediation partners", () => {
+test("every lesson has twelve semantically unique mixed exercises", () => {
   lessonBundles.forEach((bundle) => {
+    assert.equal(bundle.exercises.length, 12, `${bundle.lesson.id} does not have 12 exercises`);
+
+    const contentKeys = bundle.exercises.map(getExerciseContentKey);
+    assert.equal(
+      new Set(contentKeys).size,
+      contentKeys.length,
+      `${bundle.lesson.id} repeats semantic content`,
+    );
     assert.ok(
-      bundle.exercises.length >= 12,
-      `${bundle.lesson.id} has only ${bundle.exercises.length} exercises`,
+      bundle.exercises.every((exercise) => Boolean(exercise.contentKey)),
+      `${bundle.lesson.id} has exercises without semantic identity`,
+    );
+
+    const sentenceKeys = contentKeys.filter((key) => key.startsWith("sentence:"));
+    assert.equal(
+      new Set(sentenceKeys).size,
+      sentenceKeys.length,
+      `${bundle.lesson.id} repeats the same sentence in one session`,
     );
 
     const exerciseTypes = new Set(bundle.exercises.map((exercise) => exercise.type));
     assert.ok(exerciseTypes.has("multiple-choice"), `${bundle.lesson.id} lacks recognition practice`);
     assert.ok(exerciseTypes.has("listening"), `${bundle.lesson.id} lacks listening practice`);
     assert.ok(exerciseTypes.has("text-input"), `${bundle.lesson.id} lacks active recall`);
-
     assert.ok(
       bundle.exercises.every((exercise) => Boolean(exercise.variantGroup)),
       `${bundle.lesson.id} has exercises without a remediation group`,
@@ -145,23 +157,25 @@ test("every lesson now has substantial mixed practice and remediation partners",
       bundle.exercises.every((exercise) => Boolean(exercise.difficulty)),
       `${bundle.lesson.id} has exercises without difficulty`,
     );
+  });
+});
 
-    const groupCounts = new Map<string, number>();
+test("remediation groups connect different content instead of cloning one sentence", () => {
+  lessonBundles.forEach((bundle) => {
+    const groups = new Map<string, string[]>();
     bundle.exercises.forEach((exercise) => {
       const group = exercise.variantGroup as string;
-      groupCounts.set(group, (groupCounts.get(group) ?? 0) + 1);
+      const keys = groups.get(group) ?? [];
+      groups.set(group, [...keys, getExerciseContentKey(exercise)]);
     });
-    assert.ok(
-      [...groupCounts.values()].some((count) => count >= 2),
-      `${bundle.lesson.id} has no linked exercise pair for error remediation`,
-    );
 
-    if (bundle.lesson.id !== "lesson-006") {
-      assert.ok(
-        bundle.exercises.some((exercise) => exercise.id.includes("-auto-")),
-        `${bundle.lesson.id} did not receive expanded practice`,
-      );
-    }
+    const linkedDistinctGroups = [...groups.values()].filter(
+      (keys) => keys.length >= 2 && new Set(keys).size === keys.length,
+    );
+    assert.ok(
+      linkedDistinctGroups.length > 0,
+      `${bundle.lesson.id} has no non-duplicate remediation pair`,
+    );
   });
 });
 
