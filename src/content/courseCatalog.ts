@@ -5,17 +5,18 @@ import {
   lesson001Sentences,
   lesson001Vocabulary,
 } from "./lesson001";
-import { lesson002, lesson002Bundle } from "./lesson002";
-import { lesson003, lesson003Bundle } from "./lesson003";
-import { lesson004, lesson004Bundle } from "./lesson004";
-import { lesson005, lesson005Bundle } from "./lesson005";
-import { lesson006, lesson006Bundle } from "./lesson006";
-import { lesson007, lesson007Bundle } from "./lesson007";
-import { lesson008, lesson008Bundle } from "./lesson008";
-import { lesson009, lesson009Bundle } from "./lesson009";
-import { lesson010, lesson010Bundle } from "./lesson010";
+import { lesson002Bundle } from "./lesson002";
+import { lesson003Bundle } from "./lesson003";
+import { lesson004Bundle } from "./lesson004";
+import { lesson005Bundle } from "./lesson005";
+import { lesson006Bundle } from "./lesson006";
+import { lesson007Bundle } from "./lesson007";
+import { lesson008Bundle } from "./lesson008";
+import { lesson009Bundle } from "./lesson009";
+import { lesson010Bundle } from "./lesson010";
 import type { Lesson } from "../domain/course";
 import type { LessonBundle } from "./lessonBundle";
+import { expandLessonPractice } from "./practiceExpansion";
 
 export interface CourseUnit {
   id: string;
@@ -25,7 +26,7 @@ export interface CourseUnit {
   lessons: Lesson[];
 }
 
-export const lesson001Bundle: LessonBundle = {
+const lesson001BaseBundle: LessonBundle = {
   lesson: lesson001,
   vocabulary: lesson001Vocabulary,
   grammar: lesson001Grammar,
@@ -38,8 +39,8 @@ export const lesson001Bundle: LessonBundle = {
   ],
 };
 
-export const lessonBundles: readonly LessonBundle[] = [
-  lesson001Bundle,
+const baseLessonBundles: readonly LessonBundle[] = [
+  lesson001BaseBundle,
   lesson002Bundle,
   lesson003Bundle,
   lesson004Bundle,
@@ -51,9 +52,21 @@ export const lessonBundles: readonly LessonBundle[] = [
   lesson010Bundle,
 ];
 
+export const lessonBundles: readonly LessonBundle[] = baseLessonBundles.map((bundle) =>
+  expandLessonPractice(bundle, baseLessonBundles),
+);
+
+export const lesson001Bundle = lessonBundles[0] ?? lesson001BaseBundle;
+
 export function findLessonBundle(lessonId: string): LessonBundle | undefined {
   return lessonBundles.find((bundle) => bundle.lesson.id === lessonId);
 }
+
+const requireLesson = (lessonId: string): Lesson => {
+  const lesson = findLessonBundle(lessonId)?.lesson;
+  if (!lesson) throw new Error(`В каталоге отсутствует ${lessonId}`);
+  return lesson;
+};
 
 export const courseUnits: CourseUnit[] = [
   {
@@ -62,7 +75,11 @@ export const courseUnits: CourseUnit[] = [
     description:
       "Тема, связка, указательные слова, принадлежность, вопросы и значение «тоже».",
     jlptLevel: "N5",
-    lessons: [lesson001, lesson002, lesson003],
+    lessons: [
+      requireLesson("lesson-001"),
+      requireLesson("lesson-002"),
+      requireLesson("lesson-003"),
+    ],
   },
   {
     id: "unit-002",
@@ -70,7 +87,11 @@ export const courseUnits: CourseUnit[] = [
     description:
       "Где кто-то находится, что человек делает, куда идёт и где происходит действие.",
     jlptLevel: "N5",
-    lessons: [lesson004, lesson005, lesson006],
+    lessons: [
+      requireLesson("lesson-004"),
+      requireLesson("lesson-005"),
+      requireLesson("lesson-006"),
+    ],
   },
   {
     id: "unit-003",
@@ -78,6 +99,11 @@ export const courseUnits: CourseUnit[] = [
     description:
       "Как назвать время, рассказать о распорядке и поставить です／ます в отрицание и прошедшее.",
     jlptLevel: "N5",
-    lessons: [lesson007, lesson008, lesson009, lesson010],
+    lessons: [
+      requireLesson("lesson-007"),
+      requireLesson("lesson-008"),
+      requireLesson("lesson-009"),
+      requireLesson("lesson-010"),
+    ],
   },
 ];
