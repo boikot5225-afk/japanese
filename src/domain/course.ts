@@ -69,6 +69,11 @@ export interface Exercise {
   acceptableAnswers?: string[];
   distractors?: string[];
   explanationRu?: string;
+  variantGroup?: string;
+  difficulty?: 1 | 2 | 3 | 4;
+  confusionItemIds?: string[];
+  audioText?: string;
+  sessionRole?: "core" | "remediation";
 }
 
 export interface Lesson {
