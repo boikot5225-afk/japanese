@@ -108,8 +108,7 @@ export function createKanaQuestion(
   skill: KanaSkill,
   pool: readonly KanaSymbol[] = basicHiragana,
 ): KanaQuestion {
-  const eligiblePool =
-    skill === "listening" ? pool.filter(isKanaListeningEligible) : pool;
+  const eligiblePool = skill === "listening" ? pool.filter(isKanaListeningEligible) : pool;
   const targetIndex = Math.max(0, eligiblePool.findIndex((item) => item.id === symbol.id));
   const kanaOptions = rotateOptions(
     uniqueOptions(eligiblePool, targetIndex, (item) => item.kana),
@@ -226,9 +225,9 @@ export function updateKanaProgress(
   };
 }
 
-export function createKnownHiraganaProgress(): KanaProgressMap {
+export function createKnownKanaProgress(pool: readonly KanaSymbol[]): KanaProgressMap {
   return Object.fromEntries(
-    basicHiragana.map((symbol) => [
+    pool.map((symbol) => [
       symbol.id,
       {
         recognition: MAX_SKILL_SCORE,
@@ -240,6 +239,10 @@ export function createKnownHiraganaProgress(): KanaProgressMap {
       } satisfies KanaSkillProgress,
     ]),
   );
+}
+
+export function createKnownHiraganaProgress(): KanaProgressMap {
+  return createKnownKanaProgress(basicHiragana);
 }
 
 export function getKanaMasterySummary(
@@ -275,8 +278,7 @@ export function getSkillAverage(
   skill: KanaSkill,
   pool: readonly KanaSymbol[] = basicHiragana,
 ): number {
-  const eligiblePool =
-    skill === "listening" ? pool.filter(isKanaListeningEligible) : [...pool];
+  const eligiblePool = skill === "listening" ? pool.filter(isKanaListeningEligible) : [...pool];
   const total = eligiblePool.reduce(
     (sum, symbol) => sum + skillScore(progress[symbol.id], skill),
     0,
