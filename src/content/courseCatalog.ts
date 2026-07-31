@@ -10,6 +10,10 @@ import { lesson003, lesson003Bundle } from "./lesson003";
 import { lesson004, lesson004Bundle } from "./lesson004";
 import { lesson005, lesson005Bundle } from "./lesson005";
 import { lesson006, lesson006Bundle } from "./lesson006";
+import { lesson007, lesson007Bundle } from "./lesson007";
+import { lesson008, lesson008Bundle } from "./lesson008";
+import { lesson009, lesson009Bundle } from "./lesson009";
+import { lesson010, lesson010Bundle } from "./lesson010";
 import type { Lesson } from "../domain/course";
 import type { LessonBundle } from "./lessonBundle";
 
@@ -41,6 +45,10 @@ export const lessonBundles: readonly LessonBundle[] = [
   lesson004Bundle,
   lesson005Bundle,
   lesson006Bundle,
+  lesson007Bundle,
+  lesson008Bundle,
+  lesson009Bundle,
+  lesson010Bundle,
 ];
 
 export function findLessonBundle(lessonId: string): LessonBundle | undefined {
@@ -63,5 +71,13 @@ export const courseUnits: CourseUnit[] = [
       "Где кто-то находится, что человек делает, куда идёт и где происходит действие.",
     jlptLevel: "N5",
     lessons: [lesson004, lesson005, lesson006],
+  },
+  {
+    id: "unit-003",
+    title: "Время и формы",
+    description:
+      "Как назвать время, рассказать о распорядке и поставить です／ます в отрицание и прошедшее.",
+    jlptLevel: "N5",
+    lessons: [lesson007, lesson008, lesson009, lesson010],
   },
 ];
