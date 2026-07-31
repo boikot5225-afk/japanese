@@ -1,6 +1,6 @@
 {
   "name": "japanese-tutor",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "private": true,
   "main": "expo/AppEntry.js",
   "scripts": {
@@ -10,7 +10,8 @@
     "test:review": "node --experimental-strip-types --test src/engine/reviewEngine.test.ts",
     "test:kana": "node --experimental-strip-types --test src/engine/kanaEngine.test.ts",
     "test:kana-words": "node --experimental-strip-types --test src/engine/kanaWordEngine.test.ts",
-    "test": "npm run test:review && npm run test:kana && npm run test:kana-words",
+    "test:katakana": "node --experimental-strip-types --test src/engine/katakanaEngine.test.ts",
+    "test": "npm run test:review && npm run test:kana && npm run test:kana-words && npm run test:katakana",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

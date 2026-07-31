@@ -18,11 +18,13 @@ interface CourseScreenProps {
   onOpenKana: () => void;
 }
 
-const lessonWord = (count: number): string => {
-  if (count % 10 === 1 && count % 100 !== 11) return "урок";
-  if ([2, 3, 4].includes(count % 10) && ![12, 13, 14].includes(count % 100)) return "урока";
-  return "уроков";
+const russianForm = (count: number, one: string, few: string, many: string): string => {
+  if (count % 10 === 1 && count % 100 !== 11) return one;
+  if ([2, 3, 4].includes(count % 10) && ![12, 13, 14].includes(count % 100)) return few;
+  return many;
 };
+
+const lessonWord = (count: number): string => russianForm(count, "урок", "урока", "уроков");
 
 export function CourseScreen({
   completedLessonIds,
@@ -66,16 +68,17 @@ export function CourseScreen({
         <View style={kanaStyles.courseKanaCard}>
           <View style={kanaStyles.courseKanaHeader}>
             <View>
-              <Text style={styles.reviewEyebrow}>Азбука</Text>
-              <Text style={kanaStyles.courseKanaTitle}>Хирагана · 46 знаков</Text>
+              <Text style={styles.reviewEyebrow}>Письменность</Text>
+              <Text style={kanaStyles.courseKanaTitle}>Хирагана и катакана</Text>
             </View>
-            <Text style={kanaStyles.courseKanaGlyph}>あ</Text>
+            <Text style={kanaStyles.courseKanaGlyph}>あ ア</Text>
           </View>
           <Text style={kanaStyles.courseKanaBody}>
-            Таблица со звуком и отдельные тренировки на узнавание, чтение, слух и ввод ромадзи.
+            Две азбуки, звук, сложные пары, ввод ромадзи и сборка настоящих слов.
+            Прогресс каждого знака хранится отдельно.
           </Text>
           <TouchableOpacity style={kanaStyles.primaryButton} onPress={onOpenKana}>
-            <Text style={kanaStyles.primaryButtonText}>Открыть хирагану</Text>
+            <Text style={kanaStyles.primaryButtonText}>Открыть азбуки</Text>
           </TouchableOpacity>
         </View>
 
@@ -133,7 +136,7 @@ export function CourseScreen({
                     <Text style={styles.lessonTitle}>{lesson.title}</Text>
                     <Text style={styles.lessonMeta}>
                       {bundle
-                        ? `${bundle.grammar.length} темы · ${bundle.vocabulary.length} слова · ${bundle.exercises.length} упражнения`
+                        ? `${bundle.grammar.length} ${russianForm(bundle.grammar.length, "тема", "темы", "тем")} · ${bundle.vocabulary.length} ${russianForm(bundle.vocabulary.length, "слово", "слова", "слов")} · ${bundle.exercises.length} ${russianForm(bundle.exercises.length, "упражнение", "упражнения", "упражнений")}`
                         : "Материал готовится"}
                     </Text>
                   </View>
