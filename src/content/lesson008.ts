@@ -133,13 +133,13 @@ export const lesson008Sentences: ExampleSentence[] = [
     vocabularyIds: ["word-gozen", "word-gogo", "word-kyuu-number", "word-go-number", "word-hatarakimasu"],
   },
   {
-    id: "sentence-yoru-juuichiji-nemasu",
+    id: "sentence-yoru-juuji-nemasu",
     type: "sentence",
-    japanese: "夜十一時に寝ます。",
-    reading: "よるじゅういちじにねます。",
-    translationRu: "Я ложусь спать в одиннадцать вечера.",
+    japanese: "夜十時に寝ます。",
+    reading: "よるじゅうじにねます。",
+    translationRu: "Я ложусь спать в десять вечера.",
     grammarIds: ["grammar-time-ni", "grammar-masu-polite"],
-    vocabularyIds: ["word-yoru", "word-juu-number", "word-ichi-number", "word-nemasu"],
+    vocabularyIds: ["word-yoru", "word-juu-number", "word-nemasu"],
   },
   {
     id: "sentence-mainichi-nihongo-benkyou",
@@ -209,16 +209,16 @@ export const lesson008Exercises: Exercise[] = [
   {
     id: "exercise-yoru-nemasu-input",
     type: "text-input",
-    prompt: "Напиши по-японски: Я ложусь спать в одиннадцать вечера.",
+    prompt: "Напиши по-японски: Я ложусь спать в десять вечера.",
     targetItemIds: ["grammar-time-ni", "word-yoru", "word-nemasu"],
-    correctAnswers: ["夜十一時に寝ます", "夜十一時に寝ます。"],
+    correctAnswers: ["夜十時に寝ます", "夜十時に寝ます。"],
     acceptableAnswers: [
-      "午後十一時に寝ます",
-      "午後十一時に寝ます。",
-      "よるじゅういちじにねます",
-      "よるじゅういちじにねます。"
+      "午後十時に寝ます",
+      "午後十時に寝ます。",
+      "よるじゅうじにねます",
+      "よるじゅうじにねます。"
     ],
-    explanationRu: "Точный час 十一時 отмечается частицей に.",
+    explanationRu: "Точный час 十時 отмечается частицей に.",
   },
   {
     id: "exercise-nanji-ni-question",
