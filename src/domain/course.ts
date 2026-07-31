@@ -70,6 +70,7 @@ export interface Exercise {
   distractors?: string[];
   explanationRu?: string;
   variantGroup?: string;
+  contentKey?: string;
   difficulty?: 1 | 2 | 3 | 4;
   confusionItemIds?: string[];
   audioText?: string;
