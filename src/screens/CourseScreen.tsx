@@ -1,18 +1,30 @@
 import { SafeAreaView, ScrollView, StatusBar, Text, TouchableOpacity, View } from "react-native";
 
+import {
+  findCheckpointForUnit,
+  type CourseCheckpoint,
+} from "../content/courseCheckpoints";
 import { courseUnits, findLessonBundle } from "../content/courseCatalog";
 import type { LessonBundle } from "../content/lessonBundle";
+import {
+  isCheckpointAvailable,
+  isCheckpointPassed,
+  isLessonUnlocked,
+  type CheckpointProgress,
+} from "../engine/checkpointEngine";
 import { styles } from "../theme/appStyles";
 import { kanaStyles } from "../theme/kanaStyles";
 
 interface CourseScreenProps {
   completedLessonIds: string[];
+  checkpointProgress: CheckpointProgress[];
   todayBundle: LessonBundle | undefined;
   dueReviewCount: number;
   weakTargetCount: number;
   nextReviewLabel: string;
   onStartLesson: (bundle: LessonBundle) => void;
   onStartLessonById: (lessonId: string) => void;
+  onStartCheckpoint: (checkpoint: CourseCheckpoint) => void;
   onStartReview: () => void;
   onOpenKana: () => void;
 }
@@ -27,12 +39,14 @@ const lessonWord = (count: number): string => russianForm(count, "урок", "у
 
 export function CourseScreen({
   completedLessonIds,
+  checkpointProgress,
   todayBundle,
   dueReviewCount,
   weakTargetCount,
   nextReviewLabel,
   onStartLesson,
   onStartLessonById,
+  onStartCheckpoint,
   onStartReview,
   onOpenKana,
 }: CourseScreenProps) {
@@ -117,42 +131,100 @@ export function CourseScreen({
         </View>
 
         <Text style={[styles.sectionTitle, styles.courseHeading]}>Курс</Text>
-        {courseUnits.map((unit) => (
-          <View key={unit.id} style={styles.unitCard}>
-            <View style={styles.unitHeader}>
-              <Text style={styles.unitLevel}>{unit.jlptLevel}</Text>
-              <Text style={styles.unitCount}>{unit.lessons.length} {lessonWord(unit.lessons.length)}</Text>
-            </View>
-            <Text style={styles.unitTitle}>{unit.title}</Text>
-            <Text style={styles.body}>{unit.description}</Text>
+        {courseUnits.map((unit) => {
+          const checkpoint = findCheckpointForUnit(unit.id);
+          const checkpointState = checkpoint
+            ? checkpointProgress.find((item) => item.checkpointId === checkpoint.id)
+            : undefined;
+          const checkpointAvailable = checkpoint
+            ? isCheckpointAvailable(checkpoint, completedLessonIds)
+            : false;
+          const checkpointPassed = checkpoint
+            ? isCheckpointPassed(checkpoint.id, checkpointProgress)
+            : false;
 
-            {unit.lessons.map((lesson) => {
-              const bundle = findLessonBundle(lesson.id);
-              const completed = completedLessonIds.includes(lesson.id);
-              return (
-                <TouchableOpacity
-                  key={lesson.id}
-                  style={styles.lessonRow}
-                  disabled={!bundle}
-                  onPress={() => onStartLessonById(lesson.id)}
-                >
-                  <View style={[styles.lessonNumber, completed && styles.lessonNumberCompleted]}>
-                    <Text style={styles.lessonNumberText}>{completed ? "✓" : lesson.order}</Text>
+          return (
+            <View key={unit.id} style={styles.unitCard}>
+              <View style={styles.unitHeader}>
+                <Text style={styles.unitLevel}>{unit.jlptLevel}</Text>
+                <Text style={styles.unitCount}>{unit.lessons.length} {lessonWord(unit.lessons.length)}</Text>
+              </View>
+              <Text style={styles.unitTitle}>{unit.title}</Text>
+              <Text style={styles.body}>{unit.description}</Text>
+
+              {unit.lessons.map((lesson) => {
+                const bundle = findLessonBundle(lesson.id);
+                const completed = completedLessonIds.includes(lesson.id);
+                const unlocked = isLessonUnlocked(
+                  lesson.id,
+                  completedLessonIds,
+                  checkpointProgress,
+                );
+                return (
+                  <TouchableOpacity
+                    key={lesson.id}
+                    style={[styles.lessonRow, !unlocked && styles.disabledButton]}
+                    disabled={!bundle || !unlocked}
+                    onPress={() => onStartLessonById(lesson.id)}
+                  >
+                    <View style={[styles.lessonNumber, completed && styles.lessonNumberCompleted]}>
+                      <Text style={styles.lessonNumberText}>
+                        {completed ? "✓" : unlocked ? lesson.order : "🔒"}
+                      </Text>
+                    </View>
+                    <View style={styles.lessonInfo}>
+                      <Text style={styles.lessonTitle}>{lesson.title}</Text>
+                      <Text style={styles.lessonMeta}>
+                        {!unlocked
+                          ? "Сначала пройди контрольную точку предыдущего блока"
+                          : bundle
+                            ? `${bundle.grammar.length} ${russianForm(bundle.grammar.length, "тема", "темы", "тем")} · ${bundle.vocabulary.length} ${russianForm(bundle.vocabulary.length, "слово", "слова", "слов")} · ${bundle.exercises.length} ${russianForm(bundle.exercises.length, "упражнение", "упражнения", "упражнений")}${completed ? " · свободное повторение" : ""}`
+                            : "Материал готовится"}
+                      </Text>
+                    </View>
+                    <Text style={styles.lessonChevron}>{unlocked ? "›" : ""}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+
+              {checkpoint && (
+                <View style={styles.reviewCard}>
+                  <View style={styles.reviewHeader}>
+                    <View>
+                      <Text style={styles.reviewEyebrow}>Рубеж блока</Text>
+                      <Text style={styles.reviewTitle}>{checkpoint.title}</Text>
+                    </View>
+                    <View style={styles.reviewCountBadge}>
+                      <Text style={styles.reviewCount}>
+                        {checkpointPassed ? "✓" : checkpoint.passPercent}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.lessonInfo}>
-                    <Text style={styles.lessonTitle}>{lesson.title}</Text>
-                    <Text style={styles.lessonMeta}>
-                      {bundle
-                        ? `${bundle.grammar.length} ${russianForm(bundle.grammar.length, "тема", "темы", "тем")} · ${bundle.vocabulary.length} ${russianForm(bundle.vocabulary.length, "слово", "слова", "слов")} · ${bundle.exercises.length} ${russianForm(bundle.exercises.length, "упражнение", "упражнения", "упражнений")}${completed ? " · свободное повторение" : ""}`
-                        : "Материал готовится"}
+                  <Text style={styles.reviewBody}>
+                    {checkpointPassed
+                      ? `Пройдено. Лучший результат: ${checkpointState?.bestPercent ?? checkpoint.passPercent}%. Можно пересдать без потери доступа.`
+                      : checkpointAvailable
+                        ? `${checkpoint.questionCount} смешанных заданий из всего блока. Для перехода дальше нужно ${checkpoint.passPercent}%.`
+                        : "Откроется после завершения всех уроков этого блока."}
+                  </Text>
+                  <TouchableOpacity
+                    disabled={!checkpointAvailable}
+                    style={[styles.reviewButton, !checkpointAvailable && styles.disabledButton]}
+                    onPress={() => onStartCheckpoint(checkpoint)}
+                  >
+                    <Text style={styles.reviewButtonText}>
+                      {checkpointPassed
+                        ? "Пройти ещё раз"
+                        : checkpointAvailable
+                          ? "Начать проверку"
+                          : "Пока закрыто"}
                     </Text>
-                  </View>
-                  <Text style={styles.lessonChevron}>›</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        ))}
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          );
+        })}
       </ScrollView>
     </SafeAreaView>
   );

@@ -1,10 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { SafeAreaView, Text, TouchableOpacity, View } from "react-native";
 
+import {
+  findCheckpoint,
+  type CourseCheckpoint,
+} from "./src/content/courseCheckpoints";
 import { findLessonBundle, lessonBundles } from "./src/content/courseCatalog";
 import type { LessonBundle } from "./src/content/lessonBundle";
 import type { Exercise, Skill } from "./src/domain/course";
 import { checkAnswer, type AnswerCheckResult } from "./src/engine/checkAnswer";
+import {
+  buildCheckpointQueue,
+  calculateCheckpointResult,
+  isCheckpointAvailable,
+  isLessonUnlocked,
+  updateCheckpointProgress,
+  type CheckpointProgress,
+  type CheckpointQuestion,
+} from "./src/engine/checkpointEngine";
 import { createKnownHiraganaProgress } from "./src/engine/kanaEngine";
 import {
   commitLessonReviewItems,
@@ -17,6 +30,7 @@ import {
   getDueReviewItems,
   getNextReviewAt,
   getWeakTargetIds,
+  inferExerciseSkill,
   isSuccessfulStatus,
   reviewItemKey,
   scheduleItemReview,
@@ -26,6 +40,10 @@ import {
   type AttemptSource,
   type ReviewItem,
 } from "./src/engine/reviewEngine";
+import {
+  CheckpointResultScreen,
+  CheckpointScreen,
+} from "./src/screens/CheckpointScreens";
 import { CourseScreen } from "./src/screens/CourseScreen";
 import { KanaScreen } from "./src/screens/KanaScreen";
 import { OnboardingScreen } from "./src/screens/OnboardingScreen";
@@ -41,7 +59,16 @@ import {
 import { loadCourseProgress, saveCourseProgress } from "./src/storage/progressStorage";
 import { styles } from "./src/theme/appStyles";
 
-type Screen = "course" | "kana" | "lesson" | "result" | "review" | "review-result";
+type Screen =
+  | "course"
+  | "kana"
+  | "lesson"
+  | "result"
+  | "review"
+  | "review-result"
+  | "checkpoint"
+  | "checkpoint-result";
+
 const lessonStages: LessonStage[] = ["theory", "words", "examples", "practice"];
 const initialBundle: LessonBundle = lessonBundles[0] ?? (() => {
   throw new Error("В курсе нет ни одного урока.");
@@ -87,6 +114,7 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>("course");
   const [activeBundle, setActiveBundle] = useState<LessonBundle>(initialBundle);
   const [completedLessonIds, setCompletedLessonIds] = useState<string[]>([]);
+  const [checkpointProgress, setCheckpointProgress] = useState<CheckpointProgress[]>([]);
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
   const [attemptHistory, setAttemptHistory] = useState<AttemptLogEntry[]>([]);
   const [progressHydrated, setProgressHydrated] = useState(false);
@@ -96,10 +124,13 @@ export default function App() {
   const [lessonRunMode, setLessonRunMode] = useState<LessonRunMode>("learning");
   const [exerciseIndex, setExerciseIndex] = useState(0);
   const [lessonQueue, setLessonQueue] = useState<Exercise[]>(initialBundle.exercises);
+  const [activeCheckpoint, setActiveCheckpoint] = useState<CourseCheckpoint | null>(null);
+  const [checkpointQueue, setCheckpointQueue] = useState<CheckpointQuestion[]>([]);
   const [answer, setAnswer] = useState("");
   const [selectedTokens, setSelectedTokens] = useState<string[]>([]);
   const [result, setResult] = useState<AnswerCheckResult | null>(null);
   const [attempts, setAttempts] = useState<ExerciseAttempt[]>([]);
+  const [checkpointAttempts, setCheckpointAttempts] = useState<ExerciseAttempt[]>([]);
   const [reviewQueue, setReviewQueue] = useState<ReviewItem[]>([]);
   const [reviewIndex, setReviewIndex] = useState(0);
   const [reviewAttempts, setReviewAttempts] = useState<ExerciseAttempt[]>([]);
@@ -107,24 +138,49 @@ export default function App() {
   const [scheduledRemediationKeys, setScheduledRemediationKeys] = useState<string[]>([]);
 
   const lessonExercise = lessonQueue[exerciseIndex];
+  const activeCheckpointQuestion = checkpointQueue[exerciseIndex];
   const activeReviewItem = reviewQueue[reviewIndex];
   const activeReviewBundle = activeReviewItem ? findLessonBundle(activeReviewItem.lessonId) : undefined;
   const reviewExercise = activeReviewItem && activeReviewBundle
     ? selectExerciseForReview(activeReviewItem, activeReviewBundle.exercises)
     : undefined;
-  const currentExercise = screen === "review" ? reviewExercise : lessonExercise;
+  const currentExercise = screen === "review"
+    ? reviewExercise
+    : screen === "checkpoint"
+      ? activeCheckpointQuestion?.exercise
+      : lessonExercise;
   const reviewFocusLabel = activeReviewItem && activeReviewBundle
     ? `${getLearningItemLabel(activeReviewBundle, activeReviewItem.itemId)} · ${skillLabels[activeReviewItem.skill]}`
     : "Материал урока";
   const lessonResult = useMemo(() => calculateLessonResult(attempts), [attempts]);
   const reviewResult = useMemo(() => calculateLessonResult(reviewAttempts), [reviewAttempts]);
+  const checkpointResult = useMemo(
+    () => calculateCheckpointResult(checkpointAttempts, activeCheckpoint?.passPercent ?? 80),
+    [activeCheckpoint?.passPercent, checkpointAttempts],
+  );
   const activeBundleIndex = lessonBundles.findIndex(
     (bundle) => bundle.lesson.id === activeBundle.lesson.id,
   );
   const nextBundle = lessonBundles[activeBundleIndex + 1];
-  const todayBundle =
-    lessonBundles.find((bundle) => !completedLessonIds.includes(bundle.lesson.id)) ??
-    lessonBundles[lessonBundles.length - 1];
+  const unlockedNextBundle = nextBundle && isLessonUnlocked(
+    nextBundle.lesson.id,
+    completedLessonIds,
+    checkpointProgress,
+  )
+    ? nextBundle
+    : undefined;
+  const nextIncompleteBundle = lessonBundles.find(
+    (bundle) => !completedLessonIds.includes(bundle.lesson.id),
+  );
+  const todayBundle = nextIncompleteBundle && isLessonUnlocked(
+    nextIncompleteBundle.lesson.id,
+    completedLessonIds,
+    checkpointProgress,
+  )
+    ? nextIncompleteBundle
+    : completedLessonIds.length === lessonBundles.length
+      ? lessonBundles[lessonBundles.length - 1]
+      : undefined;
   const dueReviewItems = useMemo(() => getDueReviewItems(reviewItems, new Date()), [reviewItems]);
   const weakTargetCount = useMemo(() => getWeakTargetIds(reviewItems).length, [reviewItems]);
   const nextReviewLabel = useMemo(
@@ -145,11 +201,19 @@ export default function App() {
         const knownItemIds = new Set(
           lessonBundles.flatMap((bundle) => bundle.lesson.itemIds),
         );
+        const knownCheckpointIds = new Set(
+          snapshot.checkpointProgress
+            .map((item) => findCheckpoint(item.checkpointId)?.id)
+            .filter((item): item is string => Boolean(item)),
+        );
         const validCompletedLessonIds = snapshot.completedLessonIds.filter((lessonId) =>
           knownLessonIds.has(lessonId),
         );
         const completedLessonIdSet = new Set(validCompletedLessonIds);
         setCompletedLessonIds(validCompletedLessonIds);
+        setCheckpointProgress(
+          snapshot.checkpointProgress.filter((item) => knownCheckpointIds.has(item.checkpointId)),
+        );
         setReviewItems(
           snapshot.reviewItems.filter(
             (item) =>
@@ -197,8 +261,16 @@ export default function App() {
       lastLessonId: activeBundle.lesson.id,
       reviewItems,
       attemptHistory,
+      checkpointProgress,
     });
-  }, [activeBundle.lesson.id, attemptHistory, completedLessonIds, progressHydrated, reviewItems]);
+  }, [
+    activeBundle.lesson.id,
+    attemptHistory,
+    checkpointProgress,
+    completedLessonIds,
+    progressHydrated,
+    reviewItems,
+  ]);
 
   const completeOnboarding = async (level: LearnerStartLevel) => {
     await saveLearnerProfile(level);
@@ -217,6 +289,7 @@ export default function App() {
   };
 
   const startLesson = (bundle: LessonBundle, mode: LessonRunMode) => {
+    if (!isLessonUnlocked(bundle.lesson.id, completedLessonIds, checkpointProgress)) return;
     setActiveBundle(bundle);
     setLessonRunMode(mode);
     setScreen("lesson");
@@ -229,10 +302,27 @@ export default function App() {
   };
 
   const openCourseLesson = (bundle: LessonBundle) => {
+    if (!isLessonUnlocked(bundle.lesson.id, completedLessonIds, checkpointProgress)) return;
     const mode: LessonRunMode = completedLessonIds.includes(bundle.lesson.id)
       ? "practice"
       : "learning";
     startLesson(bundle, mode);
+  };
+
+  const startCheckpoint = (checkpoint: CourseCheckpoint) => {
+    if (!isCheckpointAvailable(checkpoint, completedLessonIds)) return;
+    const queue = buildCheckpointQueue(
+      checkpoint,
+      lessonBundles,
+      getWeakTargetIds(reviewItems),
+    );
+    if (queue.length === 0) return;
+    setActiveCheckpoint(checkpoint);
+    setCheckpointQueue(queue);
+    setCheckpointAttempts([]);
+    setExerciseIndex(0);
+    resetExerciseInput();
+    setScreen("checkpoint");
   };
 
   const startReview = () => {
@@ -278,17 +368,56 @@ export default function App() {
     ].slice(0, 200));
   };
 
+  const scheduleCheckpointReview = (
+    exercise: Exercise,
+    lessonId: string,
+    checkResult: AnswerCheckResult,
+  ) => {
+    const skill = inferExerciseSkill(exercise);
+    const now = new Date();
+    setReviewItems((previous) =>
+      exercise.targetItemIds.reduce((items, itemId) => {
+        const key = reviewItemKey({ itemId, skill });
+        const existing = items.find((item) => reviewItemKey(item) === key);
+        return upsertReviewItem(
+          items,
+          scheduleItemReview(
+            existing,
+            itemId,
+            skill,
+            exercise,
+            lessonId,
+            checkResult.status,
+            now,
+          ),
+        );
+      }, previous),
+    );
+  };
+
   const finishExercise = (checkResult: AnswerCheckResult) => {
     if (!currentExercise) return;
-    const bundle = screen === "review" ? activeReviewBundle : activeBundle;
+    const bundle = screen === "review"
+      ? activeReviewBundle
+      : screen === "checkpoint"
+        ? findLessonBundle(activeCheckpointQuestion?.lessonId ?? "")
+        : activeBundle;
     if (!bundle) return;
     setResult(checkResult);
     const source: AttemptSource = screen === "review"
       ? "review"
-      : lessonRunMode === "practice"
+      : screen === "checkpoint" || lessonRunMode === "practice"
         ? "practice"
         : "lesson";
     recordExerciseAttempt(currentExercise, bundle, checkResult, source, activeReviewItem);
+
+    if (screen === "checkpoint" && activeCheckpointQuestion) {
+      scheduleCheckpointReview(
+        currentExercise,
+        activeCheckpointQuestion.lessonId,
+        checkResult,
+      );
+    }
 
     if (
       screen === "lesson" &&
@@ -314,6 +443,8 @@ export default function App() {
     const attempt = { exerciseId: currentExercise.id, status: checkResult.status };
     if (screen === "review") {
       setReviewAttempts((previous) => [...previous, attempt]);
+    } else if (screen === "checkpoint") {
+      setCheckpointAttempts((previous) => [...previous, attempt]);
     } else {
       setAttempts((previous) => [...previous, attempt]);
     }
@@ -342,6 +473,25 @@ export default function App() {
   };
 
   const continuePractice = () => {
+    if (screen === "checkpoint") {
+      if (checkpointQueue[exerciseIndex + 1]) {
+        setExerciseIndex((previous) => previous + 1);
+        resetExerciseInput();
+        return;
+      }
+      if (!activeCheckpoint) return;
+      setCheckpointProgress((previous) =>
+        updateCheckpointProgress(
+          previous,
+          activeCheckpoint.id,
+          checkpointResult,
+          new Date(),
+        ),
+      );
+      setScreen("checkpoint-result");
+      return;
+    }
+
     if (lessonQueue[exerciseIndex + 1]) {
       setExerciseIndex((previous) => previous + 1);
       resetExerciseInput();
@@ -465,6 +615,7 @@ export default function App() {
     return (
       <CourseScreen
         completedLessonIds={completedLessonIds}
+        checkpointProgress={checkpointProgress}
         todayBundle={todayBundle}
         dueReviewCount={dueReviewItems.length}
         weakTargetCount={weakTargetCount}
@@ -474,6 +625,7 @@ export default function App() {
           const bundle = findLessonBundle(lessonId);
           if (bundle) openCourseLesson(bundle);
         }}
+        onStartCheckpoint={startCheckpoint}
         onStartReview={startReview}
         onOpenKana={() => setScreen("kana")}
       />
@@ -487,10 +639,32 @@ export default function App() {
       <LessonResultScreen
         result={lessonResult}
         activeBundle={activeBundle}
-        nextBundle={nextBundle}
+        nextBundle={unlockedNextBundle}
         mode={lessonRunMode}
-        onNextLesson={() => nextBundle && startLesson(nextBundle, "learning")}
+        onNextLesson={() => unlockedNextBundle && startLesson(unlockedNextBundle, "learning")}
         onRetry={() => startLesson(activeBundle, retryMode)}
+        onCourse={() => setScreen("course")}
+      />
+    );
+  }
+
+  if (screen === "checkpoint-result" && activeCheckpoint) {
+    const activeProgress = checkpointProgress.find(
+      (item) => item.checkpointId === activeCheckpoint.id,
+    );
+    const nextCheckpointBundle = activeCheckpoint.unlockLessonId
+      ? findLessonBundle(activeCheckpoint.unlockLessonId)
+      : undefined;
+    return (
+      <CheckpointResultScreen
+        checkpoint={activeCheckpoint}
+        result={checkpointResult}
+        progress={activeProgress}
+        nextLessonTitle={nextCheckpointBundle?.lesson.title}
+        onNextLesson={() =>
+          nextCheckpointBundle && startLesson(nextCheckpointBundle, "learning")
+        }
+        onRetry={() => startCheckpoint(activeCheckpoint)}
         onCourse={() => setScreen("course")}
       />
     );
@@ -517,6 +691,19 @@ export default function App() {
           </TouchableOpacity>
         </View>
       </SafeAreaView>
+    );
+  }
+
+  if (screen === "checkpoint" && activeCheckpoint) {
+    return (
+      <CheckpointScreen
+        {...commonPracticeProps}
+        checkpoint={activeCheckpoint}
+        exerciseIndex={exerciseIndex}
+        exerciseCount={checkpointQueue.length}
+        onCourse={() => setScreen("course")}
+        onContinue={continuePractice}
+      />
     );
   }
 
