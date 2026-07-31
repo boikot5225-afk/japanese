@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Text, TextInput, TouchableOpacity, View } from "react-native";
 
+import { getExerciseSpeechText } from "../audio/exerciseSpeechText";
 import { speakJapanese } from "../audio/japaneseSpeech";
 import type { Exercise } from "../domain/course";
 import type { AnswerCheckResult } from "../engine/checkAnswer";
@@ -47,8 +48,8 @@ export function PracticeCard({
     new Set([...exercise.correctAnswers, ...(exercise.distractors ?? [])]),
   );
   const isSuccess = result?.status === "correct" || result?.status === "acceptable";
-  const spokenAnswer = exercise.correctAnswers[0] ?? "";
-  const spokenAudio = exercise.audioText ?? spokenAnswer.replace(/\|/g, "");
+  const displayedAnswer = exercise.correctAnswers[0] ?? "";
+  const spokenAudio = getExerciseSpeechText(exercise);
   const isChoiceExercise = exercise.type === "multiple-choice" || exercise.type === "listening";
   const isTextExercise =
     exercise.type === "text-input" ||
@@ -182,7 +183,7 @@ export function PracticeCard({
               )}
               {!isSuccess && (
                 <Text style={styles.correctAnswer}>
-                  Ответ: {spokenAnswer || "—"}
+                  Ответ: {displayedAnswer || "—"}
                 </Text>
               )}
               {spokenAudio && (
@@ -190,7 +191,7 @@ export function PracticeCard({
                   style={styles.listenAnswerButton}
                   onPress={() => void speakJapanese(spokenAudio)}
                 >
-                  <Text style={styles.listenAnswerText}>🔊 Прослушать ответ</Text>
+                  <Text style={styles.listenAnswerText}>🔊 Прослушать предложение</Text>
                 </TouchableOpacity>
               )}
             </View>

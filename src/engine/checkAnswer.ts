@@ -1,3 +1,5 @@
+import { lessonBundles } from "../content/courseCatalog";
+
 export type AnswerStatus =
   | "correct"
   | "acceptable"
@@ -10,12 +12,36 @@ export interface AnswerCheckResult {
   message: string;
 }
 
+interface ReadingAlias {
+  writtenForm: string;
+  reading: string;
+}
+
+const courseReadingAliases: ReadingAlias[] = Array.from(
+  new Map(
+    lessonBundles
+      .flatMap((bundle) => bundle.vocabulary)
+      .filter((item) => item.writtenForm !== item.reading)
+      .map((item) => [item.writtenForm, item.reading] as const),
+  ).entries(),
+)
+  .map(([writtenForm, reading]) => ({ writtenForm, reading }))
+  .sort((left, right) => right.writtenForm.length - left.writtenForm.length);
+
+const replaceTaughtKanjiWithReadings = (value: string): string =>
+  courseReadingAliases.reduce(
+    (normalized, alias) => normalized.split(alias.writtenForm).join(alias.reading),
+    value,
+  );
+
 const normalizeJapanese = (value: string): string =>
-  value
-    .trim()
-    .normalize("NFKC")
-    .replace(/[。！？!?.,，]/g, "")
-    .replace(/[|\s]+/g, "");
+  replaceTaughtKanjiWithReadings(
+    value
+      .trim()
+      .normalize("NFKC")
+      .replace(/[。！？!?.,，]/g, "")
+      .replace(/[|\s]+/g, ""),
+  );
 
 export function checkAnswer(
   answer: string,

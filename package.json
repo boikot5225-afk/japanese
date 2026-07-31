@@ -1,6 +1,6 @@
 {
   "name": "japanese-tutor",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "private": true,
   "main": "expo/AppEntry.js",
   "scripts": {
@@ -10,13 +10,14 @@
     "test:review": "node --experimental-strip-types --test src/engine/reviewEngine.test.ts",
     "test:lesson-review": "tsx --test src/engine/lessonReview.test.ts",
     "test:practice-queue": "node --experimental-strip-types --test src/engine/practiceQueue.test.ts",
-    "test:answer": "node --experimental-strip-types --test src/engine/checkAnswer.test.ts",
+    "test:answer": "tsx --test src/engine/checkAnswer.test.ts",
     "test:kana": "node --experimental-strip-types --test src/engine/kanaEngine.test.ts",
     "test:kana-words": "node --experimental-strip-types --test src/engine/kanaWordEngine.test.ts",
     "test:katakana": "node --experimental-strip-types --test src/engine/katakanaEngine.test.ts",
     "test:speech": "node --experimental-strip-types --test src/audio/japaneseSpeechText.test.ts",
+    "test:exercise-speech": "node --experimental-strip-types --test src/audio/exerciseSpeechText.test.ts",
     "test:content": "tsx --test src/content/courseCatalog.test.ts",
-    "test": "npm run test:review && npm run test:lesson-review && npm run test:practice-queue && npm run test:answer && npm run test:kana && npm run test:kana-words && npm run test:katakana && npm run test:speech && npm run test:content",
+    "test": "npm run test:review && npm run test:lesson-review && npm run test:practice-queue && npm run test:answer && npm run test:kana && npm run test:kana-words && npm run test:katakana && npm run test:speech && npm run test:exercise-speech && npm run test:content",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
