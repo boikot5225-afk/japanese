@@ -36,15 +36,6 @@ export const lesson009Vocabulary: VocabularyItem[] = [
     jlptLevel: "N5",
   },
   {
-    id: "word-shigoto",
-    type: "vocabulary",
-    writtenForm: "仕事",
-    reading: "しごと",
-    meaningsRu: ["работа", "дело"],
-    partOfSpeech: ["существительное"],
-    jlptLevel: "N5",
-  },
-  {
     id: "word-getsuyoubi",
     type: "vocabulary",
     writtenForm: "月曜日",
@@ -233,12 +224,12 @@ export const lesson009Exercises: Exercise[] = [
     explanationRu: "Для значения «не был» используется ではありませんでした.",
   },
   {
-    id: "exercise-yesterday-form-choice",
+    id: "exercise-yesterday-sunday-choice",
     type: "multiple-choice",
-    prompt: "Выбери грамматически правильное предложение: «Вчера я был студентом».",
-    targetItemIds: ["grammar-desu-past", "word-kinou", "word-gakusei"],
-    correctAnswers: ["昨日は学生でした"],
-    distractors: ["昨日は学生です", "昨日は学生ます", "昨日は学生でしたかありません"],
+    prompt: "Выбери грамматически правильное предложение: «Вчера было воскресенье».",
+    targetItemIds: ["grammar-desu-past", "word-kinou", "word-nichiyoubi"],
+    correctAnswers: ["昨日は日曜日でした"],
+    distractors: ["昨日は日曜日です", "昨日は日曜日ます", "昨日は日曜日ではありません"],
     explanationRu: "Прошлый контекст 昨日 требует формы でした у именного сказуемого.",
   },
 ];
