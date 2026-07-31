@@ -48,12 +48,24 @@ export function PracticeCard({
   );
   const isSuccess = result?.status === "correct" || result?.status === "acceptable";
   const spokenAnswer = exercise.correctAnswers[0] ?? "";
+  const spokenAudio = exercise.audioText ?? spokenAnswer.replace(/\|/g, "");
+  const isChoiceExercise = exercise.type === "multiple-choice" || exercise.type === "listening";
+  const isTextExercise =
+    exercise.type === "text-input" ||
+    exercise.type === "particle-gap" ||
+    exercise.type === "conjugation";
 
   useEffect(() => {
-    if (result && isSuccess && spokenAnswer) {
-      void speakJapanese(spokenAnswer);
+    if (exercise.type === "listening" && exercise.audioText && !result) {
+      void speakJapanese(exercise.audioText);
     }
-  }, [isSuccess, result, spokenAnswer]);
+  }, [exercise.audioText, exercise.id, exercise.type, result]);
+
+  useEffect(() => {
+    if (result && isSuccess && spokenAudio) {
+      void speakJapanese(spokenAudio);
+    }
+  }, [isSuccess, result, spokenAudio]);
 
   return (
     <View style={styles.section}>
@@ -64,9 +76,21 @@ export function PracticeCard({
         </Text>
       </View>
       <View style={styles.card}>
+        {exercise.sessionRole === "remediation" && (
+          <Text style={styles.reviewEyebrow}>Закрепление после ошибки</Text>
+        )}
         <Text style={styles.prompt}>{exercise.prompt}</Text>
 
-        {exercise.type === "multiple-choice" && (
+        {exercise.type === "listening" && exercise.audioText && (
+          <TouchableOpacity
+            style={styles.secondaryWideButton}
+            onPress={() => void speakJapanese(exercise.audioText ?? "")}
+          >
+            <Text style={styles.secondaryButtonText}>🔊 Прослушать ещё раз</Text>
+          </TouchableOpacity>
+        )}
+
+        {isChoiceExercise && (
           <View style={styles.choiceList}>
             {choices.map((choice) => (
               <TouchableOpacity
@@ -122,19 +146,23 @@ export function PracticeCard({
           </>
         )}
 
-        {exercise.type === "text-input" && (
+        {isTextExercise && (
           <TextInput
             value={answer}
             editable={!result}
             onChangeText={onAnswerChange}
-            placeholder="Введите ответ по-японски"
+            placeholder={
+              exercise.type === "particle-gap"
+                ? "Введите частицу или частицы"
+                : "Введите ответ по-японски"
+            }
             autoCapitalize="none"
             autoCorrect={false}
             style={styles.input}
           />
         )}
 
-        {!result && exercise.type !== "multiple-choice" && (
+        {!result && !isChoiceExercise && (
           <TouchableOpacity style={styles.primaryButton} onPress={onSubmit}>
             <Text style={styles.primaryButtonText}>Проверить</Text>
           </TouchableOpacity>
@@ -157,10 +185,10 @@ export function PracticeCard({
                   Ответ: {spokenAnswer || "—"}
                 </Text>
               )}
-              {spokenAnswer && (
+              {spokenAudio && (
                 <TouchableOpacity
                   style={styles.listenAnswerButton}
-                  onPress={() => void speakJapanese(spokenAnswer)}
+                  onPress={() => void speakJapanese(spokenAudio)}
                 >
                   <Text style={styles.listenAnswerText}>🔊 Прослушать ответ</Text>
                 </TouchableOpacity>
