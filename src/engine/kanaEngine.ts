@@ -1,4 +1,4 @@
-import { basicHiragana, type KanaSymbol } from "../kana/hiragana";
+import { basicHiragana, type KanaSymbol } from "../kana/hiragana.ts";
 
 export type KanaSkill = "recognition" | "reading" | "listening" | "typing";
 
