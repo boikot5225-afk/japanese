@@ -10,6 +10,7 @@ import {
   isLessonUnlocked,
   updateCheckpointProgress,
 } from "./checkpointEngine";
+import { getExerciseContentKey } from "./exerciseIdentity";
 
 const firstCheckpoint = courseCheckpoints[0];
 const secondCheckpoint = courseCheckpoints[1];
@@ -17,13 +18,28 @@ if (!firstCheckpoint || !secondCheckpoint) {
   throw new Error("Контрольные рубежи курса не определены");
 }
 
-test("checkpoint queue mixes exercises from the whole unit", () => {
+test("checkpoint queue mixes exercises from the whole unit without semantic duplicates", () => {
   const queue = buildCheckpointQueue(firstCheckpoint, lessonBundles);
-  assert.ok(queue.length > 0);
-  assert.ok(queue.length <= firstCheckpoint.questionCount);
+  assert.equal(queue.length, firstCheckpoint.questionCount);
   assert.ok(queue.every((question) => firstCheckpoint.lessonIds.includes(question.lessonId)));
   assert.ok(new Set(queue.map((question) => question.lessonId)).size > 1);
   assert.equal(new Set(queue.map((question) => question.exercise.id)).size, queue.length);
+  assert.equal(
+    new Set(queue.map((question) => getExerciseContentKey(question.exercise))).size,
+    queue.length,
+  );
+});
+
+test("every checkpoint can fill its requested size with unique content", () => {
+  courseCheckpoints.forEach((checkpoint) => {
+    const queue = buildCheckpointQueue(checkpoint, lessonBundles);
+    assert.equal(queue.length, checkpoint.questionCount, checkpoint.id);
+    assert.equal(
+      new Set(queue.map((question) => getExerciseContentKey(question.exercise))).size,
+      queue.length,
+      checkpoint.id,
+    );
+  });
 });
 
 test("checkpoint uses an 80 percent pass boundary", () => {

@@ -5,6 +5,7 @@ import {
 import { lessonBundles } from "../content/courseCatalog";
 import type { LessonBundle } from "../content/lessonBundle";
 import type { Exercise, Skill } from "../domain/course";
+import { getExerciseContentKey } from "./exerciseIdentity";
 import type { ExerciseAttempt } from "./lessonSession";
 import { inferExerciseSkill, isSuccessfulStatus } from "./reviewEngine";
 
@@ -89,15 +90,21 @@ export function buildCheckpointQueue(
 
   const selected: CheckpointQuestion[] = [];
   const selectedIds = new Set<string>();
+  const selectedContentKeys = new Set<string>();
   while (selected.length < checkpoint.questionCount) {
     let addedThisRound = false;
     for (const skill of skillOrder) {
-      const next = groups.get(skill)?.find(
-        (question) => !selectedIds.has(question.exercise.id),
-      );
+      const next = groups.get(skill)?.find((question) => {
+        const contentKey = getExerciseContentKey(question.exercise);
+        return (
+          !selectedIds.has(question.exercise.id) &&
+          !selectedContentKeys.has(contentKey)
+        );
+      });
       if (!next) continue;
       selected.push(next);
       selectedIds.add(next.exercise.id);
+      selectedContentKeys.add(getExerciseContentKey(next.exercise));
       addedThisRound = true;
       if (selected.length >= checkpoint.questionCount) break;
     }
@@ -106,11 +113,18 @@ export function buildCheckpointQueue(
 
   if (selected.length < checkpoint.questionCount) {
     const remaining = pool
-      .filter((question) => !selectedIds.has(question.exercise.id))
+      .filter((question) => {
+        const contentKey = getExerciseContentKey(question.exercise);
+        return (
+          !selectedIds.has(question.exercise.id) &&
+          !selectedContentKeys.has(contentKey)
+        );
+      })
       .sort((left, right) => compareQuestions(left, right, weaknessSet));
     for (const question of remaining) {
       selected.push(question);
       selectedIds.add(question.exercise.id);
+      selectedContentKeys.add(getExerciseContentKey(question.exercise));
       if (selected.length >= checkpoint.questionCount) break;
     }
   }

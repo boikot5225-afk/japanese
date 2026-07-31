@@ -16,6 +16,7 @@ import { lesson009Bundle } from "./lesson009";
 import { lesson010Bundle } from "./lesson010";
 import type { Lesson } from "../domain/course";
 import type { LessonBundle } from "./lessonBundle";
+import { diversifyLessonPractice } from "./practiceDiversity";
 import { expandLessonPractice } from "./practiceExpansion";
 
 export interface CourseUnit {
@@ -52,8 +53,12 @@ const baseLessonBundles: readonly LessonBundle[] = [
   lesson010Bundle,
 ];
 
-export const lessonBundles: readonly LessonBundle[] = baseLessonBundles.map((bundle) =>
+const expandedLessonBundles: readonly LessonBundle[] = baseLessonBundles.map((bundle) =>
   expandLessonPractice(bundle, baseLessonBundles),
+);
+
+export const lessonBundles: readonly LessonBundle[] = expandedLessonBundles.map((bundle) =>
+  diversifyLessonPractice(bundle, expandedLessonBundles),
 );
 
 export const lesson001Bundle = lessonBundles[0] ?? lesson001BaseBundle;
