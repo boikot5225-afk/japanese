@@ -1,9 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import type { KanaProgressMap, KanaSkillProgress } from "../engine/kanaEngine";
+import type { KanaWordProgress, KanaWordProgressMap } from "../engine/kanaWordEngine";
 
 const PROFILE_KEY = "japanese.learner-profile.v1";
 const KANA_PROGRESS_KEY = "japanese.kana-progress.v1";
+const KANA_WORD_PROGRESS_KEY = "japanese.kana-word-progress.v1";
 
 export type LearnerStartLevel = "zero" | "hiragana" | "kana";
 
@@ -20,6 +22,9 @@ const isStartLevel = (value: unknown): value is LearnerStartLevel =>
 const isFiniteScore = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 5;
 
+const isNonNegativeNumber = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0;
+
 const isKanaSkillProgress = (value: unknown): value is KanaSkillProgress => {
   if (!value || typeof value !== "object") return false;
   const item = value as Partial<KanaSkillProgress>;
@@ -28,10 +33,19 @@ const isKanaSkillProgress = (value: unknown): value is KanaSkillProgress => {
     isFiniteScore(item.reading) &&
     isFiniteScore(item.listening) &&
     isFiniteScore(item.typing) &&
-    typeof item.attempts === "number" &&
-    item.attempts >= 0 &&
-    typeof item.correct === "number" &&
-    item.correct >= 0
+    isNonNegativeNumber(item.attempts) &&
+    isNonNegativeNumber(item.correct)
+  );
+};
+
+const isKanaWordProgress = (value: unknown): value is KanaWordProgress => {
+  if (!value || typeof value !== "object") return false;
+  const item = value as Partial<KanaWordProgress>;
+  return (
+    isFiniteScore(item.mastery) &&
+    isNonNegativeNumber(item.attempts) &&
+    isNonNegativeNumber(item.correct) &&
+    isNonNegativeNumber(item.lapses)
   );
 };
 
@@ -87,4 +101,22 @@ export async function loadKanaProgress(): Promise<KanaProgressMap> {
 
 export async function saveKanaProgress(progress: KanaProgressMap): Promise<void> {
   await AsyncStorage.setItem(KANA_PROGRESS_KEY, JSON.stringify(progress));
+}
+
+export async function loadKanaWordProgress(): Promise<KanaWordProgressMap> {
+  try {
+    const raw = await AsyncStorage.getItem(KANA_WORD_PROGRESS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return Object.fromEntries(
+      Object.entries(parsed).filter(([, value]) => isKanaWordProgress(value)),
+    );
+  } catch {
+    return {};
+  }
+}
+
+export async function saveKanaWordProgress(progress: KanaWordProgressMap): Promise<void> {
+  await AsyncStorage.setItem(KANA_WORD_PROGRESS_KEY, JSON.stringify(progress));
 }
