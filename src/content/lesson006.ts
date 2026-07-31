@@ -241,7 +241,7 @@ export const lesson006Exercises: Exercise[] = [
     confusionItemIds: ["grammar-ni-e-destination", "grammar-de-action-place", "grammar-o-object"],
   },
   {
-    id: "exercise-gakkou-input",
+    id: "exercise-gakkou-destination-input",
     type: "text-input",
     prompt: "Напиши по-японски: Я иду в школу.",
     targetItemIds: ["grammar-ni-e-destination", "word-gakkou", "word-ikimasu"],
