@@ -19,11 +19,19 @@ const exercises: Exercise[] = [
     targetItemIds: ["word-two", "grammar-counter"],
     correctAnswers: ["二"],
   },
+  {
+    id: "exercise-one-again",
+    type: "text-input",
+    prompt: "Первое ещё раз",
+    targetItemIds: ["word-one"],
+    correctAnswers: ["一"],
+  },
 ];
 
 const attempts = [
   { exerciseId: "exercise-one", status: "correct" as const },
   { exerciseId: "exercise-two", status: "acceptable" as const },
+  { exerciseId: "exercise-one-again", status: "correct" as const },
 ];
 const now = new Date("2026-07-31T10:00:00.000Z");
 
@@ -46,6 +54,27 @@ test("успешно завершённый новый урок добавляе
     new Set(items.map((item) => item.itemId)),
     new Set(["word-one", "word-two", "grammar-counter"]),
   );
+  assert.equal(items.find((item) => item.itemId === "word-one")?.streak, 1);
+});
+
+test("несколько заданий одного урока не накручивают интервал одного знания", () => {
+  const items = commitLessonReviewItems({
+    items: [],
+    exercises,
+    attempts: [
+      { exerciseId: "exercise-one", status: "correct" },
+      { exerciseId: "exercise-one-again", status: "incorrect" },
+    ],
+    lessonId: "lesson-test",
+    mode: "learning",
+    passed: true,
+    now,
+  });
+
+  assert.equal(items.length, 1);
+  assert.equal(items[0]?.itemId, "word-one");
+  assert.equal(items[0]?.lastStatus, "incorrect");
+  assert.equal(items[0]?.intervalDays, 0);
 });
 
 test("незавершённый урок не засоряет долгосрочную очередь", () => {
