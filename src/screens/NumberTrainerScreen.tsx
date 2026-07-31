@@ -200,6 +200,10 @@ export function NumberTrainerScreen({ onCourse }: NumberTrainerScreenProps) {
 
   if (viewMode === "session" && currentQuestion) {
     const selectedChoice = currentQuestion.choices?.includes(answer) ?? false;
+    const canPlaySpeech = Boolean(
+      currentQuestion.speechText &&
+        (currentQuestion.mode === "listening-to-digits" || answerResult),
+    );
     return (
       <SafeAreaView style={numberStyles.safeArea}>
         <StatusBar barStyle="dark-content" />
@@ -223,13 +227,15 @@ export function NumberTrainerScreen({ onCourse }: NumberTrainerScreenProps) {
               <Text style={numberStyles.displayText}>{currentQuestion.displayText}</Text>
             )}
 
-            {currentQuestion.speechText && (
+            {canPlaySpeech && (
               <TouchableOpacity
                 style={numberStyles.listenButton}
                 onPress={() => void speakJapanese(currentQuestion.speechText ?? "")}
               >
                 <Text style={numberStyles.listenButtonText}>
-                  🔊 {currentQuestion.mode === "listening-to-digits" ? "Прослушать ещё раз" : "Прослушать ответ"}
+                  🔊 {currentQuestion.mode === "listening-to-digits"
+                    ? "Прослушать ещё раз"
+                    : "Прослушать правильное чтение"}
                 </Text>
               </TouchableOpacity>
             )}
