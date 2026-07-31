@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { SafeAreaView, ScrollView, StatusBar, Text, TouchableOpacity, View } from "react-native";
 
 import {
@@ -14,6 +15,7 @@ import {
 } from "../engine/checkpointEngine";
 import { styles } from "../theme/appStyles";
 import { kanaStyles } from "../theme/kanaStyles";
+import { NumberTrainerScreen } from "./NumberTrainerScreen";
 
 interface CourseScreenProps {
   completedLessonIds: string[];
@@ -50,9 +52,14 @@ export function CourseScreen({
   onStartReview,
   onOpenKana,
 }: CourseScreenProps) {
+  const [numbersOpen, setNumbersOpen] = useState(false);
   const todayCompleted = todayBundle
     ? completedLessonIds.includes(todayBundle.lesson.id)
     : false;
+
+  if (numbersOpen) {
+    return <NumberTrainerScreen onCourse={() => setNumbersOpen(false)} />;
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -101,6 +108,26 @@ export function CourseScreen({
           </Text>
           <TouchableOpacity style={kanaStyles.primaryButton} onPress={onOpenKana}>
             <Text style={kanaStyles.primaryButtonText}>Открыть азбуки</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={kanaStyles.courseKanaCard}>
+          <View style={kanaStyles.courseKanaHeader}>
+            <View>
+              <Text style={styles.reviewEyebrow}>Отдельный тренажёр</Text>
+              <Text style={kanaStyles.courseKanaTitle}>Числа и счётные слова</Text>
+            </View>
+            <Text style={kanaStyles.courseKanaGlyph}>一 万</Text>
+          </View>
+          <Text style={kanaStyles.courseKanaBody}>
+            Числа до разряда 万, диктант и счётчики 人・本・枚・個・時・分.
+            Прогресс чтения, аудирования и активного ввода хранится отдельно.
+          </Text>
+          <TouchableOpacity
+            style={kanaStyles.primaryButton}
+            onPress={() => setNumbersOpen(true)}
+          >
+            <Text style={kanaStyles.primaryButtonText}>Открыть числительные</Text>
           </TouchableOpacity>
         </View>
 

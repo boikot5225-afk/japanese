@@ -2,13 +2,13 @@
   "expo": {
     "name": "Japanese",
     "slug": "japanese-tutor",
-    "version": "0.9.2",
+    "version": "0.10.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "android": {
       "package": "com.bulat.japanesetutor",
-      "versionCode": 22
+      "versionCode": 23
     }
   }
 }

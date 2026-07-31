@@ -2,10 +2,12 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import type { KanaProgressMap, KanaSkillProgress } from "../engine/kanaEngine";
 import type { KanaWordProgress, KanaWordProgressMap } from "../engine/kanaWordEngine";
+import type { NumberProgressMap, NumberSkillProgress } from "../engine/numberTrainer";
 
 const PROFILE_KEY = "japanese.learner-profile.v1";
 const KANA_PROGRESS_KEY = "japanese.kana-progress.v1";
 const KANA_WORD_PROGRESS_KEY = "japanese.kana-word-progress.v1";
+const NUMBER_PROGRESS_KEY = "japanese.number-progress.v1";
 
 export type LearnerStartLevel = "zero" | "hiragana" | "kana";
 
@@ -46,6 +48,20 @@ const isKanaWordProgress = (value: unknown): value is KanaWordProgress => {
     isNonNegativeNumber(item.attempts) &&
     isNonNegativeNumber(item.correct) &&
     isNonNegativeNumber(item.lapses)
+  );
+};
+
+const isNumberSkillProgress = (value: unknown): value is NumberSkillProgress => {
+  if (!value || typeof value !== "object") return false;
+  const item = value as Partial<NumberSkillProgress>;
+  return (
+    isFiniteScore(item.mastery) &&
+    isNonNegativeNumber(item.attempts) &&
+    isNonNegativeNumber(item.correct) &&
+    isNonNegativeNumber(item.lapses) &&
+    isNonNegativeNumber(item.streak) &&
+    isNonNegativeNumber(item.bestStreak) &&
+    typeof item.lastPracticedAt === "string"
   );
 };
 
@@ -119,4 +135,22 @@ export async function loadKanaWordProgress(): Promise<KanaWordProgressMap> {
 
 export async function saveKanaWordProgress(progress: KanaWordProgressMap): Promise<void> {
   await AsyncStorage.setItem(KANA_WORD_PROGRESS_KEY, JSON.stringify(progress));
+}
+
+export async function loadNumberProgress(): Promise<NumberProgressMap> {
+  try {
+    const raw = await AsyncStorage.getItem(NUMBER_PROGRESS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return Object.fromEntries(
+      Object.entries(parsed).filter(([, value]) => isNumberSkillProgress(value)),
+    );
+  } catch {
+    return {};
+  }
+}
+
+export async function saveNumberProgress(progress: NumberProgressMap): Promise<void> {
+  await AsyncStorage.setItem(NUMBER_PROGRESS_KEY, JSON.stringify(progress));
 }
