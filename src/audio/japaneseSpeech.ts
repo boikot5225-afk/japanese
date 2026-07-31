@@ -1,10 +1,9 @@
 import * as Speech from "expo-speech";
 
-const normalizeSpeechText = (text: string): string =>
-  text.replaceAll("|", "").replaceAll("__", "").trim();
+import { normalizeJapaneseSpeechText } from "./japaneseSpeechText";
 
 export async function speakJapanese(text: string): Promise<void> {
-  const normalized = normalizeSpeechText(text);
+  const normalized = normalizeJapaneseSpeechText(text);
   if (!normalized) {
     return;
   }
