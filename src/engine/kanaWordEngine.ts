@@ -29,8 +29,9 @@ const emptyWordProgress = (): KanaWordProgress => ({
 export function createKanaWordSession(
   progress: KanaWordProgressMap,
   limit = 8,
+  pool: readonly KanaWord[] = kanaWords,
 ): KanaWord[] {
-  return [...kanaWords]
+  return [...pool]
     .sort((left, right) => {
       const leftProgress = progress[left.id];
       const rightProgress = progress[right.id];
@@ -108,12 +109,15 @@ export function updateKanaWordProgress(
   };
 }
 
-export function getKanaWordSummary(progress: KanaWordProgressMap): KanaWordSummary {
+export function getKanaWordSummary(
+  progress: KanaWordProgressMap,
+  pool: readonly KanaWord[] = kanaWords,
+): KanaWordSummary {
   let started = 0;
   let mastered = 0;
   let totalMastery = 0;
 
-  kanaWords.forEach((word) => {
+  pool.forEach((word) => {
     const item = progress[word.id];
     if (!item) return;
     totalMastery += item.mastery;
@@ -122,12 +126,12 @@ export function getKanaWordSummary(progress: KanaWordProgressMap): KanaWordSumma
   });
 
   return {
-    total: kanaWords.length,
+    total: pool.length,
     started,
     mastered,
     averagePercent:
-      kanaWords.length === 0
+      pool.length === 0
         ? 0
-        : Math.round((totalMastery / (kanaWords.length * MAX_MASTERY)) * 100),
+        : Math.round((totalMastery / (pool.length * MAX_MASTERY)) * 100),
   };
 }
