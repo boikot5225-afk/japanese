@@ -3,11 +3,17 @@ import type { LessonBundle } from "./lessonBundle";
 
 const TARGET_EXERCISE_COUNT = 12;
 
-type GeneratedKind = "listening" | "text-input" | "meaning-choice" | "japanese-choice";
+type GeneratedKind =
+  | "listening"
+  | "text-input"
+  | "meaning-choice"
+  | "japanese-choice"
+  | "reading-choice";
 
 const generatedKindRounds: readonly GeneratedKind[][] = [
   ["listening", "text-input"],
   ["meaning-choice", "japanese-choice"],
+  ["reading-choice"],
 ];
 
 const unique = (values: readonly string[]): string[] =>
@@ -94,6 +100,7 @@ const createGeneratedExercise = (
   kind: GeneratedKind,
   translationPool: readonly string[],
   japanesePool: readonly string[],
+  readingPool: readonly string[],
 ): Exercise => {
   const japanese = sentence.japanese.trim();
   const japaneseWithoutPunctuation = withoutTerminalPunctuation(japanese);
@@ -158,6 +165,22 @@ const createGeneratedExercise = (
     };
   }
 
+  if (kind === "reading-choice") {
+    const correctReading = reading ?? japanese;
+    return {
+      id,
+      type: "multiple-choice",
+      prompt: `Выбери чтение полного предложения: ${japanese}`,
+      targetItemIds: targets,
+      correctAnswers: [correctReading],
+      distractors: takeDistractors(readingPool, [correctReading]),
+      explanationRu: `Чтение: ${correctReading}`,
+      variantGroup,
+      difficulty: 2,
+      confusionItemIds: confusions,
+    };
+  }
+
   return {
     id,
     type: "multiple-choice",
@@ -184,6 +207,9 @@ const buildGeneratedCandidates = (
   const japanesePool = allBundles.flatMap((item) =>
     item.sentences.map((sentence) => sentence.japanese.trim()),
   );
+  const readingPool = allBundles.flatMap((item) =>
+    item.sentences.map((sentence) => sentence.reading?.trim() ?? sentence.japanese.trim()),
+  );
 
   const candidates: Exercise[] = [];
   generatedKindRounds.forEach((kindRound) => {
@@ -196,6 +222,7 @@ const buildGeneratedCandidates = (
             kind,
             translationPool,
             japanesePool,
+            readingPool,
           ),
         );
       });
