@@ -31,7 +31,6 @@ export function CourseScreen({
   todayBundle,
   dueReviewCount,
   weakTargetCount,
-  attemptCount,
   nextReviewLabel,
   onStartLesson,
   onStartLessonById,
@@ -97,7 +96,6 @@ export function CourseScreen({
               ? `${dueReviewCount} заданий готовы сейчас · слабых элементов: ${weakTargetCount}`
               : `Сейчас очередь пуста. Следующее повторение — ${nextReviewLabel}.`}
           </Text>
-          <Text style={styles.reviewHistory}>История: {attemptCount} попыток</Text>
           <TouchableOpacity
             disabled={dueReviewCount === 0}
             style={[styles.reviewButton, dueReviewCount === 0 && styles.disabledButton]}
