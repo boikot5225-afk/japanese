@@ -76,6 +76,19 @@ const digitReadings: Record<number, string> = {
   9: "きゅう",
 };
 
+const requireLookup = (
+  table: Record<number, string>,
+  key: number,
+  label: string,
+): string => {
+  const value = table[key];
+  if (!value) throw new Error(`Missing ${label} for ${key}`);
+  return value;
+};
+
+const digitReading = (digit: number): string =>
+  requireLookup(digitReadings, digit, "digit reading");
+
 export const numberTrainingSets: readonly NumberTrainingSet[] = [
   {
     id: "basic",
@@ -187,17 +200,17 @@ const underTenThousandToKana = (value: number): string => {
     if (thousands === 1) parts.push("せん");
     else if (thousands === 3) parts.push("さんぜん");
     else if (thousands === 8) parts.push("はっせん");
-    else parts.push(`${digitReadings[thousands]}せん`);
+    else parts.push(`${digitReading(thousands)}せん`);
   }
   if (hundreds > 0) {
     if (hundreds === 1) parts.push("ひゃく");
     else if (hundreds === 3) parts.push("さんびゃく");
     else if (hundreds === 6) parts.push("ろっぴゃく");
     else if (hundreds === 8) parts.push("はっぴゃく");
-    else parts.push(`${digitReadings[hundreds]}ひゃく`);
+    else parts.push(`${digitReading(hundreds)}ひゃく`);
   }
-  if (tens > 0) parts.push(tens === 1 ? "じゅう" : `${digitReadings[tens]}じゅう`);
-  if (ones > 0) parts.push(digitReadings[ones]);
+  if (tens > 0) parts.push(tens === 1 ? "じゅう" : `${digitReading(tens)}じゅう`);
+  if (ones > 0) parts.push(digitReading(ones));
   return parts.join("");
 };
 
@@ -225,7 +238,7 @@ const counterEnding = (
 ): string => {
   const last = value % 10;
   if (last === 0) return numberToKana(value).replace(/じゅう$/u, tenEnding);
-  return `${decadePrefix(value)}${forms[last]}`;
+  return `${decadePrefix(value)}${requireLookup(forms, last, "counter ending")}`;
 };
 
 export function counterToKana(setId: NumberSetId, value: number): string {
@@ -248,7 +261,9 @@ export function counterToKana(setId: NumberSetId, value: number): string {
       9: "きゅうにん",
     };
     const last = value % 10;
-    return last === 0 ? `${numberToKana(value)}にん` : `${decadePrefix(value)}${forms[last]}`;
+    return last === 0
+      ? `${numberToKana(value)}にん`
+      : `${decadePrefix(value)}${requireLookup(forms, last, "people counter ending")}`;
   }
 
   if (setId === "long") {
@@ -279,7 +294,7 @@ export function counterToKana(setId: NumberSetId, value: number): string {
       1: "いちじ", 2: "にじ", 3: "さんじ", 4: "よじ", 5: "ごじ",
       6: "ろくじ", 7: "しちじ", 8: "はちじ", 9: "くじ",
     };
-    return `${decadePrefix(value)}${forms[last]}`;
+    return `${decadePrefix(value)}${requireLookup(forms, last, "hour ending")}`;
   }
 
   if (setId === "flat") return `${numberToKana(value)}まい`;
