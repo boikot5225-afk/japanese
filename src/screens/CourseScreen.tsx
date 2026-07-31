@@ -3,6 +3,7 @@ import { SafeAreaView, ScrollView, StatusBar, Text, TouchableOpacity, View } fro
 import { courseUnits, findLessonBundle } from "../content/courseCatalog";
 import type { LessonBundle } from "../content/lessonBundle";
 import { styles } from "../theme/appStyles";
+import { kanaStyles } from "../theme/kanaStyles";
 
 interface CourseScreenProps {
   completedLessonIds: string[];
@@ -14,6 +15,7 @@ interface CourseScreenProps {
   onStartLesson: (bundle: LessonBundle) => void;
   onStartLessonById: (lessonId: string) => void;
   onStartReview: () => void;
+  onOpenKana: () => void;
 }
 
 const lessonWord = (count: number): string => {
@@ -32,6 +34,7 @@ export function CourseScreen({
   onStartLesson,
   onStartLessonById,
   onStartReview,
+  onOpenKana,
 }: CourseScreenProps) {
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -59,6 +62,22 @@ export function CourseScreen({
             </TouchableOpacity>
           </View>
         )}
+
+        <View style={kanaStyles.courseKanaCard}>
+          <View style={kanaStyles.courseKanaHeader}>
+            <View>
+              <Text style={styles.reviewEyebrow}>Азбука</Text>
+              <Text style={kanaStyles.courseKanaTitle}>Хирагана · 46 знаков</Text>
+            </View>
+            <Text style={kanaStyles.courseKanaGlyph}>あ</Text>
+          </View>
+          <Text style={kanaStyles.courseKanaBody}>
+            Таблица со звуком и отдельные тренировки на узнавание, чтение, слух и ввод ромадзи.
+          </Text>
+          <TouchableOpacity style={kanaStyles.primaryButton} onPress={onOpenKana}>
+            <Text style={kanaStyles.primaryButtonText}>Открыть хирагану</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.reviewCard}>
           <View style={styles.reviewHeader}>
