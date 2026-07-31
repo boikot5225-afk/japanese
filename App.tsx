@@ -11,6 +11,7 @@ import {
   type LessonRunMode,
 } from "./src/engine/lessonReview";
 import { calculateLessonResult, type ExerciseAttempt } from "./src/engine/lessonSession";
+import { scheduleLessonRemediation } from "./src/engine/practiceQueue";
 import {
   createAttemptLogEntry,
   getDueReviewItems,
@@ -94,6 +95,7 @@ export default function App() {
   const [stage, setStage] = useState<LessonStage>("theory");
   const [lessonRunMode, setLessonRunMode] = useState<LessonRunMode>("learning");
   const [exerciseIndex, setExerciseIndex] = useState(0);
+  const [lessonQueue, setLessonQueue] = useState<Exercise[]>(initialBundle.exercises);
   const [answer, setAnswer] = useState("");
   const [selectedTokens, setSelectedTokens] = useState<string[]>([]);
   const [result, setResult] = useState<AnswerCheckResult | null>(null);
@@ -102,8 +104,9 @@ export default function App() {
   const [reviewIndex, setReviewIndex] = useState(0);
   const [reviewAttempts, setReviewAttempts] = useState<ExerciseAttempt[]>([]);
   const [requeuedReviewKeys, setRequeuedReviewKeys] = useState<string[]>([]);
+  const [scheduledRemediationKeys, setScheduledRemediationKeys] = useState<string[]>([]);
 
-  const lessonExercise = activeBundle.exercises[exerciseIndex];
+  const lessonExercise = lessonQueue[exerciseIndex];
   const activeReviewItem = reviewQueue[reviewIndex];
   const activeReviewBundle = activeReviewItem ? findLessonBundle(activeReviewItem.lessonId) : undefined;
   const reviewExercise = activeReviewItem && activeReviewBundle
@@ -219,6 +222,8 @@ export default function App() {
     setScreen("lesson");
     setStage("theory");
     setExerciseIndex(0);
+    setLessonQueue(bundle.exercises.map((exercise) => ({ ...exercise, sessionRole: "core" })));
+    setScheduledRemediationKeys([]);
     resetExerciseInput();
     setAttempts([]);
   };
@@ -284,6 +289,28 @@ export default function App() {
         ? "practice"
         : "lesson";
     recordExerciseAttempt(currentExercise, bundle, checkResult, source, activeReviewItem);
+
+    if (
+      screen === "lesson" &&
+      !isSuccessfulStatus(checkResult.status) &&
+      currentExercise.sessionRole !== "remediation"
+    ) {
+      const remediation = scheduleLessonRemediation(
+        lessonQueue,
+        exerciseIndex,
+        currentExercise,
+        activeBundle.exercises,
+        scheduledRemediationKeys,
+      );
+      if (remediation.scheduledKey) {
+        setLessonQueue(remediation.queue);
+        setScheduledRemediationKeys((previous) => [
+          ...previous,
+          remediation.scheduledKey as string,
+        ]);
+      }
+    }
+
     const attempt = { exerciseId: currentExercise.id, status: checkResult.status };
     if (screen === "review") {
       setReviewAttempts((previous) => [...previous, attempt]);
@@ -315,7 +342,7 @@ export default function App() {
   };
 
   const continuePractice = () => {
-    if (activeBundle.exercises[exerciseIndex + 1]) {
+    if (lessonQueue[exerciseIndex + 1]) {
       setExerciseIndex((previous) => previous + 1);
       resetExerciseInput();
       return;
@@ -527,7 +554,7 @@ export default function App() {
       stage={stage}
       practiceMode={lessonRunMode === "practice"}
       exerciseIndex={exerciseIndex}
-      exerciseCount={activeBundle.exercises.length}
+      exerciseCount={lessonQueue.length}
       onCourse={() => setScreen("course")}
       onPreviousStage={() => {
         const previous = lessonStages[stageIndex - 1];
