@@ -102,7 +102,7 @@ export function CourseScreen({
           </View>
           <Text style={styles.reviewBody}>
             {dueReviewCount > 0
-              ? `${dueReviewCount} заданий готовы сейчас · слабых элементов: ${weakTargetCount}`
+              ? `${dueReviewCount} ${russianForm(dueReviewCount, "элемент готов", "элемента готовы", "элементов готовы")} сейчас · слабых знаний: ${weakTargetCount}`
               : `Сейчас очередь пуста. Следующее повторение — ${nextReviewLabel}.`}
           </Text>
           <TouchableOpacity
