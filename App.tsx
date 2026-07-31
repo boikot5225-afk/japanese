@@ -18,6 +18,7 @@ import {
   type CheckpointProgress,
   type CheckpointQuestion,
 } from "./src/engine/checkpointEngine";
+import { getExerciseContentKey } from "./src/engine/exerciseIdentity";
 import { createKnownHiraganaProgress } from "./src/engine/kanaEngine";
 import {
   commitLessonReviewItems,
@@ -26,6 +27,7 @@ import {
 import { calculateLessonResult, type ExerciseAttempt } from "./src/engine/lessonSession";
 import { scheduleLessonRemediation } from "./src/engine/practiceQueue";
 import {
+  buildReviewSession,
   createAttemptLogEntry,
   getDueReviewItems,
   getNextReviewAt,
@@ -34,11 +36,11 @@ import {
   isSuccessfulStatus,
   reviewItemKey,
   scheduleItemReview,
-  selectExerciseForReview,
   upsertReviewItem,
   type AttemptLogEntry,
   type AttemptSource,
   type ReviewItem,
+  type ReviewSessionQuestion,
 } from "./src/engine/reviewEngine";
 import {
   CheckpointResultScreen,
@@ -73,6 +75,9 @@ const lessonStages: LessonStage[] = ["theory", "words", "examples", "practice"];
 const initialBundle: LessonBundle = lessonBundles[0] ?? (() => {
   throw new Error("В курсе нет ни одного урока.");
 })();
+const reviewExercisesByLesson: ReadonlyMap<string, readonly Exercise[]> = new Map(
+  lessonBundles.map((bundle) => [bundle.lesson.id, bundle.exercises]),
+);
 
 const skillLabels: Record<Skill, string> = {
   recognition: "узнавание",
@@ -131,26 +136,30 @@ export default function App() {
   const [result, setResult] = useState<AnswerCheckResult | null>(null);
   const [attempts, setAttempts] = useState<ExerciseAttempt[]>([]);
   const [checkpointAttempts, setCheckpointAttempts] = useState<ExerciseAttempt[]>([]);
-  const [reviewQueue, setReviewQueue] = useState<ReviewItem[]>([]);
+  const [reviewQueue, setReviewQueue] = useState<ReviewSessionQuestion[]>([]);
   const [reviewIndex, setReviewIndex] = useState(0);
   const [reviewAttempts, setReviewAttempts] = useState<ExerciseAttempt[]>([]);
-  const [requeuedReviewKeys, setRequeuedReviewKeys] = useState<string[]>([]);
   const [scheduledRemediationKeys, setScheduledRemediationKeys] = useState<string[]>([]);
 
   const lessonExercise = lessonQueue[exerciseIndex];
   const activeCheckpointQuestion = checkpointQueue[exerciseIndex];
-  const activeReviewItem = reviewQueue[reviewIndex];
-  const activeReviewBundle = activeReviewItem ? findLessonBundle(activeReviewItem.lessonId) : undefined;
-  const reviewExercise = activeReviewItem && activeReviewBundle
-    ? selectExerciseForReview(activeReviewItem, activeReviewBundle.exercises)
+  const activeReviewQuestion = reviewQueue[reviewIndex];
+  const activeReviewItem = activeReviewQuestion?.items[0];
+  const activeReviewBundle = activeReviewQuestion
+    ? findLessonBundle(activeReviewQuestion.lessonId)
     : undefined;
+  const reviewExercise = activeReviewQuestion?.exercise;
   const currentExercise = screen === "review"
     ? reviewExercise
     : screen === "checkpoint"
       ? activeCheckpointQuestion?.exercise
       : lessonExercise;
   const reviewFocusLabel = activeReviewItem && activeReviewBundle
-    ? `${getLearningItemLabel(activeReviewBundle, activeReviewItem.itemId)} · ${skillLabels[activeReviewItem.skill]}`
+    ? `${getLearningItemLabel(activeReviewBundle, activeReviewItem.itemId)} · ${skillLabels[activeReviewItem.skill]}${
+        (activeReviewQuestion?.items.length ?? 0) > 1
+          ? ` · ещё ${(activeReviewQuestion?.items.length ?? 1) - 1} связанных знания`
+          : ""
+      }`
     : "Материал урока";
   const lessonResult = useMemo(() => calculateLessonResult(attempts), [attempts]);
   const reviewResult = useMemo(() => calculateLessonResult(reviewAttempts), [reviewAttempts]);
@@ -326,12 +335,16 @@ export default function App() {
   };
 
   const startReview = () => {
-    const queue = getDueReviewItems(reviewItems, new Date()).slice(0, 20);
+    const queue = buildReviewSession(
+      getDueReviewItems(reviewItems, new Date()),
+      reviewExercisesByLesson,
+      attemptHistory,
+      20,
+    );
     if (queue.length === 0) return;
     setReviewQueue(queue);
     setReviewIndex(0);
     setReviewAttempts([]);
-    setRequeuedReviewKeys([]);
     resetExerciseInput();
     setScreen("review");
   };
@@ -341,26 +354,28 @@ export default function App() {
     bundle: LessonBundle,
     checkResult: AnswerCheckResult,
     source: AttemptSource,
-    reviewItem?: ReviewItem,
+    reviewQuestion?: ReviewSessionQuestion,
   ) => {
     const now = new Date();
-    if (source === "review" && reviewItem) {
-      setReviewItems((previous) => {
-        const key = reviewItemKey(reviewItem);
-        const existing = previous.find((item) => reviewItemKey(item) === key);
-        return upsertReviewItem(
-          previous,
-          scheduleItemReview(
-            existing,
-            reviewItem.itemId,
-            reviewItem.skill,
-            exercise,
-            reviewItem.lessonId,
-            checkResult.status,
-            now,
-          ),
-        );
-      });
+    if (source === "review" && reviewQuestion) {
+      setReviewItems((previous) =>
+        reviewQuestion.items.reduce((items, scheduledItem) => {
+          const key = reviewItemKey(scheduledItem);
+          const existing = items.find((item) => reviewItemKey(item) === key);
+          return upsertReviewItem(
+            items,
+            scheduleItemReview(
+              existing,
+              scheduledItem.itemId,
+              scheduledItem.skill,
+              exercise,
+              scheduledItem.lessonId,
+              checkResult.status,
+              now,
+            ),
+          );
+        }, previous),
+      );
     }
     setAttemptHistory((previous) => [
       createAttemptLogEntry(exercise, bundle.lesson.id, checkResult.status, source, now),
@@ -409,7 +424,13 @@ export default function App() {
       : screen === "checkpoint" || lessonRunMode === "practice"
         ? "practice"
         : "lesson";
-    recordExerciseAttempt(currentExercise, bundle, checkResult, source, activeReviewItem);
+    recordExerciseAttempt(
+      currentExercise,
+      bundle,
+      checkResult,
+      source,
+      activeReviewQuestion,
+    );
 
     if (screen === "checkpoint" && activeCheckpointQuestion) {
       scheduleCheckpointReview(
@@ -521,27 +542,39 @@ export default function App() {
   };
 
   const continueReview = () => {
-    const item = reviewQueue[reviewIndex];
-    if (!item || !result) return;
-    const key = reviewItemKey(item);
-    const shouldRequeue =
-      !isSuccessfulStatus(result.status) && !requeuedReviewKeys.includes(key);
-    const repeatedItem = currentExercise
-      ? scheduleItemReview(
+    const question = reviewQueue[reviewIndex];
+    if (!question || !result) return;
+
+    let nextQueue = reviewQueue;
+    if (!isSuccessfulStatus(result.status) && !question.remediation) {
+      const now = new Date();
+      const repeatedItems = question.items.map((item) =>
+        scheduleItemReview(
           item,
           item.itemId,
           item.skill,
-          currentExercise,
+          question.exercise,
           item.lessonId,
           result.status,
-          new Date(),
-        )
-      : item;
-    const nextQueue = shouldRequeue ? [...reviewQueue, repeatedItem] : reviewQueue;
-    if (shouldRequeue) {
-      setReviewQueue(nextQueue);
-      setRequeuedReviewKeys((previous) => [...previous, key]);
+          now,
+        ),
+      );
+      const excludedContentKeys = new Set(
+        reviewQueue.map((entry) => getExerciseContentKey(entry.exercise)),
+      );
+      const remediation = buildReviewSession(
+        repeatedItems,
+        reviewExercisesByLesson,
+        attemptHistory,
+        1,
+        { excludedContentKeys },
+      )[0];
+      if (remediation) {
+        nextQueue = [...reviewQueue, { ...remediation, remediation: true }];
+        setReviewQueue(nextQueue);
+      }
     }
+
     if (nextQueue[reviewIndex + 1]) {
       setReviewIndex((previous) => previous + 1);
       resetExerciseInput();
@@ -708,7 +741,7 @@ export default function App() {
   }
 
   if (screen === "review") {
-    if (!activeReviewBundle || !activeReviewItem) {
+    if (!activeReviewBundle || !activeReviewItem || !activeReviewQuestion) {
       return (
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.resultContainer}>
@@ -725,6 +758,7 @@ export default function App() {
         {...commonPracticeProps}
         lessonTitle={activeReviewBundle.lesson.title}
         focusLabel={reviewFocusLabel}
+        coveredCount={activeReviewQuestion.items.length}
         exerciseIndex={reviewIndex}
         exerciseCount={reviewQueue.length}
         onCourse={() => setScreen("course")}

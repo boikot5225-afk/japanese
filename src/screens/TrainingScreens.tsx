@@ -232,12 +232,14 @@ export function LessonScreen({
 interface ReviewScreenProps extends CommonPracticeProps {
   lessonTitle: string;
   focusLabel: string;
+  coveredCount: number;
   onCourse: () => void;
 }
 
 export function ReviewScreen({
   lessonTitle,
   focusLabel,
+  coveredCount,
   currentExercise,
   exerciseIndex,
   exerciseCount,
@@ -265,7 +267,9 @@ export function ReviewScreen({
         <Text style={styles.title}>{lessonTitle}</Text>
         <Text style={styles.meaning}>Сейчас проверяем: {focusLabel}</Text>
         <Text style={styles.description}>
-          Задание выбрано по сроку именно этого знания и навыка, а не всего упражнения целиком.
+          {coveredCount > 1
+            ? `Одна уникальная задача проверяет сразу ${coveredCount} связанных знания. Повторять тот же текст для каждого из них не придётся.`
+            : "Задание выбрано по сроку знания и навыка. Недавно показанные формулировки получают меньший приоритет."}
         </Text>
         <PracticeCard
           title="Повторить сегодня"

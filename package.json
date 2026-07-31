@@ -1,13 +1,13 @@
 {
   "name": "japanese-tutor",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "private": true,
   "main": "expo/AppEntry.js",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
     "web": "expo start --web",
-    "test:review": "node --experimental-strip-types --test src/engine/reviewEngine.test.ts",
+    "test:review": "tsx --test src/engine/reviewEngine.test.ts",
     "test:lesson-review": "tsx --test src/engine/lessonReview.test.ts",
     "test:practice-queue": "node --experimental-strip-types --test src/engine/practiceQueue.test.ts",
     "test:checkpoint": "tsx --test src/engine/checkpointEngine.test.ts",
