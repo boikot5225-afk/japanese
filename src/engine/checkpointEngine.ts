@@ -1,5 +1,8 @@
-import type { CourseCheckpoint } from "../content/courseCheckpoints";
-import { findCheckpointBlockingLesson } from "../content/courseCheckpoints";
+import {
+  courseCheckpoints,
+  type CourseCheckpoint,
+} from "../content/courseCheckpoints";
+import { lessonBundles } from "../content/courseCatalog";
 import type { LessonBundle } from "../content/lessonBundle";
 import type { Exercise, Skill } from "../domain/course";
 import type { ExerciseAttempt } from "./lessonSession";
@@ -165,6 +168,16 @@ export function isLessonUnlocked(
   checkpointProgress: readonly CheckpointProgress[],
 ): boolean {
   if (completedLessonIds.includes(lessonId)) return true;
-  const blocker = findCheckpointBlockingLesson(lessonId);
-  return !blocker || isCheckpointPassed(blocker.id, checkpointProgress);
+
+  const targetIndex = lessonBundles.findIndex((bundle) => bundle.lesson.id === lessonId);
+  if (targetIndex < 0) return false;
+
+  return courseCheckpoints.every((checkpoint) => {
+    if (!checkpoint.unlockLessonId) return true;
+    const unlockIndex = lessonBundles.findIndex(
+      (bundle) => bundle.lesson.id === checkpoint.unlockLessonId,
+    );
+    if (unlockIndex < 0 || targetIndex < unlockIndex) return true;
+    return isCheckpointPassed(checkpoint.id, checkpointProgress);
+  });
 }
