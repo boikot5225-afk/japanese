@@ -11,7 +11,7 @@
     "test:kana": "node --experimental-strip-types --test src/engine/kanaEngine.test.ts",
     "test:kana-words": "node --experimental-strip-types --test src/engine/kanaWordEngine.test.ts",
     "test:katakana": "node --experimental-strip-types --test src/engine/katakanaEngine.test.ts",
-    "test:content": "node --experimental-strip-types --test src/content/courseCatalog.test.ts",
+    "test:content": "tsx --test src/content/courseCatalog.test.ts",
     "test": "npm run test:review && npm run test:kana && npm run test:kana-words && npm run test:katakana && npm run test:content",
     "typecheck": "tsc --noEmit"
   },
@@ -25,6 +25,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.10",
+    "tsx": "^4.23.1",
     "typescript": "~5.9.2"
   }
 }
