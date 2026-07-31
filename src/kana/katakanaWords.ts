@@ -32,7 +32,7 @@ export const katakanaWords: readonly KanaWord[] = [
     distractors: ["コ", "デ", "ロ"],
     patterns: [],
     explanationRu:
-      "ホテル передаёт заимствованное слово японскими морами: ho-te-ru. Конечная согласная заменяется слогом ル.",
+      "ホテル передаёт заимствованное слово японскими морами: ho-te-ru. Конечный согласный исходного слова здесь передаётся морой ル.",
   },
   {
     id: "katakana-word-resutoran",
@@ -43,7 +43,7 @@ export const katakanaWords: readonly KanaWord[] = [
     distractors: ["ソ", "ロ", "ヌ"],
     patterns: [],
     explanationRu:
-      "В японском между большинством согласных появляются гласные: resutoran. Последний ン передаёт носовой звук.",
+      "Заимствование приспосабливается к японской системе мор: re-su-to-ra-n. Последний ン передаёт носовой звук.",
   },
   {
     id: "katakana-word-takushii",
@@ -109,7 +109,7 @@ export const katakanaWords: readonly KanaWord[] = [
     distractors: ["ソ", "ア", "オ", "ホ"],
     patterns: ["long-vowel"],
     explanationRu:
-      "В スマー знак ー удлиняет a. Ф + маленькая ォ образуют современное сочетание フォ — fo.",
+      "В スマー знак ー удлиняет a. フ + маленькая ォ образуют современное сочетание フォ — fo.",
   },
   {
     id: "katakana-word-kamera",
@@ -131,7 +131,7 @@ export const katakanaWords: readonly KanaWord[] = [
     distractors: ["ソ", "ケ", "ル"],
     patterns: ["long-vowel"],
     explanationRu:
-      "アイスクリーム буквально передаёт ice cream японскими морами. В リー знак ー удлиняет i.",
+      "アイスクリーム передаёт ice cream японскими морами. В リー знак ー удлиняет i.",
   },
 ];
 
