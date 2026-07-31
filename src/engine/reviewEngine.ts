@@ -1,7 +1,7 @@
 import type { Exercise } from "../domain/course";
 import type { AnswerStatus } from "./checkAnswer";
 
-export type AttemptSource = "lesson" | "review";
+export type AttemptSource = "lesson" | "review" | "practice";
 
 export interface ReviewItem {
   exerciseId: string;
@@ -30,6 +30,7 @@ export interface AttemptLogEntry {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const successfulStatuses: AnswerStatus[] = ["correct", "acceptable"];
+const WEAKNESS_THRESHOLD = 5;
 
 export const isSuccessfulStatus = (status: AnswerStatus): boolean =>
   successfulStatuses.includes(status);
@@ -40,6 +41,11 @@ const addDays = (date: Date, days: number): string =>
 const weaknessScore = (item: ReviewItem): number =>
   item.incorrectCount * 4 + item.lapseCount * 3 - item.correctCount +
   (isSuccessfulStatus(item.lastStatus) ? 0 : 6);
+
+export const isWeakReviewItem = (item: ReviewItem): boolean => {
+  if (!isSuccessfulStatus(item.lastStatus)) return true;
+  return item.streak < 3 && weaknessScore(item) >= WEAKNESS_THRESHOLD;
+};
 
 export function scheduleExerciseReview(
   existing: ReviewItem | undefined,
@@ -122,7 +128,7 @@ export function getNextReviewAt(items: ReviewItem[]): string | null {
 export function getWeakTargetIds(items: ReviewItem[]): string[] {
   const weakIds = new Set<string>();
   items
-    .filter((item) => item.incorrectCount > 0)
+    .filter(isWeakReviewItem)
     .sort((left, right) => weaknessScore(right) - weaknessScore(left))
     .forEach((item) => item.targetItemIds.forEach((id) => weakIds.add(id)));
   return [...weakIds];
