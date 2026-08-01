@@ -1,4 +1,5 @@
 import { lessonBundles } from "../content/courseCatalog";
+import { replaceJapaneseNumeralsWithArabic } from "./japaneseNumerals.ts";
 
 export type AnswerStatus =
   | "correct"
@@ -34,14 +35,15 @@ const replaceTaughtKanjiWithReadings = (value: string): string =>
     value,
   );
 
-const normalizeJapanese = (value: string): string =>
-  replaceTaughtKanjiWithReadings(
-    value
-      .trim()
-      .normalize("NFKC")
-      .replace(/[。！？!?.,，]/g, "")
-      .replace(/[|\s]+/g, ""),
-  );
+const normalizeJapanese = (value: string): string => {
+  const compact = value
+    .trim()
+    .normalize("NFKC")
+    .replace(/[。！？!?.,，]/g, "")
+    .replace(/[|\s]+/g, "");
+  const numericCanonical = replaceJapaneseNumeralsWithArabic(compact);
+  return replaceTaughtKanjiWithReadings(numericCanonical);
+};
 
 export function checkAnswer(
   answer: string,
