@@ -50,7 +50,7 @@ const normalizeJapanese = (value: string): string => {
   const compact = value
     .trim()
     .normalize("NFKC")
-    .replace(/[。！？!?.,，]/g, "")
+    .replace(/[。、！？!?.,，]/g, "")
     .replace(/[|\s]+/g, "");
   const numericCanonical = replaceJapaneseNumeralsWithArabic(compact);
   const politeCanonical = normalizeEquivalentPoliteForms(numericCanonical);
