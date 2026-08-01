@@ -57,7 +57,7 @@ test("tari practice is derived from the ta form and does not pretend to be a seq
   const answers = answersFor("lesson-030");
   assert.ok(answers.includes("読んだり"));
   assert.ok(answers.includes("書いたり"));
-  assert.ok(answers.includes("新聞を読んで、学校へ行きます"));
+  assert.ok(answers.includes("水を飲んで、日本語を勉強します"));
   assert.ok(!answers.includes("読んでり"));
   assert.ok(!answers.includes("読みたり"));
 });
