@@ -24,6 +24,10 @@ import { lesson017Bundle } from "./lesson017";
 import { lesson018Bundle } from "./lesson018";
 import { lesson019Bundle } from "./lesson019";
 import { lesson020Bundle } from "./lesson020";
+import { lesson021Bundle } from "./lesson021";
+import { lesson022Bundle } from "./lesson022";
+import { lesson023Bundle } from "./lesson023";
+import { lesson024Bundle } from "./lesson024";
 import type { Lesson } from "../domain/course";
 import type { LessonBundle } from "./lessonBundle";
 import { diversifyLessonPractice } from "./practiceDiversity";
@@ -71,6 +75,10 @@ const baseLessonBundles: readonly LessonBundle[] = [
   lesson018Bundle,
   lesson019Bundle,
   lesson020Bundle,
+  lesson021Bundle,
+  lesson022Bundle,
+  lesson023Bundle,
+  lesson024Bundle,
 ];
 
 const expandedLessonBundles: readonly LessonBundle[] = baseLessonBundles.map((bundle) =>
@@ -204,6 +212,19 @@ export const courseUnits: CourseUnit[] = [
       requireLesson("lesson-018"),
       requireLesson("lesson-019"),
       requireLesson("lesson-020"),
+    ],
+  },
+  {
+    id: "unit-007",
+    title: "Простые формы, желания и возможности",
+    description:
+      "Словарная форма, отрицание ～ない, желание ～たい и способность через ～ことができます.",
+    jlptLevel: "N5",
+    lessons: [
+      requireLesson("lesson-021"),
+      requireLesson("lesson-022"),
+      requireLesson("lesson-023"),
+      requireLesson("lesson-024"),
     ],
   },
 ];
