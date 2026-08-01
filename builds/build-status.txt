@@ -1,8 +1,9 @@
-source_commit=065bb07496d9c3f146cba5297f667b601250a624
+source_commit=0e43995c90c443e0c73d27319ce7e6cd8186d5fa
 install=success
 tests=success
 typecheck_app=success
 typecheck_tests=success
 prebuild=success
-gradle=success
+gradle_release=success
+javascript_bundle=success
 release=success

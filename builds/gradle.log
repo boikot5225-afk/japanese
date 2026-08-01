@@ -20,16 +20,16 @@ w: file:///home/runner/work/japanese/japanese/node_modules/expo-modules-autolink
 > Configure project :expo-gradle-plugin:expo-autolinking-settings-plugin
 w: file:///home/runner/work/japanese/japanese/node_modules/expo-modules-autolinking/android/expo-gradle-plugin/expo-autolinking-settings-plugin/build.gradle.kts:30:3: 'kotlinOptions(KotlinJvmOptionsDeprecated /* = KotlinJvmOptions */.() -> Unit): Unit' is deprecated. Please migrate to the compilerOptions DSL. More details are here: https://kotl.in/u1r8ln
 
-> Task :expo-gradle-plugin:expo-autolinking-plugin-shared:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :expo-gradle-plugin:expo-autolinking-settings-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
 > Task :gradle-plugin:settings-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :expo-gradle-plugin:expo-autolinking-plugin-shared:checkKotlinGradlePluginConfigurationErrors SKIPPED
 > Task :gradle-plugin:shared:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :expo-gradle-plugin:expo-autolinking-settings-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
 > Task :expo-gradle-plugin:expo-autolinking-settings-plugin:pluginDescriptors
 > Task :gradle-plugin:settings-plugin:pluginDescriptors
-> Task :gradle-plugin:settings-plugin:processResources
 > Task :expo-gradle-plugin:expo-autolinking-settings-plugin:processResources
-> Task :gradle-plugin:shared:processResources NO-SOURCE
+> Task :gradle-plugin:settings-plugin:processResources
 > Task :expo-gradle-plugin:expo-autolinking-plugin-shared:processResources NO-SOURCE
+> Task :gradle-plugin:shared:processResources NO-SOURCE
 > Task :gradle-plugin:shared:compileKotlin
 > Task :gradle-plugin:shared:compileJava NO-SOURCE
 > Task :gradle-plugin:shared:classes UP-TO-DATE
@@ -51,18 +51,18 @@ w: file:///home/runner/work/japanese/japanese/node_modules/expo-modules-autolink
 w: file:///home/runner/work/japanese/japanese/node_modules/expo-modules-core/expo-module-gradle-plugin/build.gradle.kts:58:3: 'kotlinOptions(KotlinJvmOptionsDeprecated /* = KotlinJvmOptions */.() -> Unit): Unit' is deprecated. Please migrate to the compilerOptions DSL. More details are here: https://kotl.in/u1r8ln
 
 > Task :expo-gradle-plugin:expo-autolinking-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :expo-module-gradle-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
 > Task :gradle-plugin:react-native-gradle-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :expo-module-gradle-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
 > Task :expo-module-gradle-plugin:pluginDescriptors
 > Task :expo-module-gradle-plugin:processResources
 > Task :expo-gradle-plugin:expo-autolinking-plugin:pluginDescriptors
 > Task :expo-gradle-plugin:expo-autolinking-plugin:processResources
+> Task :gradle-plugin:react-native-gradle-plugin:pluginDescriptors
+> Task :gradle-plugin:react-native-gradle-plugin:processResources
 > Task :expo-gradle-plugin:expo-autolinking-plugin:compileKotlin
 > Task :expo-gradle-plugin:expo-autolinking-plugin:compileJava NO-SOURCE
 > Task :expo-gradle-plugin:expo-autolinking-plugin:classes
 > Task :expo-gradle-plugin:expo-autolinking-plugin:jar
-> Task :gradle-plugin:react-native-gradle-plugin:pluginDescriptors
-> Task :gradle-plugin:react-native-gradle-plugin:processResources
 > Task :gradle-plugin:react-native-gradle-plugin:compileKotlin
 > Task :gradle-plugin:react-native-gradle-plugin:compileJava NO-SOURCE
 > Task :gradle-plugin:react-native-gradle-plugin:classes
@@ -111,103 +111,58 @@ Using expo modules
 > Task :app:generateAutolinkingPackageList
 > Task :app:generateCodegenSchemaFromJavaScript SKIPPED
 > Task :app:generateCodegenArtifactsFromSchema SKIPPED
+> Task :app:generateReactNativeEntryPoint
+> Task :expo-modules-core:preReleaseBuild UP-TO-DATE
 
 > Task :expo-constants:createExpoConfig
 The NODE_ENV environment variable is required but was not specified. Ensure the project is bundled with Expo CLI or NODE_ENV is set. Using only .env.local and .env
 
 > Task :expo-constants:preBuild
-> Task :expo-constants:preDebugBuild
-> Task :app:generateReactNativeEntryPoint
-> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :expo-modules-core:preDebugBuild UP-TO-DATE
+> Task :expo-constants:preReleaseBuild
 > Task :react-native-async-storage_async-storage:generateCodegenSchemaFromJavaScript
-> Task :expo-constants:writeDebugAarMetadata
-> Task :expo-modules-core:writeDebugAarMetadata
-> Task :expo-constants:generateDebugResValues
-> Task :expo-modules-core:generateDebugResValues
-> Task :expo-constants:generateDebugResources
-> Task :expo-modules-core:generateDebugResources
+> Task :expo-constants:mergeReleaseJniLibFolders
+> Task :expo-constants:mergeReleaseNativeLibs NO-SOURCE
+> Task :expo-constants:copyReleaseJniLibsProjectOnly
+> Task :expo-constants:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :expo-constants:generateReleaseBuildConfig
+> Task :expo-constants:generateReleaseResValues
+> Task :expo-constants:generateReleaseResources
 > Task :expo:generatePackagesList
 > Task :expo:preBuild
-> Task :expo:preDebugBuild
-> Task :expo:writeDebugAarMetadata
-> Task :expo:generateDebugResValues
-> Task :expo-constants:packageDebugResources
-> Task :expo-modules-core:packageDebugResources
-> Task :expo-modules-core:extractDeepLinksDebug
-> Task :expo-constants:extractDeepLinksDebug
-> Task :expo:generateDebugResources
-> Task :expo:packageDebugResources
-> Task :expo:extractDeepLinksDebug
+> Task :expo:preReleaseBuild
+> Task :expo:mergeReleaseJniLibFolders
+> Task :expo:mergeReleaseNativeLibs NO-SOURCE
+> Task :expo-constants:packageReleaseResources
+> Task :expo:copyReleaseJniLibsProjectOnly
+> Task :expo:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :expo:generateReleaseBuildConfig
+> Task :expo:generateReleaseResValues
+> Task :expo:generateReleaseResources
+> Task :expo:packageReleaseResources
 > Task :react-native-async-storage_async-storage:generateCodegenArtifactsFromSchema
 > Task :react-native-async-storage_async-storage:preBuild
 > Task :app:preBuild
-> Task :app:preDebugBuild
-> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:preReleaseBuild
+> Task :expo:parseReleaseLocalResources
+> Task :react-native-async-storage_async-storage:preReleaseBuild
+> Task :expo-constants:parseReleaseLocalResources
+> Task :react-native-async-storage_async-storage:mergeReleaseJniLibFolders
+> Task :react-native-async-storage_async-storage:mergeReleaseNativeLibs NO-SOURCE
+> Task :react-native-async-storage_async-storage:copyReleaseJniLibsProjectOnly
+> Task :react-native-async-storage_async-storage:generateReleaseBuildConfig
+> Task :react-native-async-storage_async-storage:generateReleaseResValues
+> Task :react-native-async-storage_async-storage:generateReleaseResources
+> Task :react-native-async-storage_async-storage:packageReleaseResources
+> Task :expo:generateReleaseRFile
+> Task :react-native-async-storage_async-storage:parseReleaseLocalResources
+> Task :expo-constants:generateReleaseRFile
+> Task :expo-constants:javaPreCompileRelease
+> Task :react-native-async-storage_async-storage:generateReleaseRFile
+> Task :react-native-async-storage_async-storage:javaPreCompileRelease
+> Task :expo:javaPreCompileRelease
+> Task :expo:writeReleaseAarMetadata
 
-> Task :expo-modules-core:processDebugManifest
-/home/runner/work/japanese/japanese/node_modules/expo-modules-core/android/src/main/AndroidManifest.xml:8:9-11:45 Warning:
-	meta-data#com.facebook.soloader.enabled@android:value was tagged at AndroidManifest.xml:8 to replace other declarations but no other declaration present
-
-> Task :react-native-async-storage_async-storage:preDebugBuild
-> Task :app:generateDebugBuildConfig
-> Task :expo:processDebugManifest
-> Task :expo-constants:processDebugManifest
-> Task :react-native-async-storage_async-storage:writeDebugAarMetadata
-> Task :app:generateDebugResValues
-> Task :react-native-async-storage_async-storage:generateDebugResValues
-> Task :react-native-async-storage_async-storage:generateDebugResources
-> Task :react-native-async-storage_async-storage:packageDebugResources
-> Task :react-native-async-storage_async-storage:extractDeepLinksDebug
-
-> Task :react-native-async-storage_async-storage:processDebugManifest
-package="com.reactnativecommunity.asyncstorage" found in source AndroidManifest.xml: /home/runner/work/japanese/japanese/node_modules/@react-native-async-storage/async-storage/android/src/main/AndroidManifest.xml.
-Setting the namespace via the package attribute in the source AndroidManifest.xml is no longer supported, and the value is ignored.
-Recommendation: remove package="com.reactnativecommunity.asyncstorage" from the source AndroidManifest.xml: /home/runner/work/japanese/japanese/node_modules/@react-native-async-storage/async-storage/android/src/main/AndroidManifest.xml.
-
-> Task :expo-constants:compileDebugLibraryResources
-> Task :expo:compileDebugLibraryResources
-> Task :expo:parseDebugLocalResources
-> Task :expo-modules-core:compileDebugLibraryResources
-> Task :expo:generateDebugRFile
-> Task :expo-constants:parseDebugLocalResources
-> Task :react-native-async-storage_async-storage:compileDebugLibraryResources
-> Task :expo-constants:generateDebugRFile
-> Task :expo:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :expo:generateDebugBuildConfig
-> Task :expo-constants:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :expo-constants:generateDebugBuildConfig
-> Task :expo-modules-core:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :expo-modules-core:generateDebugBuildConfig
-> Task :expo-modules-core:parseDebugLocalResources
-> Task :expo-modules-core:generateDebugRFile
-> Task :expo-modules-core:javaPreCompileDebug
-> Task :react-native-async-storage_async-storage:parseDebugLocalResources
-> Task :expo-constants:javaPreCompileDebug
-> Task :react-native-async-storage_async-storage:generateDebugRFile
-> Task :react-native-async-storage_async-storage:generateDebugBuildConfig
-> Task :react-native-async-storage_async-storage:javaPreCompileDebug
-> Task :expo:javaPreCompileDebug
-> Task :expo:mergeDebugShaders
-> Task :expo:compileDebugShaders NO-SOURCE
-> Task :expo:generateDebugAssets UP-TO-DATE
-> Task :expo:mergeDebugAssets
-> Task :expo-constants:mergeDebugShaders
-> Task :expo-constants:compileDebugShaders NO-SOURCE
-> Task :expo-constants:generateDebugAssets UP-TO-DATE
-> Task :expo-constants:mergeDebugAssets
-> Task :expo:mergeDebugJniLibFolders
-> Task :expo:mergeDebugNativeLibs NO-SOURCE
-> Task :expo:copyDebugJniLibsProjectOnly
-> Task :expo-constants:mergeDebugJniLibFolders
-> Task :expo-constants:mergeDebugNativeLibs NO-SOURCE
-> Task :expo-constants:copyDebugJniLibsProjectOnly
-> Task :expo-modules-core:mergeDebugShaders
-> Task :expo-modules-core:compileDebugShaders NO-SOURCE
-> Task :expo-modules-core:generateDebugAssets UP-TO-DATE
-> Task :expo-modules-core:mergeDebugAssets
-
-> Task :expo-modules-core:configureCMakeDebug[arm64-v8a]
+> Task :expo-modules-core:configureCMakeRelWithDebInfo[arm64-v8a]
 Checking the license for package CMake 3.22.1 in /usr/local/lib/android/sdk/licenses
 License for package CMake 3.22.1 accepted.
 Preparing "Install CMake 3.22.1 v.3.22.1".
@@ -216,43 +171,182 @@ Installing CMake 3.22.1 in /usr/local/lib/android/sdk/cmake/3.22.1
 "Install CMake 3.22.1 v.3.22.1" complete.
 "Install CMake 3.22.1 v.3.22.1" finished.
 
-> Task :app:checkDebugAarMetadata
-> Task :app:mapDebugSourceSetPaths
-> Task :app:generateDebugResources
-> Task :app:packageDebugResources
-> Task :app:parseDebugLocalResources
-> Task :app:mergeDebugResources
-> Task :app:createDebugCompatibleScreenManifests
-> Task :app:extractDeepLinksDebug
+> Task :expo-constants:writeReleaseAarMetadata
+> Task :expo:extractDeepLinksRelease
+> Task :expo:processReleaseManifest
+> Task :expo-constants:extractDeepLinksRelease
+> Task :expo-constants:processReleaseManifest
+> Task :expo:compileReleaseLibraryResources
+> Task :expo-constants:compileReleaseLibraryResources
+> Task :expo:prepareReleaseArtProfile
+> Task :expo-constants:prepareReleaseArtProfile
+> Task :expo:mergeReleaseShaders
+> Task :expo:compileReleaseShaders NO-SOURCE
+> Task :expo:generateReleaseAssets UP-TO-DATE
+> Task :expo:mergeReleaseAssets
+> Task :expo-constants:mergeReleaseShaders
+> Task :expo-constants:compileReleaseShaders NO-SOURCE
+> Task :expo-constants:generateReleaseAssets UP-TO-DATE
+> Task :expo-constants:mergeReleaseAssets
+> Task :expo:extractProguardFiles
+> Task :expo-constants:extractProguardFiles
+> Task :expo-constants:prepareLintJarForPublish
+> Task :expo:prepareLintJarForPublish
+> Task :expo:stripReleaseDebugSymbols NO-SOURCE
+> Task :expo:copyReleaseJniLibsProjectAndLocalJars
+> Task :expo:extractDeepLinksForAarRelease
+> Task :expo-constants:stripReleaseDebugSymbols NO-SOURCE
+> Task :expo-constants:copyReleaseJniLibsProjectAndLocalJars
+> Task :expo-constants:extractDeepLinksForAarRelease
+> Task :expo-constants:writeReleaseLintModelMetadata
+> Task :expo:writeReleaseLintModelMetadata
 
-> Task :app:processDebugMainManifest
-/home/runner/work/japanese/japanese/android/app/src/debug/AndroidManifest.xml:6:5-162 Warning:
-	application@android:usesCleartextTraffic was tagged at AndroidManifest.xml:6 to replace other declarations but no other declaration present
-/home/runner/work/japanese/japanese/android/app/src/debug/AndroidManifest.xml Warning:
-	provider#expo.modules.filesystem.FileSystemFileProvider@android:authorities was tagged at AndroidManifest.xml:0 to replace other declarations but no other declaration present
-
-> Task :app:processDebugManifest
-> Task :app:processDebugManifestForPackage
-> Task :app:processDebugResources
-> Task :app:javaPreCompileDebug
-> Task :app:mergeDebugShaders
-> Task :app:compileDebugShaders NO-SOURCE
-> Task :app:generateDebugAssets UP-TO-DATE
-> Task :app:desugarDebugFileDependencies
-
-> Task :react-native-async-storage_async-storage:compileDebugJavaWithJavac
+> Task :react-native-async-storage_async-storage:compileReleaseJavaWithJavac
 Note: Some input files use or override a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
 Note: /home/runner/work/japanese/japanese/node_modules/@react-native-async-storage/async-storage/android/src/javaPackage/java/com/reactnativecommunity/asyncstorage/AsyncStoragePackage.java uses unchecked or unsafe operations.
 Note: Recompile with -Xlint:unchecked for details.
 
-> Task :expo-modules-core:compileDebugKotlin
-> Task :app:checkDebugDuplicateClasses
-> Task :expo-modules-core:buildCMakeDebug[arm64-v8a]
-> Task :app:mergeExtDexDebug
-> Task :expo-modules-core:configureCMakeDebug[armeabi-v7a]
+> Task :react-native-async-storage_async-storage:writeReleaseAarMetadata
+> Task :react-native-async-storage_async-storage:bundleLibRuntimeToDirRelease
+> Task :react-native-async-storage_async-storage:extractDeepLinksRelease
 
-> Task :expo-modules-core:compileDebugKotlin
+> Task :react-native-async-storage_async-storage:processReleaseManifest
+package="com.reactnativecommunity.asyncstorage" found in source AndroidManifest.xml: /home/runner/work/japanese/japanese/node_modules/@react-native-async-storage/async-storage/android/src/main/AndroidManifest.xml.
+Setting the namespace via the package attribute in the source AndroidManifest.xml is no longer supported, and the value is ignored.
+Recommendation: remove package="com.reactnativecommunity.asyncstorage" from the source AndroidManifest.xml: /home/runner/work/japanese/japanese/node_modules/@react-native-async-storage/async-storage/android/src/main/AndroidManifest.xml.
+
+> Task :react-native-async-storage_async-storage:compileReleaseLibraryResources
+> Task :react-native-async-storage_async-storage:bundleLibCompileToJarRelease
+> Task :react-native-async-storage_async-storage:prepareReleaseArtProfile
+> Task :react-native-async-storage_async-storage:bundleLibRuntimeToJarRelease
+> Task :react-native-async-storage_async-storage:mergeReleaseShaders
+> Task :react-native-async-storage_async-storage:compileReleaseShaders NO-SOURCE
+> Task :react-native-async-storage_async-storage:generateReleaseAssets UP-TO-DATE
+> Task :react-native-async-storage_async-storage:mergeReleaseAssets
+> Task :react-native-async-storage_async-storage:processReleaseJavaRes NO-SOURCE
+> Task :react-native-async-storage_async-storage:createFullJarRelease
+> Task :react-native-async-storage_async-storage:extractProguardFiles
+> Task :app:configureCMakeRelWithDebInfo[arm64-v8a]
+> Task :react-native-async-storage_async-storage:generateReleaseLintModel
+> Task :react-native-async-storage_async-storage:prepareLintJarForPublish
+> Task :react-native-async-storage_async-storage:stripReleaseDebugSymbols NO-SOURCE
+> Task :react-native-async-storage_async-storage:copyReleaseJniLibsProjectAndLocalJars
+> Task :react-native-async-storage_async-storage:extractDeepLinksForAarRelease
+> Task :app:buildCMakeRelWithDebInfo[arm64-v8a]
+> Task :react-native-async-storage_async-storage:extractReleaseAnnotations
+> Task :react-native-async-storage_async-storage:mergeReleaseGeneratedProguardFiles
+> Task :react-native-async-storage_async-storage:mergeReleaseConsumerProguardFiles
+> Task :react-native-async-storage_async-storage:mergeReleaseJavaResource
+> Task :react-native-async-storage_async-storage:syncReleaseLibJars
+> Task :react-native-async-storage_async-storage:bundleReleaseLocalLintAar
+> Task :react-native-async-storage_async-storage:writeReleaseLintModelMetadata
+> Task :react-native-async-storage_async-storage:generateReleaseLintVitalModel
+> Task :app:configureCMakeRelWithDebInfo[armeabi-v7a]
+> Task :expo-modules-core:buildCMakeRelWithDebInfo[arm64-v8a]
+> Task :app:buildCMakeRelWithDebInfo[armeabi-v7a]
+> Task :app:configureCMakeRelWithDebInfo[x86]
+> Task :expo-modules-core:configureCMakeRelWithDebInfo[armeabi-v7a]
+> Task :react-native-async-storage_async-storage:lintVitalAnalyzeRelease
+> Task :app:buildCMakeRelWithDebInfo[x86]
+> Task :app:configureCMakeRelWithDebInfo[x86_64]
+> Task :expo-modules-core:buildCMakeRelWithDebInfo[armeabi-v7a]
+> Task :expo-modules-core:configureCMakeRelWithDebInfo[x86]
+> Task :app:buildCMakeRelWithDebInfo[x86_64]
+> Task :app:mergeReleaseJniLibFolders
+> Task :app:checkReleaseDuplicateClasses
+> Task :app:buildKotlinToolingMetadata
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:generateReleaseBuildConfig
+
+> Task :app:createBundleReleaseJsAndAssets
+Starting Metro Bundler
+Android node_modules/expo/AppEntry.js ▓░░░░░░░░░░░░░░░ 11.1% ( 5/15)
+Android node_modules/expo/AppEntry.js ▓▓▓▓░░░░░░░░░░░░ 27.2% ( 71/194)
+Android node_modules/expo/AppEntry.js ▓▓▓▓░░░░░░░░░░░░ 27.7% (160/304)
+Android node_modules/expo/AppEntry.js ▓▓▓▓▓▓▓░░░░░░░░░ 47.1% (315/459)
+Android node_modules/expo/AppEntry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 74.6% (444/514)
+Android node_modules/expo/AppEntry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 93.8% (523/540)
+Android node_modules/expo/AppEntry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (633/633)
+Android Bundled 23777ms node_modules/expo/AppEntry.js (633 modules)
+Writing bundle output to: /home/runner/work/japanese/japanese/android/app/build/generated/assets/createBundleReleaseJsAndAssets/index.android.bundle
+Writing sourcemap output to: /home/runner/work/japanese/japanese/android/app/build/intermediates/sourcemaps/react/release/index.android.bundle.packager.map
+Done writing bundle output
+Done writing sourcemap output
+
+> Task :expo-modules-core:buildCMakeRelWithDebInfo[x86]
+> Task :expo-modules-core:configureCMakeRelWithDebInfo[x86_64]
+> Task :app:generateReleaseResValues
+> Task :app:generateReleaseResources
+> Task :app:packageReleaseResources
+> Task :app:createReleaseCompatibleScreenManifests
+> Task :app:extractDeepLinksRelease
+> Task :app:javaPreCompileRelease
+> Task :app:desugarReleaseFileDependencies
+> Task :app:mergeReleaseStartupProfile
+> Task :app:parseReleaseLocalResources
+> Task :expo-modules-core:buildCMakeRelWithDebInfo[x86_64]
+> Task :app:mergeExtDexRelease
+> Task :expo-modules-core:mergeReleaseJniLibFolders
+> Task :expo-modules-core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :expo-modules-core:generateReleaseBuildConfig
+> Task :expo-modules-core:generateReleaseResValues
+> Task :expo-modules-core:generateReleaseResources
+> Task :expo-modules-core:packageReleaseResources
+> Task :expo-modules-core:javaPreCompileRelease
+> Task :expo-modules-core:parseReleaseLocalResources
+> Task :expo-modules-core:writeReleaseAarMetadata
+> Task :expo-modules-core:extractDeepLinksRelease
+> Task :expo-modules-core:generateReleaseRFile
+
+> Task :expo-modules-core:processReleaseManifest
+/home/runner/work/japanese/japanese/node_modules/expo-modules-core/android/src/main/AndroidManifest.xml:8:9-11:45 Warning:
+	meta-data#com.facebook.soloader.enabled@android:value was tagged at AndroidManifest.xml:8 to replace other declarations but no other declaration present
+
+> Task :expo-modules-core:mergeReleaseNativeLibs
+> Task :expo-modules-core:compileReleaseLibraryResources
+> Task :expo-modules-core:prepareReleaseArtProfile
+> Task :expo-modules-core:copyReleaseJniLibsProjectOnly
+> Task :expo-modules-core:mergeReleaseShaders
+> Task :expo-modules-core:compileReleaseShaders NO-SOURCE
+> Task :expo-modules-core:generateReleaseAssets UP-TO-DATE
+> Task :expo-modules-core:mergeReleaseAssets
+> Task :expo-modules-core:extractProguardFiles
+> Task :expo-modules-core:prepareLintJarForPublish
+> Task :expo-modules-core:extractDeepLinksForAarRelease
+> Task :expo-modules-core:writeReleaseLintModelMetadata
+> Task :expo-modules-core:stripReleaseDebugSymbols
+> Task :expo-modules-core:copyReleaseJniLibsProjectAndLocalJars
+> Task :app:checkReleaseAarMetadata
+> Task :app:mergeReleaseNativeLibs
+> Task :app:mapReleaseSourceSetPaths
+> Task :app:stripReleaseDebugSymbols
+> Task :app:mergeReleaseResources
+> Task :app:extractReleaseNativeSymbolTables
+
+> Task :app:processReleaseMainManifest
+/home/runner/work/japanese/japanese/android/app/src/main/AndroidManifest.xml Warning:
+	provider#expo.modules.filesystem.FileSystemFileProvider@android:authorities was tagged at AndroidManifest.xml:0 to replace other declarations but no other declaration present
+
+> Task :app:processReleaseManifest
+> Task :app:processReleaseManifestForPackage
+> Task :app:mergeReleaseArtProfile
+> Task :app:mergeReleaseShaders
+> Task :app:compileReleaseShaders NO-SOURCE
+> Task :app:generateReleaseAssets UP-TO-DATE
+> Task :app:mergeReleaseAssets
+> Task :app:compressReleaseAssets
+> Task :app:extractReleaseVersionControlInfo
+> Task :app:processReleaseResources
+> Task :app:extractProguardFiles
+> Task :app:collectReleaseDependencies
+> Task :app:sdkReleaseDependencyData
+> Task :app:validateSigningRelease
+> Task :app:writeReleaseAppMetadata
+> Task :app:writeReleaseSigningConfigVersions
+> Task :app:optimizeReleaseResources
+> Task :app:mergeReleaseNativeDebugMetadata
+> Task :expo-modules-core:compileReleaseKotlin
 w: file:///home/runner/work/japanese/japanese/node_modules/expo-modules-core/android/src/main/java/expo/modules/adapters/react/apploader/RNHeadlessAppLoader.kt:48:87 'val reactNativeHost: ReactNativeHost' is deprecated. You should not use ReactNativeHost directly in the New Architecture. Use ReactHost instead.
 w: file:///home/runner/work/japanese/japanese/node_modules/expo-modules-core/android/src/main/java/expo/modules/adapters/react/apploader/RNHeadlessAppLoader.kt:91:85 'val reactNativeHost: ReactNativeHost' is deprecated. You should not use ReactNativeHost directly in the New Architecture. Use ReactHost instead.
 w: file:///home/runner/work/japanese/japanese/node_modules/expo-modules-core/android/src/main/java/expo/modules/adapters/react/apploader/RNHeadlessAppLoader.kt:120:83 'val reactNativeHost: ReactNativeHost' is deprecated. You should not use ReactNativeHost directly in the New Architecture. Use ReactHost instead.
@@ -268,41 +362,43 @@ w: file:///home/runner/work/japanese/japanese/node_modules/expo-modules-core/and
 w: file:///home/runner/work/japanese/japanese/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/views/ViewManagerDefinition.kt:41:16 'val errorManager: JSLoggerModule?' is deprecated. Use AppContext.jsLogger instead.
 w: file:///home/runner/work/japanese/japanese/node_modules/expo-modules-core/android/src/main/java/expo/modules/kotlin/views/ViewManagerDefinition.kt:41:30 'fun reportExceptionToLogBox(codedException: CodedException): Unit' is deprecated. Use appContext.jsLogger.error(...) instead.
 
-> Task :react-native-async-storage_async-storage:mergeDebugShaders
-> Task :react-native-async-storage_async-storage:compileDebugShaders NO-SOURCE
-> Task :react-native-async-storage_async-storage:generateDebugAssets UP-TO-DATE
-> Task :react-native-async-storage_async-storage:bundleLibCompileToJarDebug
-> Task :react-native-async-storage_async-storage:mergeDebugAssets
-> Task :react-native-async-storage_async-storage:processDebugJavaRes NO-SOURCE
-> Task :react-native-async-storage_async-storage:bundleLibRuntimeToJarDebug
-> Task :expo-modules-core:buildCMakeDebug[armeabi-v7a]
-> Task :react-native-async-storage_async-storage:bundleLibRuntimeToDirDebug
-> Task :react-native-async-storage_async-storage:mergeDebugJniLibFolders
-
-> Task :expo-modules-core:compileDebugJavaWithJavac
+> Task :expo-modules-core:compileReleaseJavaWithJavac
 Note: Some input files use or override a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
 
-> Task :react-native-async-storage_async-storage:mergeDebugNativeLibs NO-SOURCE
-> Task :react-native-async-storage_async-storage:copyDebugJniLibsProjectOnly
-> Task :expo-modules-core:bundleLibCompileToJarDebug
-> Task :expo-modules-core:processDebugJavaRes
-> Task :expo-modules-core:bundleLibRuntimeToJarDebug
-> Task :expo-modules-core:bundleLibRuntimeToDirDebug
+> Task :expo-modules-core:processReleaseJavaRes
+> Task :expo-modules-core:bundleLibCompileToJarRelease
+> Task :expo-modules-core:bundleLibRuntimeToJarRelease
+> Task :expo-modules-core:generateReleaseLintModel
+> Task :expo-modules-core:bundleLibRuntimeToDirRelease
+> Task :expo-modules-core:createFullJarRelease
+> Task :expo-modules-core:extractReleaseAnnotations
+> Task :expo-modules-core:mergeReleaseGeneratedProguardFiles
+> Task :expo-modules-core:mergeReleaseConsumerProguardFiles
+> Task :expo-modules-core:mergeReleaseJavaResource
+> Task :expo-modules-core:syncReleaseLibJars
+> Task :expo-modules-core:bundleReleaseLocalLintAar
 
-> Task :expo-constants:compileDebugKotlin
+> Task :expo-constants:compileReleaseKotlin
 w: file:///home/runner/work/japanese/japanese/node_modules/expo/node_modules/expo-constants/android/src/main/java/expo/modules/constants/ConstantsModule.kt:12:5 'fun Constants(legacyConstantsProvider: () -> Map<String, Any?>): Unit' is deprecated. Use `Constant` or `Property` instead.
 
-> Task :expo-constants:compileDebugJavaWithJavac
-> Task :expo-constants:bundleLibCompileToJarDebug
-> Task :expo-constants:bundleLibRuntimeToJarDebug
-> Task :expo-constants:processDebugJavaRes
-> Task :expo-constants:bundleLibRuntimeToDirDebug
-> Task :expo-modules-core:configureCMakeDebug[x86]
-> Task :app:mergeDebugAssets
-> Task :app:compressDebugAssets
+> Task :expo-constants:compileReleaseJavaWithJavac
+> Task :expo-constants:bundleLibCompileToJarRelease
+> Task :expo-constants:bundleLibRuntimeToDirRelease
+> Task :expo-constants:bundleLibRuntimeToJarRelease
+> Task :expo-constants:processReleaseJavaRes
+> Task :expo-constants:createFullJarRelease
+> Task :expo-constants:generateReleaseLintModel
+> Task :expo-constants:extractReleaseAnnotations
+> Task :expo-constants:mergeReleaseGeneratedProguardFiles
+> Task :expo-constants:mergeReleaseConsumerProguardFiles
+> Task :expo-constants:mergeReleaseJavaResource
+> Task :expo-constants:syncReleaseLibJars
+> Task :expo-constants:bundleReleaseLocalLintAar
+> Task :expo-constants:generateReleaseLintVitalModel
+> Task :expo-modules-core:generateReleaseLintVitalModel
 
-> Task :expo:compileDebugKotlin
+> Task :expo:compileReleaseKotlin
 w: file:///home/runner/work/japanese/japanese/node_modules/expo/android/src/main/java/expo/modules/ExpoModulesPackage.kt:34:16 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
 w: file:///home/runner/work/japanese/japanese/node_modules/expo/android/src/main/java/expo/modules/ExpoReactHostFactory.kt:8:8 'class ReactNativeHost : Any' is deprecated. Deprecated in Java.
 w: file:///home/runner/work/japanese/japanese/node_modules/expo/android/src/main/java/expo/modules/ExpoReactHostFactory.kt:80:22 'class ReactNativeHost : Any' is deprecated. Deprecated in Java.
@@ -327,47 +423,50 @@ w: file:///home/runner/work/japanese/japanese/node_modules/expo/android/src/main
 w: file:///home/runner/work/japanese/japanese/node_modules/expo/android/src/main/java/expo/modules/fetch/NativeResponse.kt:42:16 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
 w: file:///home/runner/work/japanese/japanese/node_modules/expo/android/src/main/java/expo/modules/fetch/NativeResponse.kt:44:11 'fun deallocate(): Unit' is deprecated. Use sharedObjectDidRelease() instead.
 
-> Task :app:configureCMakeDebug[arm64-v8a]
-> Task :expo:compileDebugJavaWithJavac
-> Task :expo:bundleLibCompileToJarDebug
-> Task :expo:bundleLibRuntimeToJarDebug
-> Task :expo:processDebugJavaRes
-> Task :expo:bundleLibRuntimeToDirDebug
-> Task :app:buildCMakeDebug[arm64-v8a]
-> Task :app:mergeLibDexDebug
-> Task :app:configureCMakeDebug[armeabi-v7a]
+> Task :expo:compileReleaseJavaWithJavac
+> Task :expo:bundleLibCompileToJarRelease
+> Task :expo:bundleLibRuntimeToDirRelease
+> Task :expo:bundleLibRuntimeToJarRelease
+> Task :expo:processReleaseJavaRes
+> Task :expo:createFullJarRelease
+> Task :expo:generateReleaseLintModel
 
-> Task :app:compileDebugKotlin
+> Task :app:compileReleaseKotlin
 w: file:///home/runner/work/japanese/japanese/android/app/src/main/java/com/bulat/japanesetutor/MainApplication.kt:9:8 'class ReactNativeHost : Any' is deprecated. Deprecated in Java.
 w: file:///home/runner/work/japanese/japanese/android/app/src/main/java/com/bulat/japanesetutor/MainApplication.kt:21:16 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
 w: file:///home/runner/work/japanese/japanese/android/app/src/main/java/com/bulat/japanesetutor/MainApplication.kt:21:33 'class ReactNativeHost : Any' is deprecated. Deprecated in Java.
 
-> Task :expo-modules-core:buildCMakeDebug[x86]
-> Task :expo-modules-core:configureCMakeDebug[x86_64]
-> Task :app:buildCMakeDebug[armeabi-v7a]
-> Task :app:compileDebugJavaWithJavac
-> Task :app:dexBuilderDebug
-> Task :app:processDebugJavaRes
-> Task :app:mergeDebugGlobalSynthetics
-> Task :app:mergeProjectDexDebug
-> Task :app:mergeDebugJavaResource
-> Task :app:configureCMakeDebug[x86]
-> Task :app:buildCMakeDebug[x86]
-> Task :app:configureCMakeDebug[x86_64]
-> Task :expo-modules-core:buildCMakeDebug[x86_64]
-> Task :expo-modules-core:mergeDebugJniLibFolders
-> Task :expo-modules-core:mergeDebugNativeLibs
-> Task :expo-modules-core:copyDebugJniLibsProjectOnly
-> Task :app:buildCMakeDebug[x86_64]
-> Task :app:mergeDebugJniLibFolders
-> Task :app:validateSigningDebug
-> Task :app:writeDebugAppMetadata
-> Task :app:writeDebugSigningConfigVersions
-> Task :app:mergeDebugNativeLibs
-> Task :app:stripDebugDebugSymbols
-> Task :app:packageDebug
-> Task :app:createDebugApkListingFileRedirect
-> Task :app:assembleDebug
+> Task :expo:extractReleaseAnnotations
+> Task :expo:mergeReleaseGeneratedProguardFiles
+> Task :expo:mergeReleaseConsumerProguardFiles
+> Task :expo:mergeReleaseJavaResource
+> Task :expo:syncReleaseLibJars
+> Task :expo:bundleReleaseLocalLintAar
+> Task :app:compileReleaseJavaWithJavac
+> Task :app:dexBuilderRelease
+> Task :app:mergeDexRelease
+> Task :app:mergeReleaseGlobalSynthetics
+> Task :expo-constants:lintVitalAnalyzeRelease
+> Task :app:compileReleaseArtProfile
+> Task :expo:generateReleaseLintVitalModel
+> Task :app:generateReleaseLintVitalReportModel
+> Task :app:processReleaseJavaRes
+> Task :app:mergeReleaseJavaResource
+The Daemon will expire after the build after running out of JVM Metaspace.
+The project memory settings are likely not configured or are configured to an insufficient value.
+The daemon will restart for the next build, which may increase subsequent build times.
+These settings can be adjusted by setting 'org.gradle.jvmargs' in 'gradle.properties'.
+The currently configured max heap space is '2 GiB' and the configured max metaspace is '512 MiB'.
+For more information on how to set these values, please refer to https://docs.gradle.org/8.14.3/userguide/build_environment.html#sec:configuring_jvm_memory in the Gradle documentation.
+To disable this warning, set 'org.gradle.daemon.performance.disable-logging=true'.
+> Task :expo:lintVitalAnalyzeRelease
+> Task :expo-modules-core:lintVitalAnalyzeRelease
+> Task :app:lintVitalAnalyzeRelease
+> Task :app:lintVitalReportRelease
+> Task :app:lintVitalRelease
+> Task :app:packageRelease
+> Task :app:createReleaseApkListingFileRedirect
+> Task :app:assembleRelease
 
 [Incubating] Problems report is available at: file:///home/runner/work/japanese/japanese/android/build/reports/problems/problems-report.html
 
@@ -377,5 +476,5 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 
 For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD SUCCESSFUL in 5m 38s
-167 actionable tasks: 167 executed
+BUILD SUCCESSFUL in 6m 47s
+247 actionable tasks: 247 executed
