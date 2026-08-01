@@ -77,10 +77,10 @@ export const lesson014Grammar: GrammarPoint[] = [
     title: "Прошедшее отрицание ～ではありませんでした",
     meaningRu: "означает «не был таким / не находился в таком состоянии»",
     explanationRu:
-      "Прошедшее отрицание な-прилагательных строится по именной модели: 便利です → 便利ではありませんでした. Разговорный вежливый вариант — 便利じゃありませんでした.",
+      "Прошедшее отрицание な-прилагательных строится по именной модели: 便利です → 便利ではありませんでした. Разговорные вежливые варианты — 便利じゃありませんでした и 便利じゃなかったです; проверка ответов принимает их как эквивалентные формы.",
     formation: [
       "便利です → 便利ではありませんでした",
-      "元気です → 元気じゃありませんでした"
+      "元気です → 元気じゃありませんでした／元気じゃなかったです"
     ],
     cautions: [
       "便利くなかったです — неверно: ～くなかったです относится к い-прилагательным.",
@@ -118,7 +118,7 @@ export const lesson014Sentences: ExampleSentence[] = [
     type: "sentence",
     japanese: "田中さんは元気ではありませんでした。",
     reading: "たなかさんはげんきではありませんでした。",
-    translationRu: "Танака был не в форме.",
+    translationRu: "Танака плохо себя чувствовал.",
     grammarIds: ["grammar-wa-topic", "grammar-na-adjective-past-negative"],
     vocabularyIds: ["word-tanaka-san", "word-genki-na"],
   },
@@ -149,9 +149,9 @@ export const lesson014Exercises: Exercise[] = [
     prompt: "Какая форма означает «не был удобным»?",
     targetItemIds: ["grammar-na-adjective-past-negative", "word-benri-na"],
     correctAnswers: ["便利ではありませんでした"],
-    acceptableAnswers: ["便利じゃありませんでした"],
+    acceptableAnswers: ["便利じゃありませんでした", "便利じゃなかったです"],
     distractors: ["便利くなかったです", "便利ではありません", "便利でした"],
-    explanationRu: "Прошедшее отрицание な-прилагательного — ではありませんでした.",
+    explanationRu: "Основная форма — 便利ではありませんでした; вежливые варианты с じゃ тоже правильные.",
   },
   {
     id: "exercise-kouen-nigiyaka-builder",
@@ -174,7 +174,7 @@ export const lesson014Exercises: Exercise[] = [
   {
     id: "exercise-tanaka-genki-past-negative-input",
     type: "text-input",
-    prompt: "Напиши по-японски: Танака был не в форме.",
+    prompt: "Напиши по-японски: Танака плохо себя чувствовал.",
     targetItemIds: ["grammar-na-adjective-past-negative", "word-tanaka-san", "word-genki-na"],
     correctAnswers: [
       "田中さんは元気ではありませんでした",
@@ -183,10 +183,12 @@ export const lesson014Exercises: Exercise[] = [
     acceptableAnswers: [
       "田中さんは元気じゃありませんでした",
       "田中さんは元気じゃありませんでした。",
+      "田中さんは元気じゃなかったです",
+      "田中さんは元気じゃなかったです。",
       "たなかさんはげんきではありませんでした",
       "たなかさんはげんきではありませんでした。"
     ],
-    explanationRu: "元気 — な-прилагательное, поэтому используется 元気ではありませんでした.",
+    explanationRu: "元気 — な-прилагательное; основная прошедшая отрицательная форма — 元気ではありませんでした.",
   },
   {
     id: "exercise-tesuto-kantan-past-negative-input",
@@ -197,10 +199,12 @@ export const lesson014Exercises: Exercise[] = [
     acceptableAnswers: [
       "テストは簡単じゃありませんでした",
       "テストは簡単じゃありませんでした。",
+      "テストは簡単じゃなかったです",
+      "テストは簡単じゃなかったです。",
       "テストはかんたんではありませんでした",
       "テストはかんたんではありませんでした。"
     ],
-    explanationRu: "簡単です → 簡単ではありませんでした.",
+    explanationRu: "簡単です → 簡単ではありませんでした; формы с じゃ также принимаются.",
   },
   {
     id: "exercise-hima-past-choice",
@@ -245,7 +249,7 @@ export const lesson014Bundle: LessonBundle = {
   exercises: lesson014Exercises,
   outcomes: [
     "ставить な-прилагательные в прошедшую форму ～でした",
-    "строить прошедшее отрицание ～ではありませんでした",
+    "строить прошедшее отрицание ～ではありませんでした и распознавать варианты с じゃ",
     "не добавлять な в конце предложения",
     "не смешивать именную модель な-прилагательных с формами ～かった／～くなかった",
   ],
