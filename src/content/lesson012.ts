@@ -103,8 +103,12 @@ export const lesson012Grammar: GrammarPoint[] = [
     title: "Прошедшее отрицание ～くなかったです",
     meaningRu: "означает «не был таким / не было такого состояния»",
     explanationRu:
-      "Для прошедшего отрицания убирают конечное い и добавляют ～くなかったです: 寒い → 寒くなかったです. Это прошедшая форма от ～くないです.",
-    formation: ["寒い → 寒くなかったです", "高い → 高くなかったです"],
+      "Для прошедшего отрицания убирают конечное い и добавляют ～くなかったです: 寒い → 寒くなかったです. Это прошедшая форма от ～くないです. Более формальный вежливый вариант ～くありませんでした также грамматически правильный и принимается в ответах.",
+    formation: [
+      "寒い → 寒くなかったです",
+      "高い → 高くなかったです",
+      "寒い → 寒くありませんでした"
+    ],
     cautions: ["Не смешивай формы: 寒くないでした — неверно."],
     relatedGrammarIds: ["grammar-i-adjective-negative", "grammar-i-adjective-past"],
     jlptLevel: "N5",
@@ -115,11 +119,11 @@ export const lesson012Grammar: GrammarPoint[] = [
     title: "Особое прилагательное いい／よい",
     meaningRu: "изменяет формы от основы よ-, а не い-",
     explanationRu:
-      "В настоящем времени обычно говорят いいです, но остальные формы строятся от よい: よくないです, よかったです, よくなかったです. Формы いかった и いくない не существуют.",
+      "В настоящем времени обычно говорят いいです, но остальные формы строятся от よい: よくないです, よかったです, よくなかったです. Формальные варианты よくありません и よくありませんでした строятся от той же основы. Формы いかった и いくない не существуют.",
     formation: [
-      "いいです → よくないです",
+      "いいです → よくないです／よくありません",
       "いいです → よかったです",
-      "いいです → よくなかったです"
+      "いいです → よくなかったです／よくありませんでした"
     ],
     cautions: ["Запомни эту модель отдельно: いい ведёт себя как よい во всех изменяемых формах."],
     relatedGrammarIds: [
@@ -137,7 +141,7 @@ export const lesson012Sentences: ExampleSentence[] = [
     type: "sentence",
     japanese: "先週は忙しかったです。",
     reading: "せんしゅうはいそがしかったです。",
-    translationRu: "На прошлой неделе было много дел.",
+    translationRu: "На прошлой неделе я был занят.",
     grammarIds: ["grammar-wa-topic", "grammar-i-adjective-past"],
     vocabularyIds: ["word-senshuu", "word-isogashii"],
   },
@@ -186,8 +190,9 @@ export const lesson012Exercises: Exercise[] = [
     prompt: "Какая форма означает «не было холодно»?",
     targetItemIds: ["grammar-i-adjective-past-negative", "word-samui"],
     correctAnswers: ["寒くなかったです"],
+    acceptableAnswers: ["寒くありませんでした"],
     distractors: ["寒くないでした", "寒いではありませんでした", "寒かったです"],
-    explanationRu: "Прошедшее отрицание 寒い — 寒くなかったです.",
+    explanationRu: "Основная форма — 寒くなかったです; более формальный вариант 寒くありませんでした тоже правильный.",
   },
   {
     id: "exercise-ii-past-choice",
@@ -201,7 +206,7 @@ export const lesson012Exercises: Exercise[] = [
   {
     id: "exercise-senshuu-isogashikatta-builder",
     type: "sentence-builder",
-    prompt: "Собери: На прошлой неделе было много дел.",
+    prompt: "Собери: На прошлой неделе я был занят.",
     targetItemIds: ["grammar-wa-topic", "grammar-i-adjective-past", "word-senshuu", "word-isogashii"],
     correctAnswers: ["先週|は|忙しかった|です"],
     distractors: ["忙しい", "でした", "に"],
@@ -222,8 +227,15 @@ export const lesson012Exercises: Exercise[] = [
     prompt: "Напиши по-японски: Вчера не было холодно.",
     targetItemIds: ["grammar-i-adjective-past-negative", "word-kinou", "word-samui"],
     correctAnswers: ["昨日は寒くなかったです", "昨日は寒くなかったです。"],
-    acceptableAnswers: ["きのうはさむくなかったです", "きのうはさむくなかったです。"],
-    explanationRu: "寒い → 寒くなかったです.",
+    acceptableAnswers: [
+      "きのうはさむくなかったです",
+      "きのうはさむくなかったです。",
+      "昨日は寒くありませんでした",
+      "昨日は寒くありませんでした。",
+      "きのうはさむくありませんでした",
+      "きのうはさむくありませんでした。"
+    ],
+    explanationRu: "Основная учебная форма — 寒くなかったです; 寒くありませんでした тоже является правильным вежливым вариантом.",
   },
   {
     id: "exercise-tenki-yokatta-input",
@@ -268,7 +280,7 @@ export const lesson012Bundle: LessonBundle = {
   exercises: lesson012Exercises,
   outcomes: [
     "ставить い-прилагательные в прошедшую форму ～かったです",
-    "строить прошедшее отрицание ～くなかったです",
+    "строить прошедшее отрицание ～くなかったです и распознавать ～くありませんでした",
     "правильно изменять особое прилагательное いい через основу よ-",
     "различать неверные модели вроде 寒いでした и 寒くないでした",
   ],
