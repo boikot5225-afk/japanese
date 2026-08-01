@@ -36,6 +36,10 @@ import { lesson029Bundle } from "./lesson029";
 import { lesson030Bundle } from "./lesson030";
 import { lesson031Bundle } from "./lesson031";
 import { lesson032Bundle } from "./lesson032";
+import { lesson033Bundle } from "./lesson033";
+import { lesson034Bundle } from "./lesson034";
+import { lesson035Bundle } from "./lesson035";
+import { lesson036Bundle } from "./lesson036";
 import type { Lesson } from "../domain/course";
 import type { LessonBundle } from "./lessonBundle";
 import { diversifyLessonPractice } from "./practiceDiversity";
@@ -95,6 +99,10 @@ const baseLessonBundles: readonly LessonBundle[] = [
   lesson030Bundle,
   lesson031Bundle,
   lesson032Bundle,
+  lesson033Bundle,
+  lesson034Bundle,
+  lesson035Bundle,
+  lesson036Bundle,
 ];
 
 const expandedLessonBundles: readonly LessonBundle[] = baseLessonBundles.map((bundle) =>
@@ -271,6 +279,19 @@ export const courseUnits: CourseUnit[] = [
       requireLesson("lesson-030"),
       requireLesson("lesson-031"),
       requireLesson("lesson-032"),
+    ],
+  },
+  {
+    id: "unit-010",
+    title: "Разговор о действиях и времени",
+    description:
+      "Приглашения и предложения, уже завершённые и ещё не завершённые действия, связанные описания и временные конструкции с ～とき.",
+    jlptLevel: "N5",
+    lessons: [
+      requireLesson("lesson-033"),
+      requireLesson("lesson-034"),
+      requireLesson("lesson-035"),
+      requireLesson("lesson-036"),
     ],
   },
 ];
