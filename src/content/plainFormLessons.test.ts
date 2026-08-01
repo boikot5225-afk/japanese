@@ -39,6 +39,8 @@ test("lesson 21 keeps dictionary forms separate from te forms", () => {
 });
 
 test("lesson 22 handles the u to wa exception and irregular negatives", () => {
+  const lesson = byId.get("lesson-022");
+  assert.ok(lesson);
   const answers = answersFor("lesson-022");
   ["読まない", "買わない", "見ない", "しない"].forEach((form) =>
     assert.ok(answers.includes(form), `missing ${form}`),
@@ -46,6 +48,13 @@ test("lesson 22 handles the u to wa exception and irregular negatives", () => {
   ["読みない", "買あない", "見るない", "するない"].forEach((form) =>
     assert.ok(!answers.includes(form), `accepted invalid negative ${form}`),
   );
+
+  const ikanai = lesson.sentences.find(
+    (sentence) => sentence.id === "sentence-22-kyou-gakkou-ikanai",
+  );
+  assert.ok(ikanai);
+  assert.ok(ikanai.grammarIds.includes("grammar-nai-form-group1"));
+  assert.ok(!ikanai.grammarIds.includes("grammar-nai-form-group2-irregular"));
 });
 
 test("lesson 23 distinguishes not doing from not wanting to do", () => {
