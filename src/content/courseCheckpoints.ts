@@ -109,6 +109,17 @@ export const courseCheckpoints: readonly CourseCheckpoint[] = [
     questionCount: 18,
     passPercent: 80,
   },
+  {
+    id: "checkpoint-unit-010",
+    unitId: "unit-010",
+    title: "Контрольная точка: действия и время",
+    description:
+      "Проверка уроков 33–36: приглашения и предложения, もう／まだ, соединительные формы прилагательных и существительных, временная конструкция ～とき.",
+    lessonIds: ["lesson-033", "lesson-034", "lesson-035", "lesson-036"],
+    unlockLessonId: "lesson-037",
+    questionCount: 18,
+    passPercent: 80,
+  },
 ];
 
 export const findCheckpoint = (checkpointId: string): CourseCheckpoint | undefined =>
