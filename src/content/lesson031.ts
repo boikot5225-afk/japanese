@@ -10,7 +10,7 @@ export const lesson031Grammar: GrammarPoint[] = [
     explanationRu: "Положительный совет строится из ～た-формы и ほうがいいです: 傘を持ったほうがいいです — «Лучше взять зонт». Говорящий считает этот вариант разумнее другого.",
     formation: ["[глагол в ～た-форме] + ほうがいいです", "持ったほうがいいです", "勉強したほうがいいです"],
     cautions: ["～た здесь является частью конструкции совета и не сообщает, что действие уже произошло."],
-    relatedGrammarIds: ["grammar-ta-form-role", "grammar-hou-ga-comparison"], jlptLevel: "N5",
+    relatedGrammarIds: ["grammar-ta-form-role", "grammar-yori-houga"], jlptLevel: "N5",
   },
   {
     id: "grammar-nai-hou-ga-ii", type: "grammar", title: "Совет не делать ～ないほうがいいです",
