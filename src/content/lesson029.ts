@@ -18,7 +18,7 @@ export const lesson029Grammar: GrammarPoint[] = [
     explanationRu: "Отрицание ставится в あります: 日本料理を食べたことがありません — «Я никогда не ел японскую кухню». Глагол перед こと остаётся в ～た-форме.",
     formation: ["[глагол в ～た-форме] + ことがありません"],
     cautions: ["Не ставь отрицание в самом действии: 食べなかったことがあります означает «бывали случаи, когда я не ел», а не «никогда не ел»."],
-    relatedGrammarIds: ["grammar-ta-koto-ga-arimasu-experience", "grammar-plain-past-negative-sentence"], jlptLevel: "N5",
+    relatedGrammarIds: ["grammar-ta-koto-ga-arimasu-experience", "grammar-nakatta-role"], jlptLevel: "N5",
   },
   {
     id: "grammar-ta-koto-ga-arimasu-ka", type: "grammar", title: "Вопрос об опыте",
