@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { checkAnswer } from "../engine/checkAnswer.ts";
 import { lessonBundles } from "./courseCatalog.ts";
+import { lesson016Exercises } from "./lesson016.ts";
 
 const byId = new Map(lessonBundles.map((bundle) => [bundle.lesson.id, bundle]));
 
@@ -57,7 +59,43 @@ test("lesson 16 keeps comparison direction, binary choice and superlative distin
   assert.ok(bundle.grammar.some((item) => item.id === "grammar-ichiban-superlative"));
   assert.ok(bundle.sentences.some((item) => item.japanese === "猫より犬のほうが大きいです。"));
   assert.ok(bundle.sentences.some((item) => item.japanese === "夏と冬とどちらが好きですか。"));
-  assert.ok(bundle.sentences.some((item) => item.japanese === "季節で春が一番好きです。"));
+  assert.ok(bundle.sentences.some((item) => item.japanese === "季節では春が一番好きです。"));
+});
+
+test("lesson 16 accepts natural comparison alternatives without replacing the taught model", () => {
+  const hotter = lesson016Exercises.find(
+    (exercise) => exercise.id === "exercise-haru-natsu-input",
+  );
+  const binaryQuestion = lesson016Exercises.find(
+    (exercise) => exercise.id === "exercise-natsu-fuyu-question-input",
+  );
+  const favorite = lesson016Exercises.find(
+    (exercise) => exercise.id === "exercise-kisetsu-ichiban-input",
+  );
+  assert.ok(hotter);
+  assert.ok(binaryQuestion);
+  assert.ok(favorite);
+
+  assert.notEqual(
+    checkAnswer("夏は春より暑いです", hotter.correctAnswers, hotter.acceptableAnswers).status,
+    "incorrect",
+  );
+  assert.notEqual(
+    checkAnswer(
+      "夏と冬ではどちらが好きですか",
+      binaryQuestion.correctAnswers,
+      binaryQuestion.acceptableAnswers,
+    ).status,
+    "incorrect",
+  );
+  assert.notEqual(
+    checkAnswer(
+      "季節の中では春が一番好きです",
+      favorite.correctAnswers,
+      favorite.acceptableAnswers,
+    ).status,
+    "incorrect",
+  );
 });
 
 test("lessons 14-16 expose twelve mixed exercises after expansion", () => {
