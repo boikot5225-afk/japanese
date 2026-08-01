@@ -17,6 +17,9 @@ import { lesson010Bundle } from "./lesson010";
 import { lesson011Bundle } from "./lesson011";
 import { lesson012Bundle } from "./lesson012";
 import { lesson013Bundle } from "./lesson013";
+import { lesson014Bundle } from "./lesson014";
+import { lesson015Bundle } from "./lesson015";
+import { lesson016Bundle } from "./lesson016";
 import type { Lesson } from "../domain/course";
 import type { LessonBundle } from "./lessonBundle";
 import { diversifyLessonPractice } from "./practiceDiversity";
@@ -57,6 +60,9 @@ const baseLessonBundles: readonly LessonBundle[] = [
   lesson011Bundle,
   lesson012Bundle,
   lesson013Bundle,
+  lesson014Bundle,
+  lesson015Bundle,
+  lesson016Bundle,
 ];
 
 const expandedLessonBundles: readonly LessonBundle[] = baseLessonBundles.map((bundle) =>
@@ -127,6 +133,18 @@ export const courseUnits: CourseUnit[] = [
       requireLesson("lesson-011"),
       requireLesson("lesson-012"),
       requireLesson("lesson-013"),
+    ],
+  },
+  {
+    id: "unit-005",
+    title: "Состояния, предпочтения и сравнение",
+    description:
+      "Прошедшие формы な-прилагательных, симпатии и навыки с が, сравнение через より／ほうが и выбор через 一番.",
+    jlptLevel: "N5",
+    lessons: [
+      requireLesson("lesson-014"),
+      requireLesson("lesson-015"),
+      requireLesson("lesson-016"),
     ],
   },
 ];
