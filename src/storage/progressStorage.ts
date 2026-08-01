@@ -3,7 +3,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { courseCheckpoints } from "../content/courseCheckpoints";
 import { lessonBundles } from "../content/courseCatalog";
 import type { Skill } from "../domain/course";
-import type { CheckpointProgress } from "../engine/checkpointEngine";
+import {
+  reconcileCheckpointProgress,
+  type CheckpointProgress,
+} from "../engine/checkpointEngine";
 import {
   migrateLegacyReviewItems,
   type AttemptLogEntry,
@@ -52,6 +55,8 @@ const skills: Skill[] = [
   "writing",
   "usage",
 ];
+
+const knownCheckpointIds = new Set(courseCheckpoints.map((checkpoint) => checkpoint.id));
 
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === "string");
@@ -130,24 +135,14 @@ const validCommonSnapshot = (
   Array.isArray(candidate.attemptHistory) &&
   candidate.attemptHistory.every(isAttemptLogEntry);
 
-const inferLegacyCheckpointProgress = (
+const restoreCheckpointProgress = (
+  progress: readonly CheckpointProgress[],
   completedLessonIds: readonly string[],
-): CheckpointProgress[] => {
-  const now = new Date(0).toISOString();
-  return courseCheckpoints
-    .filter(
-      (checkpoint) =>
-        checkpoint.unlockLessonId && completedLessonIds.includes(checkpoint.unlockLessonId),
-    )
-    .map((checkpoint) => ({
-      checkpointId: checkpoint.id,
-      passed: true,
-      bestPercent: 100,
-      lastPercent: 100,
-      attemptCount: 1,
-      lastAttemptAt: now,
-    }));
-};
+): CheckpointProgress[] =>
+  reconcileCheckpointProgress(
+    progress.filter((item) => knownCheckpointIds.has(item.checkpointId)),
+    completedLessonIds,
+  );
 
 export async function loadCourseProgress(): Promise<CourseProgressSnapshot | null> {
   try {
@@ -168,7 +163,10 @@ export async function loadCourseProgress(): Promise<CourseProgressSnapshot | nul
           lastLessonId: candidate.lastLessonId,
           reviewItems: candidate.reviewItems,
           attemptHistory: candidate.attemptHistory,
-          checkpointProgress: candidate.checkpointProgress,
+          checkpointProgress: restoreCheckpointProgress(
+            candidate.checkpointProgress,
+            candidate.completedLessonIds,
+          ),
           updatedAt:
             typeof candidate.updatedAt === "string"
               ? candidate.updatedAt
@@ -193,7 +191,7 @@ export async function loadCourseProgress(): Promise<CourseProgressSnapshot | nul
           lastLessonId: typed.lastLessonId,
           reviewItems: typed.reviewItems,
           attemptHistory: typed.attemptHistory,
-          checkpointProgress: inferLegacyCheckpointProgress(typed.completedLessonIds),
+          checkpointProgress: restoreCheckpointProgress([], typed.completedLessonIds),
           updatedAt: typed.updatedAt ?? new Date(0).toISOString(),
         };
       }
@@ -216,7 +214,7 @@ export async function loadCourseProgress(): Promise<CourseProgressSnapshot | nul
           lastLessonId: typed.lastLessonId,
           reviewItems: migrateLegacyReviewItems(typed.reviewItems, exercises),
           attemptHistory: typed.attemptHistory,
-          checkpointProgress: inferLegacyCheckpointProgress(typed.completedLessonIds),
+          checkpointProgress: restoreCheckpointProgress([], typed.completedLessonIds),
           updatedAt: typed.updatedAt ?? new Date(0).toISOString(),
         };
       }
@@ -240,7 +238,7 @@ export async function loadCourseProgress(): Promise<CourseProgressSnapshot | nul
           lastLessonId: candidate.lastLessonId,
           reviewItems: [],
           attemptHistory: [],
-          checkpointProgress: inferLegacyCheckpointProgress(candidate.completedLessonIds),
+          checkpointProgress: restoreCheckpointProgress([], candidate.completedLessonIds),
           updatedAt: new Date(0).toISOString(),
         };
       }
