@@ -33,3 +33,25 @@ test("manual vocabulary reading practice suppresses its generated duplicate", ()
     "the generated 暑い reading clone leaked into the final session",
   );
 });
+
+test("lessons 11-16 retain unique sentence-building practice", () => {
+  lessonBundles
+    .filter(
+      (bundle) =>
+        bundle.lesson.order >= 11 && bundle.lesson.order <= 16,
+    )
+    .forEach((bundle) => {
+      const builders = bundle.exercises.filter(
+        (exercise) => exercise.type === "sentence-builder",
+      );
+      assert.ok(
+        builders.length >= 1,
+        `${bundle.lesson.id} lost sentence-building practice during diversification`,
+      );
+      assert.equal(
+        new Set(builders.map(getExerciseContentKey)).size,
+        builders.length,
+        `${bundle.lesson.id} repeats sentence-building content`,
+      );
+    });
+});
