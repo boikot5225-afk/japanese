@@ -23,6 +23,7 @@ export function getHandwritingAssessmentAnswer(
   exercise: Exercise,
   looksCorrect: boolean,
 ): string {
-  if (!looksCorrect) return HANDWRITING_RETRY_ANSWER;
-  return exercise.correctAnswers[0] ?? "";
+  const reference = exercise.correctAnswers[0]?.trim();
+  if (!looksCorrect || !reference) return HANDWRITING_RETRY_ANSWER;
+  return reference;
 }
