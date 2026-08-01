@@ -1,0 +1,59 @@
+name: Apply editorial audit fixes
+
+on:
+  push:
+    branches:
+      - agent/content-audit-0.14.1
+    paths:
+      - scripts/apply-editorial-audit.mjs
+      - .github/workflows/editorial-audit-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: contains(github.event.head_commit.message, 'Run editorial audit fixer')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout audit branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/content-audit-0.14.1
+          fetch-depth: 0
+
+      - name: Apply deterministic corrections
+        run: node scripts/apply-editorial-audit.mjs
+
+      - name: Remove one-shot audit machinery
+        run: |
+          rm -f scripts/apply-editorial-audit.mjs
+          rm -f .github/workflows/editorial-audit-fix.yml
+          rm -f README.audit.tmp
+
+      - name: Commit corrected course
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- \
+            src/domain/course.ts \
+            src/content/lesson002.ts \
+            src/content/lesson005.ts \
+            src/content/lesson006.ts \
+            src/content/lesson007.ts \
+            src/content/lesson011.ts \
+            src/content/lesson012.ts \
+            src/content/lesson013.ts \
+            src/content/lesson014.ts \
+            src/content/lesson022.ts \
+            src/content/lesson023.ts \
+            src/content/lesson025.ts \
+            src/content/lesson026.ts \
+            src/content/practiceDiversity.ts \
+            src/screens/TrainingScreens.tsx \
+            scripts/apply-editorial-audit.mjs \
+            .github/workflows/editorial-audit-fix.yml \
+            README.audit.tmp
+          git diff --cached --check
+          git commit -m "Apply full course editorial corrections [skip build]"
+          git push origin HEAD:agent/content-audit-0.14.1
