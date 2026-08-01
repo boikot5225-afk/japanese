@@ -196,7 +196,7 @@ export const lesson016Exercises: Exercise[] = [
     prompt: "Как сказать «Из времён года больше всего люблю весну»?",
     targetItemIds: ["grammar-ichiban-superlative", "word-kisetsu", "word-haru", "word-ichiban", "word-suki-na"],
     correctAnswers: ["季節では春が一番好きです"],
-    acceptableAnswers: ["季節の中では春が一番好きです", "季節で春が一番好きです"],
+    acceptableAnswers: ["季節の中では春が一番好きです"],
     distractors: ["季節に春を一番好きです", "春より季節が好きです", "季節は春のほうです"],
     explanationRu: "Группа задаётся через 季節では, выбранный элемент — 春が, степень — 一番.",
   },
@@ -260,9 +260,7 @@ export const lesson016Exercises: Exercise[] = [
       "きせつでははるがいちばんすきです",
       "きせつでははるがいちばんすきです。",
       "季節の中では春が一番好きです",
-      "季節の中では春が一番好きです。",
-      "季節で春が一番好きです",
-      "季節で春が一番好きです。"
+      "季節の中では春が一番好きです。"
     ],
     explanationRu: "Основной вариант: 季節では + 春が + 一番好きです. Развёрнуто можно сказать 季節の中では春が一番好きです.",
   },
