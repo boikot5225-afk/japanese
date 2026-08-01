@@ -20,6 +20,10 @@ import { lesson013Bundle } from "./lesson013";
 import { lesson014Bundle } from "./lesson014";
 import { lesson015Bundle } from "./lesson015";
 import { lesson016Bundle } from "./lesson016";
+import { lesson017Bundle } from "./lesson017";
+import { lesson018Bundle } from "./lesson018";
+import { lesson019Bundle } from "./lesson019";
+import { lesson020Bundle } from "./lesson020";
 import type { Lesson } from "../domain/course";
 import type { LessonBundle } from "./lessonBundle";
 import { diversifyLessonPractice } from "./practiceDiversity";
@@ -63,6 +67,10 @@ const baseLessonBundles: readonly LessonBundle[] = [
   lesson014Bundle,
   lesson015Bundle,
   lesson016Bundle,
+  lesson017Bundle,
+  lesson018Bundle,
+  lesson019Bundle,
+  lesson020Bundle,
 ];
 
 const expandedLessonBundles: readonly LessonBundle[] = baseLessonBundles.map((bundle) =>
@@ -183,6 +191,19 @@ export const courseUnits: CourseUnit[] = [
       requireLesson("lesson-014"),
       requireLesson("lesson-015"),
       requireLesson("lesson-016"),
+    ],
+  },
+  {
+    id: "unit-006",
+    title: "て-форма в действии",
+    description:
+      "Образование て-формы, просьбы, разрешения, запреты, порядок действий и ～ています.",
+    jlptLevel: "N5",
+    lessons: [
+      requireLesson("lesson-017"),
+      requireLesson("lesson-018"),
+      requireLesson("lesson-019"),
+      requireLesson("lesson-020"),
     ],
   },
 ];

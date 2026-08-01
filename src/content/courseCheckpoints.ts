@@ -65,6 +65,17 @@ export const courseCheckpoints: readonly CourseCheckpoint[] = [
     questionCount: 15,
     passPercent: 80,
   },
+  {
+    id: "checkpoint-unit-006",
+    unitId: "unit-006",
+    title: "Контрольная точка: て-форма в действии",
+    description:
+      "Проверка уроков 17–20: образование て-формы, просьбы, разрешения, запреты, порядок действий и значения ～ています.",
+    lessonIds: ["lesson-017", "lesson-018", "lesson-019", "lesson-020"],
+    unlockLessonId: "lesson-021",
+    questionCount: 18,
+    passPercent: 80,
+  },
 ];
 
 export const findCheckpoint = (checkpointId: string): CourseCheckpoint | undefined =>
