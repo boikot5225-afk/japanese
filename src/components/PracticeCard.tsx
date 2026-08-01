@@ -235,14 +235,7 @@ export function PracticeCard({
         )}
 
         {!result && interactionMode === "text" && (
-          <TouchableOpacity
-            disabled={answer.trim().length === 0}
-            style={[
-              styles.primaryButton,
-              answer.trim().length === 0 && styles.disabledButton,
-            ]}
-            onPress={() => submitTextAnswer()}
-          >
+          <TouchableOpacity style={styles.primaryButton} onPress={() => submitTextAnswer()}>
             <Text style={styles.primaryButtonText}>Проверить</Text>
           </TouchableOpacity>
         )}
