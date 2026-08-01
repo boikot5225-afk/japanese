@@ -14,6 +14,9 @@ import { lesson007Bundle } from "./lesson007";
 import { lesson008Bundle } from "./lesson008";
 import { lesson009Bundle } from "./lesson009";
 import { lesson010Bundle } from "./lesson010";
+import { lesson011Bundle } from "./lesson011";
+import { lesson012Bundle } from "./lesson012";
+import { lesson013Bundle } from "./lesson013";
 import type { Lesson } from "../domain/course";
 import type { LessonBundle } from "./lessonBundle";
 import { diversifyLessonPractice } from "./practiceDiversity";
@@ -51,6 +54,9 @@ const baseLessonBundles: readonly LessonBundle[] = [
   lesson008Bundle,
   lesson009Bundle,
   lesson010Bundle,
+  lesson011Bundle,
+  lesson012Bundle,
+  lesson013Bundle,
 ];
 
 const expandedLessonBundles: readonly LessonBundle[] = baseLessonBundles.map((bundle) =>
@@ -109,6 +115,18 @@ export const courseUnits: CourseUnit[] = [
       requireLesson("lesson-008"),
       requireLesson("lesson-009"),
       requireLesson("lesson-010"),
+    ],
+  },
+  {
+    id: "unit-004",
+    title: "Описание предметов и мест",
+    description:
+      "い- и な-прилагательные: описание, отрицание, прошедшее время и особая форма いい／よい.",
+    jlptLevel: "N5",
+    lessons: [
+      requireLesson("lesson-011"),
+      requireLesson("lesson-012"),
+      requireLesson("lesson-013"),
     ],
   },
 ];
