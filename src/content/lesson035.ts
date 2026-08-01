@@ -37,7 +37,7 @@ export const lesson035Grammar: GrammarPoint[] = [
     explanationRu: "Как и в других изменяемых формах, いい использует основу よ-: いい→よくて. 天気がよくて、暖かいです — «Погода хорошая и тёплая». Форма いくて для значения «хороший и...» неверна.",
     formation: ["いい → よくて"],
     cautions: ["Не образуй いいくて или いくて; используется историческая основа よ-."],
-    relatedGrammarIds: ["grammar-i-adjective-kute", "grammar-ii-special"], jlptLevel: "N5",
+    relatedGrammarIds: ["grammar-i-adjective-kute", "grammar-ii-irregular"], jlptLevel: "N5",
   },
 ];
 
@@ -45,7 +45,7 @@ export const lesson035Sentences: ExampleSentence[] = [
   { id: "sentence-35-room-large-clean", type: "sentence", japanese: "この部屋は大きくて、きれいです。", reading: "このへやはおおきくて、きれいです。", translationRu: "Эта комната большая и красивая.", grammarIds: ["grammar-i-adjective-kute", "grammar-na-adjective-predicate", "grammar-wa-topic"], vocabularyIds: ["word-heya", "word-ookii", "word-kirei-na"] },
   { id: "sentence-35-town-quiet-convenient", type: "sentence", japanese: "この町は静かで、便利です。", reading: "このまちはしずかで、べんりです。", translationRu: "Этот город тихий и удобный.", grammarIds: ["grammar-na-adjective-de", "grammar-na-adjective-predicate", "grammar-wa-topic"], vocabularyIds: ["word-machi", "word-shizuka-na", "word-benri-na"] },
   { id: "sentence-35-tanaka-japanese-teacher", type: "sentence", japanese: "田中さんは日本人で、先生です。", reading: "たなかさんはにほんじんで、せんせいです。", translationRu: "Танака — японец и преподаватель.", grammarIds: ["grammar-noun-de-connection", "grammar-wa-topic", "grammar-desu"], vocabularyIds: ["word-tanaka-san", "word-nihonjin-35", "word-sensei"] },
-  { id: "sentence-35-weather-good-warm", type: "sentence", japanese: "今日は天気がよくて、暖かいです。", reading: "きょうはてんきがよくて、あたたかいです。", translationRu: "Сегодня погода хорошая и тёплая.", grammarIds: ["grammar-ii-yokute", "grammar-i-adjective-predicate", "grammar-wa-topic", "grammar-ga-subject"], vocabularyIds: ["word-kyou", "word-tenki", "word-ii-yoi", "word-atatakai-35"] },
+  { id: "sentence-35-weather-good-warm", type: "sentence", japanese: "今日は天気がよくて、暖かいです。", reading: "きょうはてんきがよくて、あたたかいです。", translationRu: "Сегодня погода хорошая и тёплая.", grammarIds: ["grammar-ii-yokute", "grammar-i-adjective-predicate", "grammar-wa-topic"], vocabularyIds: ["word-kyou", "word-tenki", "word-ii-yoi", "word-atatakai-35"] },
   { id: "sentence-35-car-new-large-expensive", type: "sentence", japanese: "この車は新しくて、大きくて、高いです。", reading: "このくるまはあたらしくて、おおきくて、たかいです。", translationRu: "Эта машина новая, большая и дорогая.", grammarIds: ["grammar-i-adjective-kute", "grammar-i-adjective-predicate", "grammar-wa-topic"], vocabularyIds: ["word-kuruma", "word-atarashii", "word-ookii", "word-takai"] },
 ];
 
