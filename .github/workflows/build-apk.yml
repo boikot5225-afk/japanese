@@ -48,6 +48,10 @@ jobs:
         with:
           node-version: 22
 
+      - name: Read application version
+        shell: bash
+        run: echo "APP_VERSION=$(node -p \"require('./package.json').version\")" >> "$GITHUB_ENV"
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -123,15 +127,15 @@ jobs:
           test -s "$APK"
           unzip -l "$APK" | tee builds/apk-contents.log
           unzip -l "$APK" | grep -q "assets/index.android.bundle"
-          cp "$APK" builds/Japanese-0.11.1-standalone.apk
+          cp "$APK" "builds/Japanese-${APP_VERSION}-standalone.apk"
           echo "Verified assets/index.android.bundle in standalone APK" | tee builds/bundle-verification.log
 
       - name: Upload standalone APK artifact
         if: steps.bundle.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: Japanese-0.11.1-standalone
-          path: builds/Japanese-0.11.1-standalone.apk
+          name: Japanese-${{ env.APP_VERSION }}-standalone
+          path: builds/Japanese-${{ env.APP_VERSION }}-standalone.apk
           if-no-files-found: error
           retention-days: 14
 
@@ -143,12 +147,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          TAG="build-0.11.1-preview"
-          APK="builds/Japanese-0.11.1-standalone.apk"
+          TAG="build-${APP_VERSION}-preview"
+          APK="builds/Japanese-${APP_VERSION}-standalone.apk"
           gh release delete "$TAG" --cleanup-tag --yes >/dev/null 2>&1 || true
           gh release create "$TAG" "$APK" \
             --target "$GITHUB_SHA" \
-            --title "Japanese Tutor 0.11.1 standalone preview" \
+            --title "Japanese Tutor ${APP_VERSION} standalone preview" \
             --notes "Исправленная автономная Android-сборка с упакованным JavaScript bundle. Не требует Metro или подключения к компьютеру." \
             --prerelease
 
@@ -168,6 +172,7 @@ jobs:
           mkdir -p builds
           {
             echo "source_commit=$GITHUB_SHA"
+            echo "version=$APP_VERSION"
             echo "install=$INSTALL_OUTCOME"
             echo "tests=$TESTS_OUTCOME"
             echo "typecheck_app=$APP_TYPES_OUTCOME"
@@ -183,7 +188,7 @@ jobs:
           if git diff --cached --quiet; then
             exit 0
           fi
-          git commit -m "Report Japanese 0.11.1 standalone build [skip build]"
+          git commit -m "Report Japanese ${APP_VERSION} standalone build [skip build]"
           git push
 
       - name: Report final build status
