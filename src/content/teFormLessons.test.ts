@@ -1,9 +1,19 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { lessonBundles } from "./courseCatalog.ts";
+import type { LessonBundle } from "./lessonBundle";
+import { lesson017Bundle } from "./lesson017.ts";
+import { lesson018Bundle } from "./lesson018.ts";
+import { lesson019Bundle } from "./lesson019.ts";
+import { lesson020Bundle } from "./lesson020.ts";
 
-const byId = new Map(lessonBundles.map((bundle) => [bundle.lesson.id, bundle]));
+const bundles: LessonBundle[] = [
+  lesson017Bundle,
+  lesson018Bundle,
+  lesson019Bundle,
+  lesson020Bundle,
+];
+const byId = new Map(bundles.map((bundle) => [bundle.lesson.id, bundle]));
 const answersFor = (lessonId: string): string[] =>
   (byId.get(lessonId)?.exercises ?? []).flatMap((exercise) => [
     ...exercise.correctAnswers,
@@ -11,13 +21,11 @@ const answersFor = (lessonId: string): string[] =>
   ]);
 
 test("the te-form unit contains four contiguous lessons", () => {
-  const lessons = [17, 18, 19, 20].map((order) => byId.get(`lesson-${String(order).padStart(3, "0")}`));
-  lessons.forEach((lesson) => assert.ok(lesson));
   assert.deepEqual(
-    lessons.map((bundle) => bundle?.lesson.order),
+    bundles.map((bundle) => bundle.lesson.order),
     [17, 18, 19, 20],
   );
-  assert.ok(lessons.every((bundle) => bundle?.lesson.unitId === "unit-006"));
+  assert.ok(bundles.every((bundle) => bundle.lesson.unitId === "unit-006"));
 });
 
 test("lesson 17 keeps the essential te-form transformations correct", () => {
