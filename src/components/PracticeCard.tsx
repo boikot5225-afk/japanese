@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Text, TextInput, TouchableOpacity, View } from "react-native";
 
 import { getExerciseSpeechText } from "../audio/exerciseSpeechText";
@@ -9,6 +9,11 @@ import {
   getHandwritingAssessmentAnswer,
   getPracticeInteractionMode,
 } from "../engine/practiceInteraction";
+import {
+  createBuilderTokenOrder,
+  createChoiceOptionOrder,
+  retainAvailableTokenOrder,
+} from "../engine/practicePresentation";
 import { styles } from "../theme/appStyles";
 import { HandwritingPad } from "./HandwritingPad";
 
@@ -31,6 +36,11 @@ interface PracticeCardProps {
   onContinue: () => void;
 }
 
+interface BuilderOrderCache {
+  key: string;
+  tokens: string[];
+}
+
 export function PracticeCard({
   title,
   finishLabel,
@@ -51,9 +61,38 @@ export function PracticeCard({
 }: PracticeCardProps) {
   const [handwritingHasInk, setHandwritingHasInk] = useState(false);
   const [handwritingCompared, setHandwritingCompared] = useState(false);
+  const [presentationSessionKey] = useState(
+    () => `${Date.now()}:${Math.random().toString(36).slice(2)}`,
+  );
   const textDraftRef = useRef(answer);
-  const choices = Array.from(
-    new Set([...exercise.correctAnswers, ...(exercise.distractors ?? [])]),
+  const builderOrderRef = useRef<BuilderOrderCache>({ key: "", tokens: [] });
+  const presentationKey = `${presentationSessionKey}:${exercise.id}:${exerciseIndex}:${exercise.sessionRole ?? "core"}`;
+  const choices = useMemo(
+    () => createChoiceOptionOrder(exercise, presentationKey),
+    [exercise, presentationKey],
+  );
+  const correctBuilderSequence = useMemo(
+    () =>
+      exercise.type === "sentence-builder"
+        ? (exercise.correctAnswers[0]?.split("|") ?? [])
+        : [],
+    [exercise],
+  );
+
+  if (builderOrderRef.current.key !== presentationKey) {
+    builderOrderRef.current = {
+      key: presentationKey,
+      tokens: createBuilderTokenOrder(
+        [...availableBuilderTokens, ...selectedTokens],
+        correctBuilderSequence,
+        presentationKey,
+      ),
+    };
+  }
+
+  const orderedBuilderTokens = retainAvailableTokenOrder(
+    builderOrderRef.current.tokens,
+    availableBuilderTokens,
   );
   const isSuccess = result?.status === "correct" || result?.status === "acceptable";
   const displayedAnswer = exercise.correctAnswers[0] ?? "";
@@ -66,7 +105,7 @@ export function PracticeCard({
     setHandwritingHasInk(false);
     setHandwritingCompared(false);
     textDraftRef.current = "";
-  }, [exercise.id]);
+  }, [exercise.id, exerciseIndex]);
 
   useEffect(() => {
     textDraftRef.current = answer;
@@ -161,7 +200,7 @@ export function PracticeCard({
               )}
             </View>
             <View style={styles.tokenList}>
-              {availableBuilderTokens.map((token, index) => (
+              {orderedBuilderTokens.map((token, index) => (
                 <TouchableOpacity
                   key={`${token}-${index}`}
                   disabled={Boolean(result)}
