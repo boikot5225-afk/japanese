@@ -1,12 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import type { VocabularyItem } from "../domain/course.ts";
+import type { Lesson, VocabularyItem } from "../domain/course.ts";
 import { lessonBundles } from "./courseCatalog.ts";
-
-type AuditedVocabularyItem = VocabularyItem & {
-  alternativeReadings?: string[];
-};
+import { diversifyLessonPractice } from "./practiceDiversity.ts";
+import type { LessonBundle } from "./lessonBundle.ts";
 
 const compact = (value: string): string =>
   value.trim().normalize("NFKC").replace(/\s+/gu, "");
@@ -14,7 +12,7 @@ const compact = (value: string): string =>
 const allVocabulary = lessonBundles.flatMap((bundle) =>
   bundle.vocabulary.map((word) => ({
     lessonId: bundle.lesson.id,
-    word: word as AuditedVocabularyItem,
+    word,
   })),
 );
 
@@ -69,10 +67,59 @@ test("alternative readings are unique and separate from the primary reading", ()
     if (normalized.includes(compact(word.reading))) {
       issues.push(`${lessonId}/${word.id}: primary repeated as alternative`);
     }
+    if (alternatives.some((reading) => /[／/|]/u.test(reading))) {
+      issues.push(`${lessonId}/${word.id}: compound alternative reading`);
+    }
     return issues;
   });
 
   assert.deepEqual(malformed, [], malformed.join("\n"));
+});
+
+test("generated vocabulary practice accepts every alternative reading without speaking a separator", () => {
+  const word: VocabularyItem = {
+    id: "audit-word-nani",
+    type: "vocabulary",
+    writtenForm: "何",
+    reading: "なに",
+    alternativeReadings: ["なん"],
+    meaningsRu: ["что"],
+    partOfSpeech: ["вопросительное слово"],
+    jlptLevel: "N5",
+  };
+  const lesson: Lesson = {
+    id: "audit-lesson",
+    unitId: "audit-unit",
+    order: 999,
+    title: "Audit",
+    description: "Audit",
+    theory: [],
+    itemIds: [word.id],
+    exerciseIds: [],
+    estimatedMinutes: 1,
+  };
+  const bundle: LessonBundle = {
+    lesson,
+    vocabulary: [word],
+    grammar: [],
+    sentences: [],
+    exercises: [],
+    outcomes: [],
+  };
+
+  const diversified = diversifyLessonPractice(bundle, [bundle]);
+  const readingInput = diversified.exercises.find(
+    (exercise) => exercise.contentKey === "vocabulary:audit-word-nani:reading" && exercise.type === "text-input",
+  );
+  assert.ok(readingInput);
+  assert.deepEqual(readingInput.correctAnswers, ["なに"]);
+  assert.deepEqual(readingInput.acceptableAnswers, ["なん"]);
+
+  diversified.exercises
+    .filter((exercise) => exercise.audioText)
+    .forEach((exercise) => {
+      assert.ok(!/[／/|]/u.test(exercise.audioText ?? ""), exercise.id);
+    });
 });
 
 test("example translations contain translations, not editorial stage directions", () => {
@@ -95,7 +142,7 @@ test("the course uses neutral terminology for plain forms", () => {
   assert.deepEqual(deprecated, [], `deprecated terminology:\n${deprecated.join("\n")}`);
 });
 
-test("generated reading prompts do not demand hiragana for every script", () => {
+test("reading prompts do not demand hiragana for every script", () => {
   const misleading = lessonBundles.flatMap((bundle) =>
     bundle.exercises
       .filter((exercise) => /Напиши хираганой чтение/u.test(exercise.prompt))
@@ -113,4 +160,24 @@ test("vocabulary audio never contains a printed alternative-reading separator", 
   );
 
   assert.deepEqual(malformed, [], `unspeakable audio text:\n${malformed.join("\n")}`);
+});
+
+test("a task requesting tai desu does not accept the plain tai form", () => {
+  const lesson23 = lessonBundles.find((bundle) => bundle.lesson.id === "lesson-023");
+  assert.ok(lesson23);
+  const exercise = lesson23.exercises.find((item) => item.id === "exercise-23-tabetai");
+  assert.ok(exercise);
+  assert.deepEqual(exercise.correctAnswers, ["食べたいです"]);
+  assert.ok(exercise.acceptableAnswers?.includes("たべたいです"));
+  assert.ok(!exercise.acceptableAnswers?.includes("食べたい"));
+  assert.ok(!exercise.acceptableAnswers?.includes("たべたい"));
+});
+
+test("te kara is not presented as automatically immediate", () => {
+  const lesson27 = lessonBundles.find((bundle) => bundle.lesson.id === "lesson-027");
+  assert.ok(lesson27);
+  const contrast = lesson27.grammar.find((item) => item.id === "grammar-ato-de-vs-te-kara");
+  assert.ok(contrast);
+  assert.match(contrast.explanationRu, /не требует.+немедленно/iu);
+  assert.ok(!contrast.relatedGrammarIds?.includes("grammar-time-ni"));
 });
