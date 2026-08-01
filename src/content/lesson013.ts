@@ -164,7 +164,7 @@ export const lesson013Sentences: ExampleSentence[] = [
     type: "sentence",
     japanese: "図書館は便利ではありません。",
     reading: "としょかんはべんりではありません。",
-    translationRu: "Библиотека неудобная.",
+    translationRu: "Библиотека неудобна.",
     grammarIds: ["grammar-wa-topic", "grammar-na-adjective-negative"],
     vocabularyIds: ["word-toshokan", "word-benri-na"],
   },
@@ -209,13 +209,18 @@ export const lesson013Exercises: Exercise[] = [
     explanationRu: "な-прилагательные отрицаются по именной модели: 便利ではありません. Варианты 便利じゃありません и 便利じゃないです тоже правильные.",
   },
   {
-    id: "exercise-machi-shizuka-builder",
+    id: "exercise-kireina-kouen-builder",
     type: "sentence-builder",
-    prompt: "Собери: Город тихий.",
-    targetItemIds: ["grammar-wa-topic", "grammar-na-adjective-predicate", "word-machi", "word-shizuka-na"],
-    correctAnswers: ["町|は|静か|です"],
-    distractors: ["な", "を", "静かい"],
-    explanationRu: "В конце предложения な не ставится: 町は静かです.",
+    prompt: "Собери: Это красивый парк.",
+    targetItemIds: [
+      "grammar-na-adjective-noun",
+      "grammar-desu",
+      "word-kirei-na",
+      "word-kouen"
+    ],
+    correctAnswers: ["きれい|な|公園|です"],
+    distractors: ["は", "きれいい", "の"],
+    explanationRu: "Перед существительным 公園 слово きれい соединяется с ним через な: きれいな公園です.",
   },
   {
     id: "exercise-shizukana-machi-input",
@@ -238,7 +243,7 @@ export const lesson013Exercises: Exercise[] = [
   {
     id: "exercise-toshokan-benri-negative-input",
     type: "text-input",
-    prompt: "Напиши по-японски: Библиотека неудобная.",
+    prompt: "Напиши по-японски: Библиотека неудобна.",
     targetItemIds: ["grammar-na-adjective-negative", "word-toshokan", "word-benri-na"],
     correctAnswers: [
       "図書館は便利ではありません",
