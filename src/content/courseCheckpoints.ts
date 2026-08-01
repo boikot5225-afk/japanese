@@ -76,6 +76,17 @@ export const courseCheckpoints: readonly CourseCheckpoint[] = [
     questionCount: 18,
     passPercent: 80,
   },
+  {
+    id: "checkpoint-unit-007",
+    unitId: "unit-007",
+    title: "Контрольная точка: простые формы и возможности",
+    description:
+      "Проверка уроков 21–24: словарная форма, отрицание ～ない, желание ～たい и способность через ～ことができます.",
+    lessonIds: ["lesson-021", "lesson-022", "lesson-023", "lesson-024"],
+    unlockLessonId: "lesson-025",
+    questionCount: 18,
+    passPercent: 80,
+  },
 ];
 
 export const findCheckpoint = (checkpointId: string): CourseCheckpoint | undefined =>
