@@ -36,12 +36,22 @@ test("handwriting self-check records success or schedules honest remediation", (
   assert.equal(checkAnswer(retry, task.correctAnswers).status, "incorrect");
 });
 
+test("handwriting with no reference can never be marked correct accidentally", () => {
+  const task = { ...exercise("handwriting"), correctAnswers: [] };
+  assert.equal(
+    checkAnswer(
+      getHandwritingAssessmentAnswer(task, true),
+      task.correctAnswers,
+    ).status,
+    "incorrect",
+  );
+});
+
 test("edge swipe goes back without stealing an interior handwriting stroke", () => {
   const options = {
     allowBack: true,
     allowForward: false,
     backEdgeOnly: true,
-    edgeWidth: 24,
   };
 
   assert.equal(
@@ -50,6 +60,13 @@ test("edge swipe goes back without stealing an interior handwriting stroke", () 
       options,
     ),
     "back",
+  );
+  assert.equal(
+    resolveSwipeNavigation(
+      { startX: 28, dx: 110, dy: 4, velocityX: 0.7 },
+      options,
+    ),
+    null,
   );
   assert.equal(
     resolveSwipeNavigation(
