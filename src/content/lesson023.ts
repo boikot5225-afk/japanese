@@ -4,7 +4,6 @@ import type { LessonBundle } from "./lessonBundle";
 export const lesson023Vocabulary: VocabularyItem[] = [
   { id: "word-eiga-23", type: "vocabulary", writtenForm: "映画", reading: "えいが", meaningsRu: ["фильм", "кино"], partOfSpeech: ["существительное"], jlptLevel: "N5" },
   { id: "word-raamen-23", type: "vocabulary", writtenForm: "ラーメン", reading: "ラーメン", meaningsRu: ["рамэн"], partOfSpeech: ["существительное"], jlptLevel: "N5" },
-  { id: "word-ryokou-shimasu-23", type: "vocabulary", writtenForm: "旅行します", reading: "りょこうします", meaningsRu: ["путешествовать"], partOfSpeech: ["глагол", "вежливая форма"], jlptLevel: "N5" },
   { id: "word-nani-23", type: "vocabulary", writtenForm: "何", reading: "なに／なん", meaningsRu: ["что"], partOfSpeech: ["вопросительное слово"], jlptLevel: "N5" },
 ];
 
@@ -49,7 +48,7 @@ export const lesson023Sentences: ExampleSentence[] = [
   { id: "sentence-23-eiga-mitakunai", type: "sentence", japanese: "今日は映画を見たくないです。", reading: "きょうはえいがをみたくないです。", translationRu: "Сегодня я не хочу смотреть фильм.", grammarIds: ["grammar-takunai", "grammar-tai-object", "grammar-wa-topic", "grammar-time-without-ni", "grammar-o-object"], vocabularyIds: ["word-kyou-22", "word-eiga-23", "word-mimasu"] },
   { id: "sentence-23-nani-shitai", type: "sentence", japanese: "何をしたいですか。", reading: "なにをしたいですか。", translationRu: "Что вы хотите сделать?", grammarIds: ["grammar-tai-question-person", "grammar-ka-question", "grammar-o-object"], vocabularyIds: ["word-nani-23"] },
   { id: "sentence-23-nihongo-benkyou-shitai", type: "sentence", japanese: "日本語を勉強したいです。", reading: "にほんごをべんきょうしたいです。", translationRu: "Я хочу заниматься японским.", grammarIds: ["grammar-tai-desire", "grammar-tai-object", "grammar-o-object"], vocabularyIds: ["word-nihongo", "word-benkyoushimasu"] },
-  { id: "sentence-23-ryokou-shitai", type: "sentence", japanese: "旅行したいです。", reading: "りょこうしたいです。", translationRu: "Я хочу путешествовать.", grammarIds: ["grammar-tai-desire"], vocabularyIds: ["word-ryokou-shimasu-23"] },
+  { id: "sentence-23-ryokou-shitai", type: "sentence", japanese: "旅行したいです。", reading: "りょこうしたいです。", translationRu: "Я хочу путешествовать.", grammarIds: ["grammar-tai-desire"], vocabularyIds: ["word-ryokou"] },
 ];
 
 const confusions = ["grammar-tai-desire", "grammar-takunai", "grammar-nai-form-role", "grammar-suki-kirai-ga"];
