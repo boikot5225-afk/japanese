@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { getExerciseSpeechText } from "../audio/exerciseSpeechText.ts";
+import type { Exercise } from "../domain/course.ts";
 import { checkAnswer } from "../engine/checkAnswer.ts";
 import { getExerciseContentKey } from "../engine/exerciseIdentity.ts";
 import { lessonBundles } from "./courseCatalog.ts";
@@ -17,9 +18,9 @@ const compact = (value: string): string =>
     .replace(/[\s|_。、，！？!?.,:;「」『』（）()［\][\]{}"'«»—–-]+/gu, "");
 
 const requireExercise = (
-  exercises: readonly { id: string }[],
+  exercises: readonly Exercise[],
   exerciseId: string,
-) => {
+): Exercise => {
   const exercise = exercises.find((item) => item.id === exerciseId);
   assert.ok(exercise, `${exerciseId} is missing`);
   return exercise;
