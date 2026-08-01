@@ -41,12 +41,12 @@ test("every completed unit gates the first lesson of the following unit", () => 
   });
 });
 
-test("the current final checkpoint is ready to gate lesson 21", () => {
+test("the current final checkpoint is ready to gate lesson 25", () => {
   const finalUnit = courseUnits[courseUnits.length - 1];
   assert.ok(finalUnit);
   const checkpoint = courseCheckpoints.find(
     (candidate) => candidate.unitId === finalUnit.id,
   );
   assert.ok(checkpoint);
-  assert.equal(checkpoint.unlockLessonId, "lesson-021");
+  assert.equal(checkpoint.unlockLessonId, "lesson-025");
 });
