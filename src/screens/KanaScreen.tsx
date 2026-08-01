@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { SafeAreaView, ScrollView, StatusBar, Text, TouchableOpacity, View } from "react-native";
 
+import { SwipeNavigationView } from "../components/SwipeNavigationView";
 import { createKnownKanaProgress, type KanaProgressMap } from "../engine/kanaEngine";
 import type { KanaWordProgressMap } from "../engine/kanaWordEngine";
 import {
@@ -104,7 +105,7 @@ const katakanaMeta: Record<
   },
   loan: {
     title: "Современные звуки заимствований",
-    shortTitle: "Фォ・ティ・ヴ",
+    shortTitle: "フォ・ティ・ヴ",
     body: "Сочетания для звуков, которых нет в базовой таблице.",
     hero: "フォティヴ",
     chartDescription:
@@ -234,86 +235,92 @@ export function KanaScreen({ onCourse }: KanaScreenProps) {
 
   if (activeScript === "hiragana") {
     return (
-      <KanaTrainerScreen
-        key="hiragana"
-        scriptTitle="Хирагана"
-        scriptEyebrow="Азбука · плавные формы"
-        description="Базовые записи, дакутэн, хандакутэн, сочетания ёон и орфография настоящих японских слов."
-        sets={hiraganaSets}
-        words={kanaWords}
-        wordExamples="がっこう · しゃしん · きっぷ"
-        wordDescription="Собирай слова из отдельных знаков. Большие и маленькие варианты перемешиваются, а ошибки получают приоритет."
-        rules={hiraganaRules}
-        progress={progress}
-        wordProgress={wordProgress}
-        onProgressChange={setProgress}
-        onWordProgressChange={setWordProgress}
-        onBack={() => setActiveScript(null)}
-      />
+      <SwipeNavigationView onBack={() => setActiveScript(null)}>
+        <KanaTrainerScreen
+          key="hiragana"
+          scriptTitle="Хирагана"
+          scriptEyebrow="Азбука · плавные формы"
+          description="Базовые записи, дакутэн, хандакутэн, сочетания ёон и орфография настоящих японских слов."
+          sets={hiraganaSets}
+          words={kanaWords}
+          wordExamples="がっこう · しゃしん · きっぷ"
+          wordDescription="Собирай слова из отдельных знаков. Большие и маленькие варианты перемешиваются, а ошибки получают приоритет."
+          rules={hiraganaRules}
+          progress={progress}
+          wordProgress={wordProgress}
+          onProgressChange={setProgress}
+          onWordProgressChange={setWordProgress}
+          onBack={() => setActiveScript(null)}
+        />
+      </SwipeNavigationView>
     );
   }
 
   if (activeScript === "katakana") {
     return (
-      <KanaTrainerScreen
-        key="katakana"
-        scriptTitle="Катакана"
-        scriptEyebrow="Азбука · заимствования"
-        description="Базовые знаки, сложные пары, долгота ー, маленькая ッ и современные сочетания для иностранных слов."
-        sets={katakanaSets}
-        words={katakanaWords}
-        wordExamples="コーヒー · チケット · コンピューター"
-        wordDescription="Собирай слова-заимствования, различай シ／ツ и ソ／ン и учись видеть долготу и маленькую кану внутри слова."
-        rules={katakanaRules}
-        progress={progress}
-        wordProgress={wordProgress}
-        onProgressChange={setProgress}
-        onWordProgressChange={setWordProgress}
-        onBack={() => setActiveScript(null)}
-      />
+      <SwipeNavigationView onBack={() => setActiveScript(null)}>
+        <KanaTrainerScreen
+          key="katakana"
+          scriptTitle="Катакана"
+          scriptEyebrow="Азбука · заимствования"
+          description="Базовые знаки, сложные пары, долгота ー, маленькая ッ и современные сочетания для иностранных слов."
+          sets={katakanaSets}
+          words={katakanaWords}
+          wordExamples="コーヒー · チケット · コンピューター"
+          wordDescription="Собирай слова-заимствования, различай シ／ツ и ソ／ン и учись видеть долготу и маленькую кану внутри слова."
+          rules={katakanaRules}
+          progress={progress}
+          wordProgress={wordProgress}
+          onProgressChange={setProgress}
+          onWordProgressChange={setWordProgress}
+          onBack={() => setActiveScript(null)}
+        />
+      </SwipeNavigationView>
     );
   }
 
   return (
-    <SafeAreaView style={kanaStyles.safeArea}>
-      <StatusBar barStyle="dark-content" />
-      <ScrollView contentContainerStyle={kanaStyles.container}>
-        <TouchableOpacity style={kanaStyles.backButton} onPress={onCourse}>
-          <Text style={kanaStyles.backButtonText}>‹ К основному курсу</Text>
-        </TouchableOpacity>
-        <Text style={kanaStyles.eyebrow}>Письменность</Text>
-        <Text style={kanaStyles.title}>Хирагана и катакана</Text>
-        <Text style={kanaStyles.description}>
-          Две азбуки используют один движок навыков, но хранят прогресс по каждому знаку отдельно.
-          Выбери систему, которую хочешь изучать или повторять.
-        </Text>
-
-        <View style={kanaStyles.courseKanaCard}>
-          <View style={kanaStyles.courseKanaHeader}>
-            <View>
-              <Text style={kanaStyles.courseKanaTitle}>Хирагана</Text>
-              <Text style={kanaStyles.courseKanaBody}>Японские окончания, частицы и обычные слова.</Text>
-            </View>
-            <Text style={kanaStyles.courseKanaGlyph}>あ</Text>
-          </View>
-          <TouchableOpacity style={kanaStyles.primaryButton} onPress={() => setActiveScript("hiragana")}>
-            <Text style={kanaStyles.primaryButtonText}>Открыть хирагану</Text>
+    <SwipeNavigationView onBack={onCourse}>
+      <SafeAreaView style={kanaStyles.safeArea}>
+        <StatusBar barStyle="dark-content" />
+        <ScrollView contentContainerStyle={kanaStyles.container}>
+          <TouchableOpacity style={kanaStyles.backButton} onPress={onCourse}>
+            <Text style={kanaStyles.backButtonText}>‹ К основному курсу</Text>
           </TouchableOpacity>
-        </View>
+          <Text style={kanaStyles.eyebrow}>Письменность</Text>
+          <Text style={kanaStyles.title}>Хирагана и катакана</Text>
+          <Text style={kanaStyles.description}>
+            Две азбуки используют один движок навыков, но хранят прогресс по каждому знаку отдельно.
+            Выбери систему, которую хочешь изучать или повторять.
+          </Text>
 
-        <View style={kanaStyles.courseKanaCard}>
-          <View style={kanaStyles.courseKanaHeader}>
-            <View>
-              <Text style={kanaStyles.courseKanaTitle}>Катакана</Text>
-              <Text style={kanaStyles.courseKanaBody}>Заимствования, имена, бренды и звукоподражания.</Text>
+          <View style={kanaStyles.courseKanaCard}>
+            <View style={kanaStyles.courseKanaHeader}>
+              <View>
+                <Text style={kanaStyles.courseKanaTitle}>Хирагана</Text>
+                <Text style={kanaStyles.courseKanaBody}>Японские окончания, частицы и обычные слова.</Text>
+              </View>
+              <Text style={kanaStyles.courseKanaGlyph}>あ</Text>
             </View>
-            <Text style={kanaStyles.courseKanaGlyph}>ア</Text>
+            <TouchableOpacity style={kanaStyles.primaryButton} onPress={() => setActiveScript("hiragana")}>
+              <Text style={kanaStyles.primaryButtonText}>Открыть хирагану</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={kanaStyles.primaryButton} onPress={() => setActiveScript("katakana")}>
-            <Text style={kanaStyles.primaryButtonText}>Открыть катакану</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+
+          <View style={kanaStyles.courseKanaCard}>
+            <View style={kanaStyles.courseKanaHeader}>
+              <View>
+                <Text style={kanaStyles.courseKanaTitle}>Катакана</Text>
+                <Text style={kanaStyles.courseKanaBody}>Заимствования, имена, бренды и звукоподражания.</Text>
+              </View>
+              <Text style={kanaStyles.courseKanaGlyph}>ア</Text>
+            </View>
+            <TouchableOpacity style={kanaStyles.primaryButton} onPress={() => setActiveScript("katakana")}>
+              <Text style={kanaStyles.primaryButtonText}>Открыть катакану</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </SwipeNavigationView>
   );
 }
