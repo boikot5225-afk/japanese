@@ -12,15 +12,37 @@ import {
   calculateCheckpointResult,
   isCheckpointAvailable,
   isLessonUnlocked,
+  reconcileCheckpointProgress,
   updateCheckpointProgress,
 } from "./checkpointEngine";
 import { getExerciseContentKey } from "./exerciseIdentity";
 
 const firstCheckpoint = courseCheckpoints[0];
 const secondCheckpoint = courseCheckpoints[1];
-if (!firstCheckpoint || !secondCheckpoint) {
+const thirdCheckpoint = courseCheckpoints[2];
+const fourthCheckpoint = courseCheckpoints[3];
+const fifthCheckpoint = courseCheckpoints[4];
+if (
+  !firstCheckpoint ||
+  !secondCheckpoint ||
+  !thirdCheckpoint ||
+  !fourthCheckpoint ||
+  !fifthCheckpoint
+) {
   throw new Error("Контрольные рубежи курса не определены");
 }
+
+const passCheckpoint = (
+  progress: ReturnType<typeof updateCheckpointProgress>,
+  checkpointId: string,
+  hour: number,
+) =>
+  updateCheckpointProgress(
+    progress,
+    checkpointId,
+    calculateCheckpointResult([{ exerciseId: checkpointId, status: "correct" }], 80),
+    new Date(`2026-07-31T${String(hour).padStart(2, "0")}:00:00.000Z`),
+  );
 
 test("checkpoint queue mixes exercises from the whole unit without semantic duplicates", () => {
   const queue = buildCheckpointQueue(firstCheckpoint, lessonBundles);
@@ -132,35 +154,73 @@ test("the whole next unit stays locked until its checkpoint is passed", () => {
   assert.equal(isLessonUnlocked("lesson-005", completed, []), false);
   assert.equal(isLessonUnlocked("lesson-006", completed, []), false);
 
-  const progress = updateCheckpointProgress(
-    [],
-    firstCheckpoint.id,
-    calculateCheckpointResult([{ exerciseId: "1", status: "correct" }], 80),
-    new Date("2026-07-31T12:00:00.000Z"),
-  );
+  const progress = passCheckpoint([], firstCheckpoint.id, 12);
   assert.equal(isLessonUnlocked("lesson-004", completed, progress), true);
   assert.equal(isLessonUnlocked("lesson-005", completed, progress), true);
   assert.equal(isLessonUnlocked("lesson-006", completed, progress), true);
   assert.equal(isLessonUnlocked("lesson-007", completed, progress), false);
 });
 
-test("later lessons require every earlier checkpoint", () => {
-  const firstProgress = updateCheckpointProgress(
-    [],
-    firstCheckpoint.id,
-    calculateCheckpointResult([{ exerciseId: "1", status: "correct" }], 80),
-    new Date("2026-07-31T12:00:00.000Z"),
-  );
+test("lessons 11 through 16 require every earlier checkpoint", () => {
+  const firstProgress = passCheckpoint([], firstCheckpoint.id, 12);
   assert.equal(isLessonUnlocked("lesson-008", [], firstProgress), false);
 
-  const bothProgress = updateCheckpointProgress(
-    firstProgress,
-    secondCheckpoint.id,
-    calculateCheckpointResult([{ exerciseId: "2", status: "correct" }], 80),
-    new Date("2026-07-31T13:00:00.000Z"),
+  const twoProgress = passCheckpoint(firstProgress, secondCheckpoint.id, 13);
+  assert.equal(isLessonUnlocked("lesson-008", [], twoProgress), true);
+  assert.equal(isLessonUnlocked("lesson-010", [], twoProgress), true);
+  assert.equal(isLessonUnlocked("lesson-011", [], twoProgress), false);
+
+  const threeProgress = passCheckpoint(twoProgress, thirdCheckpoint.id, 14);
+  assert.equal(isLessonUnlocked("lesson-011", [], threeProgress), true);
+  assert.equal(isLessonUnlocked("lesson-013", [], threeProgress), true);
+  assert.equal(isLessonUnlocked("lesson-014", [], threeProgress), false);
+
+  const fourProgress = passCheckpoint(threeProgress, fourthCheckpoint.id, 15);
+  assert.equal(isLessonUnlocked("lesson-014", [], fourProgress), true);
+  assert.equal(isLessonUnlocked("lesson-016", [], fourProgress), true);
+});
+
+test("the final adjective checkpoint becomes available after lessons 14 through 16", () => {
+  assert.equal(isCheckpointAvailable(fifthCheckpoint, fifthCheckpoint.lessonIds), true);
+  assert.equal(
+    isCheckpointAvailable(fifthCheckpoint, fifthCheckpoint.lessonIds.slice(0, 2)),
+    false,
   );
-  assert.equal(isLessonUnlocked("lesson-008", [], bothProgress), true);
-  assert.equal(isLessonUnlocked("lesson-010", [], bothProgress), true);
+});
+
+test("saved progress infers checkpoints already crossed in an older build", () => {
+  const reconciled = reconcileCheckpointProgress([], ["lesson-015"]);
+  const passedIds = new Set(
+    reconciled.filter((item) => item.passed).map((item) => item.checkpointId),
+  );
+
+  assert.equal(passedIds.has(firstCheckpoint.id), true);
+  assert.equal(passedIds.has(secondCheckpoint.id), true);
+  assert.equal(passedIds.has(thirdCheckpoint.id), true);
+  assert.equal(passedIds.has(fourthCheckpoint.id), true);
+  assert.equal(passedIds.has(fifthCheckpoint.id), false);
+});
+
+test("reconciliation preserves a real failed attempt while restoring access", () => {
+  const failed = updateCheckpointProgress(
+    [],
+    fourthCheckpoint.id,
+    calculateCheckpointResult(
+      [
+        { exerciseId: "1", status: "correct" },
+        { exerciseId: "2", status: "incorrect" },
+      ],
+      80,
+    ),
+    new Date("2026-07-31T15:00:00.000Z"),
+  );
+  const reconciled = reconcileCheckpointProgress(failed, ["lesson-015"]);
+  const restored = reconciled.find((item) => item.checkpointId === fourthCheckpoint.id);
+
+  assert.equal(restored?.passed, true);
+  assert.equal(restored?.bestPercent, 100);
+  assert.equal(restored?.lastPercent, 50);
+  assert.equal(restored?.attemptCount, 1);
 });
 
 test("a passed checkpoint is not revoked by a weaker retry", () => {
