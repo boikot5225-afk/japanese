@@ -32,6 +32,14 @@ const describeExercise = (exercise: Exercise): string =>
 const describeItem = (lessonId: string, item: VocabularyItem | GrammarPoint): string =>
   `${lessonId}/${item.id}`;
 
+const findExercise = (exerciseId: string): Exercise => {
+  const exercise = n5Bundles
+    .flatMap((bundle) => bundle.exercises)
+    .find((candidate) => candidate.id === exerciseId);
+  assert.ok(exercise, exerciseId);
+  return exercise;
+};
+
 test("N5 is a contiguous ten-unit block ending at lesson 36", () => {
   assert.deepEqual(
     n5Bundles.map((bundle) => bundle.lesson.order),
@@ -248,4 +256,44 @@ test("N5 generated sessions do not expose a Japanese answer verbatim inside its 
   );
 
   assert.deepEqual(leaked, [], `answers visible in prompts:\n${leaked.join("\n")}`);
+});
+
+test("generic suru conjugation drills credit grammar rather than unrelated vocabulary", () => {
+  ["exercise-22-shinai", "exercise-26-shinakatta", "exercise-32-suru-duty"].forEach((id) => {
+    const exercise = findExercise(id);
+    assert.ok(
+      exercise.targetItemIds.every((itemId) => !itemId.startsWith("word-")),
+      `${id} incorrectly credits vocabulary: ${exercise.targetItemIds.join(", ")}`,
+    );
+  });
+});
+
+test("te-form lesson titles do not imply that the te-form itself is past tense", () => {
+  const lesson17 = n5Bundles.find((bundle) => bundle.lesson.id === "lesson-017")?.lesson;
+  const lesson19 = n5Bundles.find((bundle) => bundle.lesson.id === "lesson-019")?.lesson;
+  assert.equal(lesson17?.title, "Одно действие за другим");
+  assert.equal(lesson19?.title, "Сначала одно, затем другое");
+  assert.doesNotMatch(`${lesson17?.description} ${lesson19?.description}`, /сама.*прошед/u);
+});
+
+test("daily newspaper example cannot be misread as the Mainichi Shimbun name", () => {
+  const lesson21 = n5Bundles.find((bundle) => bundle.lesson.id === "lesson-021");
+  const sentence = lesson21?.sentences.find(
+    (candidate) => candidate.id === "sentence-21-mainichi-shinbun-yomu",
+  );
+  assert.equal(sentence?.japanese, "毎日、新聞を読む。");
+  assert.equal(sentence?.reading, "まいにち、しんぶんをよむ。");
+});
+
+test("au marks the person met instead of treating that person as a travel destination", () => {
+  const lesson36 = n5Bundles.find((bundle) => bundle.lesson.id === "lesson-036");
+  const sentence = lesson36?.sentences.find(
+    (candidate) => candidate.id === "sentence-36-went-school-met",
+  );
+  assert.ok(sentence?.grammarIds.includes("grammar-au-person-ni-to"));
+
+  const particleExercise = findExercise("exercise-36-au-particle");
+  assert.deepEqual(particleExercise.correctAnswers, ["に"]);
+  assert.ok(particleExercise.acceptableAnswers?.includes("と"));
+  assert.ok(!particleExercise.correctAnswers.includes("を"));
 });
