@@ -35,6 +35,17 @@ const replaceTaughtKanjiWithReadings = (value: string): string =>
     value,
   );
 
+const normalizeEquivalentPoliteForms = (value: string): string =>
+  value
+    .replace(/くありませんでした/gu, "くなかったです")
+    .replace(/くありません/gu, "くないです")
+    .replace(/じゃありませんでした/gu, "ではありませんでした")
+    .replace(/じゃなかったです/gu, "ではありませんでした")
+    .replace(/ではなかったです/gu, "ではありませんでした")
+    .replace(/じゃありません/gu, "ではありません")
+    .replace(/じゃないです/gu, "ではありません")
+    .replace(/ではないです/gu, "ではありません");
+
 const normalizeJapanese = (value: string): string => {
   const compact = value
     .trim()
@@ -42,7 +53,8 @@ const normalizeJapanese = (value: string): string => {
     .replace(/[。！？!?.,，]/g, "")
     .replace(/[|\s]+/g, "");
   const numericCanonical = replaceJapaneseNumeralsWithArabic(compact);
-  return replaceTaughtKanjiWithReadings(numericCanonical);
+  const politeCanonical = normalizeEquivalentPoliteForms(numericCanonical);
+  return replaceTaughtKanjiWithReadings(politeCanonical);
 };
 
 export function checkAnswer(
