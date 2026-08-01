@@ -87,6 +87,17 @@ export const courseCheckpoints: readonly CourseCheckpoint[] = [
     questionCount: 18,
     passPercent: 80,
   },
+  {
+    id: "checkpoint-unit-008",
+    unitId: "unit-008",
+    title: "Контрольная точка: прошлое, порядок и причины",
+    description:
+      "Проверка уроков 25–28: ～た, ～なかった, действия до и после, три значения から и причинные конструкции.",
+    lessonIds: ["lesson-025", "lesson-026", "lesson-027", "lesson-028"],
+    unlockLessonId: "lesson-029",
+    questionCount: 18,
+    passPercent: 80,
+  },
 ];
 
 export const findCheckpoint = (checkpointId: string): CourseCheckpoint | undefined =>
