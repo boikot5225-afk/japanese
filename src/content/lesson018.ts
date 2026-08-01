@@ -4,9 +4,7 @@ import type { LessonBundle } from "./lessonBundle";
 export const lesson018Vocabulary: VocabularyItem[] = [
   { id: "word-doa-18", type: "vocabulary", writtenForm: "ドア", reading: "ドア", meaningsRu: ["дверь"], partOfSpeech: ["существительное"], jlptLevel: "N5" },
   { id: "word-mado-18", type: "vocabulary", writtenForm: "窓", reading: "まど", meaningsRu: ["окно"], partOfSpeech: ["существительное"], jlptLevel: "N5" },
-  { id: "word-isu-18", type: "vocabulary", writtenForm: "いす", reading: "いす", meaningsRu: ["стул"], partOfSpeech: ["существительное"], jlptLevel: "N5" },
   { id: "word-akemasu-18", type: "vocabulary", writtenForm: "開けます", reading: "あけます", meaningsRu: ["открывать"], partOfSpeech: ["глагол", "вежливая форма"], jlptLevel: "N5" },
-  { id: "word-suwarimasu-18", type: "vocabulary", writtenForm: "座ります", reading: "すわります", meaningsRu: ["садиться", "сидеть"], partOfSpeech: ["глагол", "вежливая форма"], jlptLevel: "N5" },
   { id: "word-shashin-18", type: "vocabulary", writtenForm: "写真", reading: "しゃしん", meaningsRu: ["фотография"], partOfSpeech: ["существительное"], jlptLevel: "N5" },
   { id: "word-torimasu-18", type: "vocabulary", writtenForm: "撮ります", reading: "とります", meaningsRu: ["фотографировать", "снимать"], partOfSpeech: ["глагол", "вежливая форма"], jlptLevel: "N5" },
 ];
@@ -15,13 +13,13 @@ export const lesson018Grammar: GrammarPoint[] = [
   {
     id: "grammar-te-kudasai", type: "grammar", title: "Просьба ～てください",
     meaningRu: "вежливо просит выполнить действие",
-    explanationRu: "После て-формы ставится ください: ドアを開けてください — «Откройте дверь, пожалуйста». Это обычная просьба, но не универсальный приказ для любой ситуации.",
+    explanationRu: "После て-формы ставится ください: ドアを開けてください — «Откройте дверь, пожалуйста». Это обычная вежливая просьба; в зависимости от ситуации она всё равно может звучать достаточно прямо.",
     formation: ["[て-форма] + ください"], cautions: ["Не ставь ～ます перед ください: правильно 開けてください."], relatedGrammarIds: ["grammar-te-form-role"], jlptLevel: "N5",
   },
   {
     id: "grammar-te-mo-ii", type: "grammar", title: "Разрешение ～てもいいです",
     meaningRu: "сообщает, что действие разрешено",
-    explanationRu: "て-форма + もいいです означает «можно сделать»: ここに座ってもいいです — «Здесь можно сесть».",
+    explanationRu: "て-форма + もいいです означает «можно сделать»: ここで写真を撮ってもいいです — «Здесь можно фотографировать».",
     formation: ["[て-форма] + もいいです"], cautions: ["Это разрешение, а не обязанность и не совет."], relatedGrammarIds: ["grammar-te-form-role"], jlptLevel: "N5",
   },
   {
@@ -40,12 +38,12 @@ export const lesson018Grammar: GrammarPoint[] = [
 
 export const lesson018Sentences: ExampleSentence[] = [
   { id: "sentence-18-doa-kudasai", type: "sentence", japanese: "ドアを開けてください。", reading: "ドアをあけてください。", translationRu: "Откройте дверь, пожалуйста.", grammarIds: ["grammar-te-kudasai", "grammar-te-form-group2-irregular", "grammar-o-object"], vocabularyIds: ["word-doa-18", "word-akemasu-18"] },
-  { id: "sentence-18-isu-ii", type: "sentence", japanese: "いすに座ってもいいです。", reading: "いすにすわってもいいです。", translationRu: "Можно сесть на стул.", grammarIds: ["grammar-te-mo-ii", "grammar-te-form-group1", "grammar-ni-location"], vocabularyIds: ["word-isu-18", "word-suwarimasu-18"] },
+  { id: "sentence-18-photo-ii", type: "sentence", japanese: "ここで写真を撮ってもいいです。", reading: "ここでしゃしんをとってもいいです。", translationRu: "Здесь можно фотографировать.", grammarIds: ["grammar-te-mo-ii", "grammar-te-form-group1", "grammar-de-action-place", "grammar-o-object"], vocabularyIds: ["word-koko", "word-shashin-18", "word-torimasu-18"] },
   { id: "sentence-18-mado-question", type: "sentence", japanese: "窓を開けてもいいですか。", reading: "まどをあけてもいいですか。", translationRu: "Можно открыть окно?", grammarIds: ["grammar-te-mo-ii-ka", "grammar-te-form-group2-irregular", "grammar-o-object"], vocabularyIds: ["word-mado-18", "word-akemasu-18"] },
   { id: "sentence-18-school-photo", type: "sentence", japanese: "学校で写真を撮ってはいけません。", reading: "がっこうでしゃしんをとってはいけません。", translationRu: "В школе нельзя фотографировать.", grammarIds: ["grammar-te-wa-ikemasen", "grammar-te-form-group1", "grammar-de-action-place", "grammar-o-object"], vocabularyIds: ["word-gakkou", "word-shashin-18", "word-torimasu-18"] },
 ];
 
-const confusions = ["grammar-te-kudasai", "grammar-te-mo-ii-ka", "grammar-te-wa-ikemasen"];
+const confusions = ["grammar-te-kudasai", "grammar-te-mo-ii", "grammar-te-mo-ii-ka", "grammar-te-wa-ikemasen"];
 export const lesson018Exercises: Exercise[] = [
   { id: "exercise-18-request-choice", type: "multiple-choice", prompt: "Как попросить: «Откройте дверь, пожалуйста»?", targetItemIds: ["grammar-te-kudasai", "word-doa-18", "word-akemasu-18"], correctAnswers: ["ドアを開けてください"], distractors: ["ドアを開けてもいいですか", "ドアを開けてはいけません", "ドアを開けますください"], explanationRu: "Просьба строится как 開けてください.", variantGroup: "lesson-018:functions", difficulty: 1, confusionItemIds: confusions },
   { id: "exercise-18-permission-choice", type: "multiple-choice", prompt: "Что означает 窓を開けてもいいですか?", targetItemIds: ["grammar-te-mo-ii-ka", "word-mado-18", "word-akemasu-18"], correctAnswers: ["Можно открыть окно?"], distractors: ["Откройте окно, пожалуйста.", "Окно нельзя открывать.", "Я уже открыл окно."], explanationRu: "～てもいいですか спрашивает разрешение.", variantGroup: "lesson-018:functions", difficulty: 1, confusionItemIds: confusions },
