@@ -10,7 +10,7 @@ export const lesson027Grammar: GrammarPoint[] = [
     explanationRu: "Перед 前に глагол ставится в словарную форму: 寝る前に、本を読みます — «Перед сном читаю книгу». Эта форма показывает действие-ориентир, которое ещё не произошло к моменту главного действия.",
     formation: ["[словарная форма] + 前に、[главное действие]", "寝る前に、本を読みます"],
     cautions: ["Даже если всё предложение относится к прошлому, перед 前に остаётся словарная форма: 昨日、寝る前に本を読んだ."],
-    relatedGrammarIds: ["grammar-dictionary-form-role", "grammar-time-ni"], jlptLevel: "N5",
+    relatedGrammarIds: ["grammar-dictionary-form-role"], jlptLevel: "N5",
   },
   {
     id: "grammar-verb-ato-de", type: "grammar", title: "После действия: ～た + 後で",
@@ -31,9 +31,9 @@ export const lesson027Grammar: GrammarPoint[] = [
   {
     id: "grammar-ato-de-vs-te-kara", type: "grammar", title: "～た後で и ～てから",
     meaningRu: "различает нейтральное «после» и подчёркнутую последовательность",
-    explanationRu: "Обе конструкции ставят второе действие после первого. ～てから часто подчёркивает переход к следующему действию сразу после завершения первого; ～た後で нейтрально помещает действие позже и допускает больший промежуток.",
+    explanationRu: "Обе конструкции ставят второе действие после первого. ～てから сильнее выстраивает последовательность и делает завершение первого действия отправной точкой для второго. ～た後で нейтрально помещает второе действие позже. Ни одна конструкция сама по себе не требует, чтобы второе действие началось немедленно.",
     formation: ["食べてから、行きます", "食べた後で、行きます"],
-    cautions: ["Не смешивай половины конструкций: 食べて後で и 食べたから в значении «после еды» неверны."],
+    cautions: ["Не смешивай половины конструкций: 食べて後で и 食べたから в значении «после еды» неверны.", "Не добавляй значение «сразу» без дополнительного контекста."],
     relatedGrammarIds: ["grammar-verb-ato-de", "grammar-te-kara"], jlptLevel: "N5",
   },
 ];
@@ -52,7 +52,7 @@ export const lesson027Exercises: Exercise[] = [
   { id: "exercise-27-ato-form", type: "multiple-choice", prompt: "Выбери: 朝ご飯を __ 後で、学校へ行きます。", targetItemIds: ["grammar-verb-ato-de", "word-asagohan-19", "word-tabemasu", "word-gakkou"], correctAnswers: ["食べた"], distractors: ["食べる", "食べて", "食べます"], explanationRu: "Перед 後で используется ～た-форма 食べた.", variantGroup: "lesson-027:after", difficulty: 1, confusionItemIds: confusions },
   { id: "exercise-27-past-mae", type: "multiple-choice", prompt: "Как правильно сказать «Вчера перед сном я прочитал книгу»?", targetItemIds: ["grammar-verb-mae-ni", "grammar-ta-form-from-te", "word-kinou", "word-nemasu", "word-hon", "word-yomimasu"], correctAnswers: ["昨日、寝る前に本を読んだ"], distractors: ["昨日、寝た前に本を読んだ", "昨日、寝て前に本を読む", "昨日、寝ます前に本を読んだ"], explanationRu: "Перед 前に остаётся 寝る, а главное действие принимает прошедшее 読んだ.", variantGroup: "lesson-027:contrast", difficulty: 2, confusionItemIds: confusions },
   { id: "exercise-27-builder", type: "sentence-builder", prompt: "Собери: После возвращения домой я смотрю телевизор.", targetItemIds: ["grammar-verb-ato-de", "word-ie", "word-kaerimasu", "word-terebi", "word-mimasu"], correctAnswers: ["家|に|帰った|後で|テレビ|を|見ます"], distractors: ["帰る", "前に", "見た"], explanationRu: "帰る → 帰った + 後で; главное действие остаётся 見ます.", variantGroup: "lesson-027:after", difficulty: 2, confusionItemIds: confusions },
-  { id: "exercise-27-tekara-contrast", type: "multiple-choice", prompt: "Какая конструкция особенно подчёркивает переход к следующему действию после завершения первого?", targetItemIds: ["grammar-ato-de-vs-te-kara", "grammar-te-kara"], correctAnswers: ["～てから"], distractors: ["～る前に", "～ない", "～たい"], explanationRu: "～てから обычно сильнее подчёркивает последовательность; ～た後で нейтрально означает «после». ", variantGroup: "lesson-027:contrast", difficulty: 2, confusionItemIds: confusions },
+  { id: "exercise-27-tekara-contrast", type: "multiple-choice", prompt: "Какая конструкция особенно подчёркивает переход к следующему действию после завершения первого?", targetItemIds: ["grammar-ato-de-vs-te-kara", "grammar-te-kara"], correctAnswers: ["～てから"], distractors: ["～る前に", "～ない", "～たい"], explanationRu: "～てから обычно сильнее подчёркивает последовательность; ～た後で нейтрально означает «после».", variantGroup: "lesson-027:contrast", difficulty: 2, confusionItemIds: confusions },
   { id: "exercise-27-input", type: "text-input", prompt: "Напиши по-японски: Перед тем как идти в школу, я завтракаю.", targetItemIds: ["grammar-verb-mae-ni", "word-gakkou", "word-ikimasu", "word-asagohan-19", "word-tabemasu"], correctAnswers: ["学校へ行く前に朝ご飯を食べます", "学校へ行く前に、朝ご飯を食べます", "学校に行く前に朝ご飯を食べます", "学校に行く前に、朝ご飯を食べます"], acceptableAnswers: ["がっこうへいくまえにあさごはんをたべます", "がっこうへいくまえに、あさごはんをたべます"], explanationRu: "行く — словарная форма перед 前に; 朝ご飯 — объект с を.", variantGroup: "lesson-027:before", difficulty: 3, confusionItemIds: ["grammar-verb-mae-ni", "grammar-verb-ato-de"] },
 ];
 
