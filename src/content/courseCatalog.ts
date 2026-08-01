@@ -32,6 +32,10 @@ import { lesson025Bundle } from "./lesson025";
 import { lesson026Bundle } from "./lesson026";
 import { lesson027Bundle } from "./lesson027";
 import { lesson028Bundle } from "./lesson028";
+import { lesson029Bundle } from "./lesson029";
+import { lesson030Bundle } from "./lesson030";
+import { lesson031Bundle } from "./lesson031";
+import { lesson032Bundle } from "./lesson032";
 import type { Lesson } from "../domain/course";
 import type { LessonBundle } from "./lessonBundle";
 import { diversifyLessonPractice } from "./practiceDiversity";
@@ -87,6 +91,10 @@ const baseLessonBundles: readonly LessonBundle[] = [
   lesson026Bundle,
   lesson027Bundle,
   lesson028Bundle,
+  lesson029Bundle,
+  lesson030Bundle,
+  lesson031Bundle,
+  lesson032Bundle,
 ];
 
 const expandedLessonBundles: readonly LessonBundle[] = baseLessonBundles.map((bundle) =>
@@ -246,6 +254,19 @@ export const courseUnits: CourseUnit[] = [
       requireLesson("lesson-026"),
       requireLesson("lesson-027"),
       requireLesson("lesson-028"),
+    ],
+  },
+  {
+    id: "unit-009",
+    title: "Опыт, варианты и необходимость",
+    description:
+      "Прошлый опыт, перечисление характерных действий, советы, обязанность и отсутствие необходимости.",
+    jlptLevel: "N5",
+    lessons: [
+      requireLesson("lesson-029"),
+      requireLesson("lesson-030"),
+      requireLesson("lesson-031"),
+      requireLesson("lesson-032"),
     ],
   },
 ];
