@@ -1,11 +1,16 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Text, TextInput, TouchableOpacity, View } from "react-native";
 
 import { getExerciseSpeechText } from "../audio/exerciseSpeechText";
 import { speakJapanese } from "../audio/japaneseSpeech";
 import type { Exercise } from "../domain/course";
 import type { AnswerCheckResult } from "../engine/checkAnswer";
+import {
+  getHandwritingAssessmentAnswer,
+  getPracticeInteractionMode,
+} from "../engine/practiceInteraction";
 import { styles } from "../theme/appStyles";
+import { HandwritingPad } from "./HandwritingPad";
 
 interface PracticeCardProps {
   title: string;
@@ -44,17 +49,22 @@ export function PracticeCard({
   onSubmit,
   onContinue,
 }: PracticeCardProps) {
+  const [handwritingHasInk, setHandwritingHasInk] = useState(false);
+  const [handwritingCompared, setHandwritingCompared] = useState(false);
   const choices = Array.from(
     new Set([...exercise.correctAnswers, ...(exercise.distractors ?? [])]),
   );
   const isSuccess = result?.status === "correct" || result?.status === "acceptable";
   const displayedAnswer = exercise.correctAnswers[0] ?? "";
   const spokenAudio = getExerciseSpeechText(exercise);
-  const isChoiceExercise = exercise.type === "multiple-choice" || exercise.type === "listening";
-  const isTextExercise =
-    exercise.type === "text-input" ||
-    exercise.type === "particle-gap" ||
-    exercise.type === "conjugation";
+  const interactionMode = getPracticeInteractionMode(exercise);
+  const isChoiceExercise = interactionMode === "choice";
+  const isTextExercise = interactionMode === "text";
+
+  useEffect(() => {
+    setHandwritingHasInk(false);
+    setHandwritingCompared(false);
+  }, [exercise.id]);
 
   useEffect(() => {
     if (exercise.type === "listening" && exercise.audioText && !result) {
@@ -67,6 +77,11 @@ export function PracticeCard({
       void speakJapanese(spokenAudio);
     }
   }, [isSuccess, result, spokenAudio]);
+
+  const handleInkChange = useCallback((hasInk: boolean) => {
+    setHandwritingHasInk(hasInk);
+    if (!hasInk) setHandwritingCompared(false);
+  }, []);
 
   return (
     <View style={styles.section}>
@@ -109,7 +124,7 @@ export function PracticeCard({
           </View>
         )}
 
-        {exercise.type === "sentence-builder" && (
+        {interactionMode === "builder" && (
           <>
             <View style={styles.builderAnswer}>
               {selectedTokens.length === 0 ? (
@@ -163,11 +178,47 @@ export function PracticeCard({
           />
         )}
 
-        {!result && !isChoiceExercise && (
-          <TouchableOpacity style={styles.primaryButton} onPress={onSubmit}>
-            <Text style={styles.primaryButtonText}>Проверить</Text>
-          </TouchableOpacity>
+        {interactionMode === "handwriting" && (
+          <>
+            <HandwritingPad
+              key={exercise.id}
+              reference={displayedAnswer}
+              disabled={Boolean(result)}
+              onInkChange={handleInkChange}
+              onCompare={() => setHandwritingCompared(true)}
+            />
+            {!result && handwritingCompared && handwritingHasInk && (
+              <View style={styles.choiceList}>
+                <Text style={styles.feedbackExplanation}>
+                  Сравни с усиленным образцом. Пока без распознавания штрихов оценка ручная — зато приложение не врёт, будто умеет видеть то, чего ещё не проверяет.
+                </Text>
+                <TouchableOpacity
+                  style={styles.choiceButton}
+                  onPress={() =>
+                    onChoice(getHandwritingAssessmentAnswer(exercise, true))
+                  }
+                >
+                  <Text style={styles.choiceText}>Похоже на образец</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.choiceButton}
+                  onPress={() =>
+                    onChoice(getHandwritingAssessmentAnswer(exercise, false))
+                  }
+                >
+                  <Text style={styles.choiceText}>Нужно повторить</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </>
         )}
+
+        {!result &&
+          (interactionMode === "text" || interactionMode === "builder") && (
+            <TouchableOpacity style={styles.primaryButton} onPress={onSubmit}>
+              <Text style={styles.primaryButtonText}>Проверить</Text>
+            </TouchableOpacity>
+          )}
 
         {result && (
           <>
