@@ -10,19 +10,22 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   CI: "1"
 
 jobs:
   build-apk:
+    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip build]')
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: true
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -64,3 +67,18 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish branch APK
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/agent/')
+        run: |
+          mkdir -p builds
+          cp android/app/build/outputs/apk/debug/app-debug.apk builds/Japanese-0.11.0-debug.apk
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- builds/Japanese-0.11.0-debug.apk
+          if git diff --cached --quiet; then
+            echo "APK unchanged"
+            exit 0
+          fi
+          git commit -m "Publish Japanese 0.11.0 APK [skip build]"
+          git push
