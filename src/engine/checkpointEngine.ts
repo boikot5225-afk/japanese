@@ -41,6 +41,9 @@ const skillOrder: Skill[] = [
   "writing",
 ];
 
+const isObjectivelyGradableCheckpointExercise = (exercise: Exercise): boolean =>
+  exercise.type !== "handwriting";
+
 const weaknessHits = (exercise: Exercise, weakTargetIds: Set<string>): number =>
   exercise.targetItemIds.filter((itemId) => weakTargetIds.has(itemId)).length;
 
@@ -70,11 +73,13 @@ export function buildCheckpointQueue(
   const pool = bundles
     .filter((bundle) => checkpointLessonIds.has(bundle.lesson.id))
     .flatMap((bundle) =>
-      bundle.exercises.map((exercise) => ({
-        exercise: { ...exercise, sessionRole: "core" as const },
-        lessonId: bundle.lesson.id,
-        skill: inferExerciseSkill(exercise),
-      })),
+      bundle.exercises
+        .filter(isObjectivelyGradableCheckpointExercise)
+        .map((exercise) => ({
+          exercise: { ...exercise, sessionRole: "core" as const },
+          lessonId: bundle.lesson.id,
+          skill: inferExerciseSkill(exercise),
+        })),
     );
 
   const groups = new Map<Skill, CheckpointQuestion[]>();
