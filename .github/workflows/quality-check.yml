@@ -32,5 +32,8 @@ jobs:
       - name: Run full test suite
         run: npm test
 
-      - name: Run TypeScript check
+      - name: Run application TypeScript check
         run: npm run typecheck
+
+      - name: Run test TypeScript check
+        run: npm run typecheck:tests
