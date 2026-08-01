@@ -11,9 +11,14 @@ on:
 
 permissions:
   contents: write
+  statuses: write
 
 env:
   CI: "1"
+
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-apk:
@@ -26,6 +31,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: true
+
+      - name: Report build started
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+            -f state=pending \
+            -f context=agent-apk-build \
+            -f description="Android build started"
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -153,6 +168,37 @@ jobs:
           fi
           git commit -m "Report Japanese 0.11.0 build [skip build]"
           git push
+
+      - name: Report final build status
+        if: always() && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INSTALL_OUTCOME: ${{ steps.install.outcome }}
+          TESTS_OUTCOME: ${{ steps.tests.outcome }}
+          APP_TYPES_OUTCOME: ${{ steps.app_types.outcome }}
+          TEST_TYPES_OUTCOME: ${{ steps.test_types.outcome }}
+          PREBUILD_OUTCOME: ${{ steps.prebuild.outcome }}
+          GRADLE_OUTCOME: ${{ steps.gradle.outcome }}
+          RELEASE_OUTCOME: ${{ steps.release.outcome }}
+        shell: bash
+        run: |
+          STATE=failure
+          DESCRIPTION="Android build failed"
+          if [[ "$INSTALL_OUTCOME" == success && \
+                "$TESTS_OUTCOME" == success && \
+                "$APP_TYPES_OUTCOME" == success && \
+                "$TEST_TYPES_OUTCOME" == success && \
+                "$PREBUILD_OUTCOME" == success && \
+                "$GRADLE_OUTCOME" == success ]]; then
+            if [[ "$GITHUB_REF" != refs/heads/agent/* || "$RELEASE_OUTCOME" == success ]]; then
+              STATE=success
+              DESCRIPTION="APK built and published"
+            fi
+          fi
+          gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
+            -f state="$STATE" \
+            -f context=agent-apk-build \
+            -f description="$DESCRIPTION"
 
       - name: Enforce successful build
         if: always()
