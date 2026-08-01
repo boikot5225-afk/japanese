@@ -152,7 +152,7 @@ export const lesson013Sentences: ExampleSentence[] = [
     type: "sentence",
     japanese: "公園はきれいです。",
     reading: "こうえんはきれいです。",
-    translationRu: "Парк красивый и чистый.",
+    translationRu: "Парк красивый.",
     grammarIds: ["grammar-wa-topic", "grammar-na-adjective-predicate"],
     vocabularyIds: ["word-kouen", "word-kirei-na"],
   },
@@ -226,11 +226,11 @@ export const lesson013Exercises: Exercise[] = [
   {
     id: "exercise-kouen-kirei-input",
     type: "text-input",
-    prompt: "Напиши по-японски: Парк красивый и чистый.",
+    prompt: "Напиши по-японски: Парк красивый.",
     targetItemIds: ["grammar-na-adjective-predicate", "word-kouen", "word-kirei-na"],
     correctAnswers: ["公園はきれいです", "公園はきれいです。"],
     acceptableAnswers: ["こうえんはきれいです", "こうえんはきれいです。"],
-    explanationRu: "В конце предложения используется きれいです, без な.",
+    explanationRu: "Здесь きれい описывает внешний вид парка; в конце предложения な не ставится.",
   },
   {
     id: "exercise-toshokan-benri-negative-input",
