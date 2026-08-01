@@ -24,7 +24,7 @@ const directionAllowed = (
   if (sample.dx > 0) {
     if (!options.allowBack) return false;
     if (!options.backEdgeOnly) return true;
-    return sample.startX <= (options.edgeWidth ?? 32);
+    return sample.startX <= (options.edgeWidth ?? 24);
   }
   return sample.dx < 0 && options.allowForward;
 };
