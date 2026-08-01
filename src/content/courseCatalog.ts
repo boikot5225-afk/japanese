@@ -69,9 +69,47 @@ const expandedLessonBundles: readonly LessonBundle[] = baseLessonBundles.map((bu
   expandLessonPractice(bundle, baseLessonBundles),
 );
 
-export const lessonBundles: readonly LessonBundle[] = expandedLessonBundles.map((bundle) =>
-  diversifyLessonPractice(bundle, expandedLessonBundles),
-);
+const exerciseMinutes = (bundle: LessonBundle): number =>
+  bundle.exercises.reduce((total, exercise) => {
+    switch (exercise.type) {
+      case "multiple-choice":
+        return total + 0.45;
+      case "listening":
+        return total + 0.7;
+      case "sentence-builder":
+      case "particle-gap":
+      case "conjugation":
+        return total + 0.9;
+      case "text-input":
+        return total + 1.15;
+      case "handwriting":
+        return total + 1.4;
+      default:
+        return total + 0.8;
+    }
+  }, 0);
+
+const withReviewedDuration = (bundle: LessonBundle): LessonBundle => {
+  if (bundle.lesson.order <= 10) return bundle;
+
+  const studyMinutes =
+    bundle.grammar.length * 1.1 +
+    bundle.vocabulary.length * 0.2 +
+    bundle.sentences.length * 0.35;
+  const estimatedMinutes = Math.ceil(studyMinutes + exerciseMinutes(bundle));
+
+  return {
+    ...bundle,
+    lesson: {
+      ...bundle.lesson,
+      estimatedMinutes,
+    },
+  };
+};
+
+export const lessonBundles: readonly LessonBundle[] = expandedLessonBundles
+  .map((bundle) => diversifyLessonPractice(bundle, expandedLessonBundles))
+  .map(withReviewedDuration);
 
 export const lesson001Bundle = lessonBundles[0] ?? lesson001BaseBundle;
 
