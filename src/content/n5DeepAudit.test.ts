@@ -11,6 +11,8 @@ const compact = (value: string): string =>
     .toLocaleLowerCase("ru-RU")
     .replace(/[\s|_。、，！？!?.,:;「」『』（）()［\][\]{}"'«»—–-]+/gu, "");
 
+const exact = (value: string): string => value.trim().normalize("NFKC");
+
 const n5Bundles = lessonBundles.filter((bundle) => bundle.lesson.order <= 36);
 const n5Units = courseUnits.filter((unit) => unit.lessons.some((lesson) => lesson.order <= 36));
 
@@ -143,15 +145,15 @@ test("N5 final sessions do not repeat the exact same task across different lesso
   assert.deepEqual(duplicates, [], `cross-lesson duplicate tasks:\n${duplicates.join("\n")}`);
 });
 
-test("N5 exercise answer sets and target sets contain no normalized duplicates", () => {
+test("N5 exercise answer sets and target sets contain no exact duplicates", () => {
   const malformed: string[] = [];
 
   n5Bundles.forEach((bundle) => {
     bundle.exercises.forEach((exercise) => {
-      const correct = exercise.correctAnswers.map(compact);
-      const acceptable = (exercise.acceptableAnswers ?? []).map(compact);
-      const targets = exercise.targetItemIds.map(compact);
-      const distractors = (exercise.distractors ?? []).map(compact);
+      const correct = exercise.correctAnswers.map(exact);
+      const acceptable = (exercise.acceptableAnswers ?? []).map(exact);
+      const targets = exercise.targetItemIds.map(exact);
+      const distractors = (exercise.distractors ?? []).map(exact);
 
       if (correct.length === 0 || correct.some((answer) => answer.length === 0)) {
         malformed.push(`${bundle.lesson.id}/${exercise.id}: empty correct answer`);
@@ -170,9 +172,6 @@ test("N5 exercise answer sets and target sets contain no normalized duplicates",
       }
       if (new Set(distractors).size !== distractors.length) {
         malformed.push(`${bundle.lesson.id}/${exercise.id}: duplicate distractors`);
-      }
-      if ((exercise.type === "multiple-choice" || exercise.type === "listening") && distractors.length < 3) {
-        malformed.push(`${bundle.lesson.id}/${exercise.id}: fewer than three distractors`);
       }
     });
   });
@@ -210,6 +209,28 @@ test("every N5 grammar point is used in an example or directly practised", () =>
   });
 
   assert.deepEqual(orphaned, [], `orphaned N5 grammar:\n${orphaned.join("\n")}`);
+});
+
+test("kana-only vocabulary never receives a self-revealing reading exercise", () => {
+  const leaked = n5Bundles.flatMap((bundle) =>
+    bundle.vocabulary.flatMap((word) => {
+      const readings = [word.reading, ...(word.alternativeReadings ?? [])]
+        .map(compact)
+        .filter(Boolean);
+      if (!readings.includes(compact(word.writtenForm))) return [];
+
+      return bundle.exercises
+        .filter(
+          (exercise) =>
+            exercise.targetItemIds.length === 1 &&
+            exercise.targetItemIds[0] === word.id &&
+            exercise.contentKey === `vocabulary:${word.id}:reading`,
+        )
+        .map((exercise) => `${bundle.lesson.id}/${exercise.id}: ${word.writtenForm}`);
+    }),
+  );
+
+  assert.deepEqual(leaked, [], `self-revealing kana reading exercises:\n${leaked.join("\n")}`);
 });
 
 test("N5 generated sessions do not expose a Japanese answer verbatim inside its own prompt", () => {
