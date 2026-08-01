@@ -32,7 +32,7 @@ export const lesson006Vocabulary: VocabularyItem[] = [
     writtenForm: "行きます",
     reading: "いきます",
     meaningsRu: ["идти", "ехать"],
-    partOfSpeech: ["глагол"],
+    partOfSpeech: ["глагол", "вежливая форма"],
     jlptLevel: "N5",
   },
   {
@@ -41,7 +41,7 @@ export const lesson006Vocabulary: VocabularyItem[] = [
     writtenForm: "勉強します",
     reading: "べんきょうします",
     meaningsRu: ["учиться", "заниматься"],
-    partOfSpeech: ["глагол"],
+    partOfSpeech: ["глагол", "вежливая форма"],
     jlptLevel: "N5",
   },
 ];

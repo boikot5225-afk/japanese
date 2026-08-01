@@ -249,7 +249,7 @@ export const lesson012Exercises: Exercise[] = [
   {
     id: "exercise-atsui-reading-input",
     type: "text-input",
-    prompt: "Напиши хираганой чтение слова 暑い.",
+    prompt: "Напиши чтение слова 暑い.",
     targetItemIds: ["word-atsui"],
     correctAnswers: ["あつい"],
     explanationRu: "暑い читается あつい и относится прежде всего к жаркой погоде.",

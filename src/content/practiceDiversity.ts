@@ -12,6 +12,12 @@ const SESSION_EXERCISE_COUNT = 12;
 const unique = (values: readonly string[]): string[] =>
   [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 
+const getWordReadings = (word: VocabularyItem): string[] =>
+  unique([word.reading, ...(word.alternativeReadings ?? [])]);
+
+const getWordReadingLabel = (word: VocabularyItem): string =>
+  getWordReadings(word).join(" / ");
+
 const normalizeText = (value: string): string =>
   value
     .toLocaleLowerCase("ru-RU")
@@ -85,11 +91,13 @@ const inferVocabularyContentKey = (
     ...exercise.correctAnswers,
     ...(exercise.acceptableAnswers ?? []),
   ]).map(normalizeText);
-  const reading = normalizeText(word.reading);
+  const readings = getWordReadings(word).map(normalizeText);
   const written = normalizeText(word.writtenForm);
   const meanings = word.meaningsRu.map(normalizeText);
 
-  if (answers.includes(reading)) return `vocabulary:${word.id}:reading`;
+  if (answers.some((answer) => readings.includes(answer))) {
+    return `vocabulary:${word.id}:reading`;
+  }
   if (answers.includes(written)) return `vocabulary:${word.id}:written`;
   if (answers.some((answer) => meanings.includes(answer))) {
     return `vocabulary:${word.id}:meaning`;
@@ -163,9 +171,12 @@ const createVocabularyExercises = (
   allBundles: readonly LessonBundle[],
 ): Exercise[] => {
   const words = allBundles.flatMap((item) => item.vocabulary);
+  const readings = getWordReadings(word);
+  const primaryReading = readings[0] ?? word.reading;
+  const readingLabel = getWordReadingLabel(word);
   const meaning = word.meaningsRu[0] ?? word.writtenForm;
   const meaningPool = words.flatMap((item) => item.meaningsRu);
-  const readingPool = words.map((item) => item.reading);
+  const readingPool = words.flatMap(getWordReadings);
   const writtenPool = words.map((item) => item.writtenForm);
   const confusions = vocabularyConfusions(bundle, word.id);
   const variantGroup = `vocabulary:${word.id}:practice`;
@@ -182,7 +193,7 @@ const createVocabularyExercises = (
       correctAnswers: [meaning],
       acceptableAnswers: word.meaningsRu.slice(1),
       distractors: takeDistractors(meaningPool, word.meaningsRu),
-      explanationRu: `${word.writtenForm}（${word.reading}）— ${word.meaningsRu.join(", ")}.`,
+      explanationRu: `${word.writtenForm}（${readingLabel}）— ${word.meaningsRu.join(", ")}.`,
       variantGroup,
       contentKey: meaningKey,
       difficulty: 1,
@@ -192,12 +203,12 @@ const createVocabularyExercises = (
       id: vocabularyExerciseId(bundle, word, "meaning-listening"),
       type: "listening",
       prompt: "Прослушай слово и выбери его значение.",
-      audioText: word.reading || word.writtenForm,
+      audioText: primaryReading || word.writtenForm,
       targetItemIds: [word.id],
       correctAnswers: [meaning],
       acceptableAnswers: word.meaningsRu.slice(1),
       distractors: takeDistractors(meaningPool, word.meaningsRu),
-      explanationRu: `${word.writtenForm}（${word.reading}）— ${word.meaningsRu.join(", ")}.`,
+      explanationRu: `${word.writtenForm}（${readingLabel}）— ${word.meaningsRu.join(", ")}.`,
       variantGroup,
       contentKey: meaningKey,
       difficulty: 2,
@@ -206,11 +217,14 @@ const createVocabularyExercises = (
     {
       id: vocabularyExerciseId(bundle, word, "reading-choice"),
       type: "multiple-choice",
-      prompt: `Выбери чтение слова ${word.writtenForm}.`,
+      prompt:
+        readings.length > 1
+          ? `Выбери основное чтение слова ${word.writtenForm}.`
+          : `Выбери чтение слова ${word.writtenForm}.`,
       targetItemIds: [word.id],
-      correctAnswers: [word.reading],
-      distractors: takeDistractors(readingPool, [word.reading]),
-      explanationRu: `${word.writtenForm} читается ${word.reading}.`,
+      correctAnswers: [primaryReading],
+      distractors: takeDistractors(readingPool, readings),
+      explanationRu: `${word.writtenForm}: ${readingLabel}.`,
       variantGroup,
       contentKey: readingKey,
       difficulty: 2,
@@ -219,10 +233,14 @@ const createVocabularyExercises = (
     {
       id: vocabularyExerciseId(bundle, word, "reading-input"),
       type: "text-input",
-      prompt: `Напиши хираганой чтение слова ${word.writtenForm}.`,
+      prompt:
+        readings.length > 1
+          ? `Напиши одно из допустимых чтений слова ${word.writtenForm}.`
+          : `Напиши чтение слова ${word.writtenForm}.`,
       targetItemIds: [word.id],
-      correctAnswers: [word.reading],
-      explanationRu: `${word.writtenForm} читается ${word.reading}.`,
+      correctAnswers: [primaryReading],
+      acceptableAnswers: readings.length > 1 ? readings.slice(1) : undefined,
+      explanationRu: `${word.writtenForm}: ${readingLabel}.`,
       variantGroup,
       contentKey: readingKey,
       difficulty: 3,
@@ -235,7 +253,7 @@ const createVocabularyExercises = (
       targetItemIds: [word.id],
       correctAnswers: [word.writtenForm],
       distractors: takeDistractors(writtenPool, [word.writtenForm]),
-      explanationRu: `${meaning} — ${word.writtenForm}（${word.reading}）.`,
+      explanationRu: `${meaning} — ${word.writtenForm}（${readingLabel}）.`,
       variantGroup,
       contentKey: writtenKey,
       difficulty: 2,
@@ -245,11 +263,11 @@ const createVocabularyExercises = (
       id: vocabularyExerciseId(bundle, word, "written-listening"),
       type: "listening",
       prompt: "Прослушай слово и выбери его написание.",
-      audioText: word.reading || word.writtenForm,
+      audioText: primaryReading || word.writtenForm,
       targetItemIds: [word.id],
       correctAnswers: [word.writtenForm],
       distractors: takeDistractors(writtenPool, [word.writtenForm]),
-      explanationRu: `${word.reading} — ${word.writtenForm}.`,
+      explanationRu: `${primaryReading} — ${word.writtenForm}.`,
       variantGroup,
       contentKey: writtenKey,
       difficulty: 2,
@@ -296,7 +314,7 @@ const createGrammarExercises = (
     {
       id: grammarExerciseId(bundle, grammar, "title-choice"),
       type: "multiple-choice",
-      prompt: `Выбери тему, которая ${grammar.meaningRu}.`,
+      prompt: `Какой грамматической теме соответствует описание: «${grammar.meaningRu}»?`,
       targetItemIds: [grammar.id],
       correctAnswers: [grammar.title],
       distractors: takeDistractors(titlePool, [grammar.title]),

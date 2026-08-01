@@ -153,7 +153,9 @@ export function LessonScreen({
                 <View key={word.id} style={styles.wordRow}>
                   <View style={styles.wordTextBlock}>
                     <Text style={styles.wordWritten}>{word.writtenForm}</Text>
-                    <Text style={styles.wordReading}>{word.reading}</Text>
+                    <Text style={styles.wordReading}>
+                      {[word.reading, ...(word.alternativeReadings ?? [])].join(" / ")}
+                    </Text>
                   </View>
                   <View style={styles.wordActions}>
                     <Text style={styles.wordMeaning}>{word.meaningsRu.join(", ")}</Text>
