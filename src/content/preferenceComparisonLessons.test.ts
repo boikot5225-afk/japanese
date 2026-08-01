@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { checkAnswer } from "../engine/checkAnswer.ts";
 import { lessonBundles } from "./courseCatalog.ts";
+import { lesson015Exercises } from "./lesson015.ts";
 import { lesson016Exercises } from "./lesson016.ts";
 
 const byId = new Map(lessonBundles.map((bundle) => [bundle.lesson.id, bundle]));
@@ -48,6 +49,26 @@ test("lesson 15 distinguishes preference and skill patterns with ga", () => {
     ) {
       assert.ok(sentence.japanese.includes("が"), `${sentence.id} loses the ga-marked target`);
     }
+  });
+});
+
+test("lesson 15 accepts equivalent dislike wording and an omitted understood topic", () => {
+  const exercise = lesson015Exercises.find(
+    (item) => item.id === "exercise-supootsu-not-suki-input",
+  );
+  assert.ok(exercise);
+
+  [
+    "私はスポーツが好きではありません",
+    "スポーツが好きじゃありません",
+    "私はスポーツが嫌いです",
+    "スポーツが嫌いです",
+  ].forEach((answer) => {
+    assert.notEqual(
+      checkAnswer(answer, exercise.correctAnswers, exercise.acceptableAnswers).status,
+      "incorrect",
+      `${exercise.id} rejects natural answer ${answer}`,
+    );
   });
 });
 
