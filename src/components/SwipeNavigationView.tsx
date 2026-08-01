@@ -7,12 +7,12 @@ import {
   resolveSwipeNavigation,
 } from "../engine/swipeNavigation";
 
-interface SwipeNavigationViewProps extends PropsWithChildren {
+type SwipeNavigationViewProps = PropsWithChildren<{
   onBack?: () => void;
   onForward?: () => void;
   backEdgeOnly?: boolean;
   disabled?: boolean;
-}
+}>;
 
 export function SwipeNavigationView({
   children,
