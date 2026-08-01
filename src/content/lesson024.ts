@@ -12,10 +12,10 @@ export const lesson024Grammar: GrammarPoint[] = [
   {
     id: "grammar-koto-ga-dekimasu", type: "grammar", title: "Умение и возможность ～ことができます",
     meaningRu: "сообщает, что человек может выполнить действие",
-    explanationRu: "Поставь глагол в словарную форму, добавь ことができます: 漢字を読むことができます — «Могу читать кандзи». こと превращает действие в абстрактное «делание этого», а できます сообщает о возможности.",
+    explanationRu: "Поставь глагол в словарную форму, добавь ことができます: 漢字を読むことができます — «Могу читать кандзи». こと превращает действие в абстрактное «делание этого», а вся конструкция ことができます сообщает о возможности.",
     formation: ["[словарная форма] + ことができます", "読むことができます", "食べることができます"],
     cautions: ["Перед こと нужна словарная форма: 読むことができます, не 読みますことができます."],
-    relatedGrammarIds: ["grammar-dictionary-form-role", "grammar-ga-existence"], jlptLevel: "N5",
+    relatedGrammarIds: ["grammar-dictionary-form-role"], jlptLevel: "N5",
   },
   {
     id: "grammar-koto-ga-dekimasen", type: "grammar", title: "Невозможность ～ことができません",
