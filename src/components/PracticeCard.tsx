@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Text, TextInput, TouchableOpacity, View } from "react-native";
 
 import { getExerciseSpeechText } from "../audio/exerciseSpeechText";
@@ -51,6 +51,7 @@ export function PracticeCard({
 }: PracticeCardProps) {
   const [handwritingHasInk, setHandwritingHasInk] = useState(false);
   const [handwritingCompared, setHandwritingCompared] = useState(false);
+  const textDraftRef = useRef(answer);
   const choices = Array.from(
     new Set([...exercise.correctAnswers, ...(exercise.distractors ?? [])]),
   );
@@ -64,7 +65,12 @@ export function PracticeCard({
   useEffect(() => {
     setHandwritingHasInk(false);
     setHandwritingCompared(false);
+    textDraftRef.current = "";
   }, [exercise.id]);
+
+  useEffect(() => {
+    textDraftRef.current = answer;
+  }, [answer]);
 
   useEffect(() => {
     if (exercise.type === "listening" && exercise.audioText && !result) {
@@ -82,6 +88,18 @@ export function PracticeCard({
     setHandwritingHasInk(hasInk);
     if (!hasInk) setHandwritingCompared(false);
   }, []);
+
+  const changeTextAnswer = (value: string) => {
+    textDraftRef.current = value;
+    onAnswerChange(value);
+  };
+
+  const submitTextAnswer = (nativeValue?: string) => {
+    const submitted = nativeValue ?? textDraftRef.current;
+    if (submitted.trim().length === 0 || result) return;
+    textDraftRef.current = submitted;
+    onChoice(submitted);
+  };
 
   return (
     <View style={styles.section}>
@@ -164,9 +182,11 @@ export function PracticeCard({
 
         {isTextExercise && (
           <TextInput
+            key={exercise.id}
             value={answer}
             editable={!result}
-            onChangeText={onAnswerChange}
+            onChangeText={changeTextAnswer}
+            onSubmitEditing={(event) => submitTextAnswer(event.nativeEvent.text)}
             placeholder={
               exercise.type === "particle-gap"
                 ? "Введите частицу или частицы"
@@ -174,6 +194,7 @@ export function PracticeCard({
             }
             autoCapitalize="none"
             autoCorrect={false}
+            returnKeyType="done"
             style={styles.input}
           />
         )}
@@ -213,12 +234,24 @@ export function PracticeCard({
           </>
         )}
 
-        {!result &&
-          (interactionMode === "text" || interactionMode === "builder") && (
-            <TouchableOpacity style={styles.primaryButton} onPress={onSubmit}>
-              <Text style={styles.primaryButtonText}>Проверить</Text>
-            </TouchableOpacity>
-          )}
+        {!result && interactionMode === "text" && (
+          <TouchableOpacity
+            disabled={answer.trim().length === 0}
+            style={[
+              styles.primaryButton,
+              answer.trim().length === 0 && styles.disabledButton,
+            ]}
+            onPress={() => submitTextAnswer()}
+          >
+            <Text style={styles.primaryButtonText}>Проверить</Text>
+          </TouchableOpacity>
+        )}
+
+        {!result && interactionMode === "builder" && (
+          <TouchableOpacity style={styles.primaryButton} onPress={onSubmit}>
+            <Text style={styles.primaryButtonText}>Проверить</Text>
+          </TouchableOpacity>
+        )}
 
         {result && (
           <>
