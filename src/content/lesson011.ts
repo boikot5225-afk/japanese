@@ -266,7 +266,7 @@ export const lesson011Exercises: Exercise[] = [
   {
     id: "exercise-yasui-reading-input",
     type: "text-input",
-    prompt: "Напиши хираганой чтение слова 安い.",
+    prompt: "Напиши чтение слова 安い.",
     targetItemIds: ["word-yasui"],
     correctAnswers: ["やすい"],
     explanationRu: "安い читается やすい.",

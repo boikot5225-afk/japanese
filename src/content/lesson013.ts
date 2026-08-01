@@ -262,7 +262,7 @@ export const lesson013Exercises: Exercise[] = [
   {
     id: "exercise-yuumei-reading-input",
     type: "text-input",
-    prompt: "Напиши хираганой чтение слова 有名.",
+    prompt: "Напиши чтение слова 有名.",
     targetItemIds: ["word-yuumei-na"],
     correctAnswers: ["ゆうめい"],
     explanationRu: "有名 читается ゆうめい.",

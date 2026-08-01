@@ -218,7 +218,7 @@ export const lesson014Exercises: Exercise[] = [
   {
     id: "exercise-shinsetsu-reading-input",
     type: "text-input",
-    prompt: "Напиши хираганой чтение слова 親切.",
+    prompt: "Напиши чтение слова 親切.",
     targetItemIds: ["word-shinsetsu-na"],
     correctAnswers: ["しんせつ"],
     explanationRu: "親切 читается しんせつ.",

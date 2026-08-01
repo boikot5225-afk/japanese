@@ -21,6 +21,7 @@ export interface VocabularyItem {
   type: "vocabulary";
   writtenForm: string;
   reading: string;
+  alternativeReadings?: string[];
   meaningsRu: string[];
   partOfSpeech: string[];
   jlptLevel?: JlptLevel;
