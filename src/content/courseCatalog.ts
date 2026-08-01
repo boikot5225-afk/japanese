@@ -40,6 +40,10 @@ import { lesson033Bundle } from "./lesson033";
 import { lesson034Bundle } from "./lesson034";
 import { lesson035Bundle } from "./lesson035";
 import { lesson036Bundle } from "./lesson036";
+import { lesson037Bundle } from "./lesson037";
+import { lesson038Bundle } from "./lesson038";
+import { lesson039Bundle } from "./lesson039";
+import { lesson040Bundle } from "./lesson040";
 import type { Lesson } from "../domain/course";
 import type { LessonBundle } from "./lessonBundle";
 import { diversifyLessonPractice } from "./practiceDiversity";
@@ -103,6 +107,10 @@ const baseLessonBundles: readonly LessonBundle[] = [
   lesson034Bundle,
   lesson035Bundle,
   lesson036Bundle,
+  lesson037Bundle,
+  lesson038Bundle,
+  lesson039Bundle,
+  lesson040Bundle,
 ];
 
 const expandedLessonBundles: readonly LessonBundle[] = baseLessonBundles.map((bundle) =>
@@ -292,6 +300,19 @@ export const courseUnits: CourseUnit[] = [
       requireLesson("lesson-034"),
       requireLesson("lesson-035"),
       requireLesson("lesson-036"),
+    ],
+  },
+  {
+    id: "unit-011",
+    title: "Мысли, речь и планы",
+    description:
+      "Мнения и предположения через ～と思います, прямая и косвенная речь, намерения ～つもり, конкретные планы ～予定 и вероятность ～でしょう.",
+    jlptLevel: "N4",
+    lessons: [
+      requireLesson("lesson-037"),
+      requireLesson("lesson-038"),
+      requireLesson("lesson-039"),
+      requireLesson("lesson-040"),
     ],
   },
 ];
