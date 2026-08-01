@@ -95,9 +95,10 @@ export const lesson016Grammar: GrammarPoint[] = [
     title: "Вопрос AとBとどちらが",
     meaningRu: "спрашивает, какой из двух вариантов больше подходит",
     explanationRu:
-      "Чтобы сравнить два варианта вопросом, используют AとBとどちらが～ですか. Ответ часто строится как Aのほうが～です: 夏と冬とどちらが好きですか。冬のほうが好きです.",
+      "Чтобы сравнить два варианта вопросом, используют AとBとどちらが～ですか. Также естественна модель AとBではどちらが～ですか. Ответ часто строится как Aのほうが～です: 夏と冬とどちらが好きですか。冬のほうが好きです.",
     formation: [
       "A と B と どちらが [прилагательное] ですか",
+      "A と B では どちらが [прилагательное] ですか",
       "A のほうが [прилагательное] です"
     ],
     cautions: ["どちら используется для выбора из двух. Для трёх и более вариантов нужна другая модель."],
@@ -107,11 +108,11 @@ export const lesson016Grammar: GrammarPoint[] = [
   {
     id: "grammar-ichiban-superlative",
     type: "grammar",
-    title: "Превосходная степень ～で一番",
-    meaningRu: "выделяет самый сильный вариант внутри группы",
+    title: "Лучший вариант внутри группы: ～では一番",
+    meaningRu: "выделяет самый сильный вариант внутри названной группы",
     explanationRu:
-      "Группа или область отмечается で, выбранный элемент — が, а перед признаком ставится 一番: 季節で春が一番好きです — «Из времён года больше всего люблю весну».",
-    formation: ["[группа] で [элемент] が 一番 [прилагательное] です"],
+      "Группу удобно задать через では, выбранный элемент отметить が, а перед признаком поставить 一番: 季節では春が一番好きです — «Из времён года больше всего люблю весну». Более развёрнутый вариант — 季節の中では春が一番好きです.",
+    formation: ["[группа] では [элемент] が 一番 [прилагательное] です"],
     cautions: [
       "一番 само по себе не заменяет прилагательное: после него нужно 好き, 大きい, きれい и т. п.",
       "Вопрос о лучшем варианте обычно использует 何／どれ／どこ в зависимости от группы."
@@ -161,8 +162,8 @@ export const lesson016Sentences: ExampleSentence[] = [
   {
     id: "sentence-kisetsu-haru-ichiban-suki",
     type: "sentence",
-    japanese: "季節で春が一番好きです。",
-    reading: "きせつではるがいちばんすきです。",
+    japanese: "季節では春が一番好きです。",
+    reading: "きせつでははるがいちばんすきです。",
     translationRu: "Из времён года больше всего мне нравится весна.",
     grammarIds: ["grammar-ichiban-superlative", "grammar-suki-kirai-ga"],
     vocabularyIds: ["word-kisetsu", "word-haru", "word-ichiban", "word-suki-na"],
@@ -185,17 +186,19 @@ export const lesson016Exercises: Exercise[] = [
     prompt: "Выбери правильный вопрос «Что нравится больше: лето или зима?»",
     targetItemIds: ["grammar-dochira-comparison", "word-natsu", "word-fuyu", "word-dochira", "word-suki-na"],
     correctAnswers: ["夏と冬とどちらが好きですか"],
+    acceptableAnswers: ["夏と冬ではどちらが好きですか"],
     distractors: ["夏より冬と好きですか", "夏と冬がどちらを好きですか", "夏のほうが冬ですか"],
-    explanationRu: "Выбор из двух строится по модели AとBとどちらが～ですか.",
+    explanationRu: "Выбор из двух строится как AとBとどちらが～ですか; вариант AとBではどちらが～ですか тоже естественен.",
   },
   {
     id: "exercise-ichiban-choice",
     type: "multiple-choice",
     prompt: "Как сказать «Из времён года больше всего люблю весну»?",
     targetItemIds: ["grammar-ichiban-superlative", "word-kisetsu", "word-haru", "word-ichiban", "word-suki-na"],
-    correctAnswers: ["季節で春が一番好きです"],
+    correctAnswers: ["季節では春が一番好きです"],
+    acceptableAnswers: ["季節の中では春が一番好きです", "季節で春が一番好きです"],
     distractors: ["季節に春を一番好きです", "春より季節が好きです", "季節は春のほうです"],
-    explanationRu: "Группа отмечается で, выбранный элемент — が, степень — 一番.",
+    explanationRu: "Группа задаётся через 季節では, выбранный элемент — 春が, степень — 一番.",
   },
   {
     id: "exercise-neko-inu-builder",
@@ -212,8 +215,15 @@ export const lesson016Exercises: Exercise[] = [
     prompt: "Напиши по-японски: Летом жарче, чем весной.",
     targetItemIds: ["grammar-yori-houga", "word-haru", "word-natsu", "word-atsui"],
     correctAnswers: ["春より夏のほうが暑いです", "春より夏のほうが暑いです。"],
-    acceptableAnswers: ["はるよりなつのほうがあついです", "はるよりなつのほうがあついです。"],
-    explanationRu: "Весна — точка сравнения, поэтому 春より; лето — более жаркий вариант, 夏のほうが.",
+    acceptableAnswers: [
+      "はるよりなつのほうがあついです",
+      "はるよりなつのほうがあついです。",
+      "夏は春より暑いです",
+      "夏は春より暑いです。",
+      "なつははるよりあついです",
+      "なつははるよりあついです。"
+    ],
+    explanationRu: "Основная учебная модель — 春より夏のほうが暑いです. Естественная более короткая модель 夏は春より暑いです тоже принимается.",
   },
   {
     id: "exercise-natsu-fuyu-question-input",
@@ -221,8 +231,15 @@ export const lesson016Exercises: Exercise[] = [
     prompt: "Напиши по-японски: Что вам нравится больше — лето или зима?",
     targetItemIds: ["grammar-dochira-comparison", "word-natsu", "word-fuyu", "word-dochira", "word-suki-na"],
     correctAnswers: ["夏と冬とどちらが好きですか", "夏と冬とどちらが好きですか。"],
-    acceptableAnswers: ["なつとふゆとどちらがすきですか", "なつとふゆとどちらがすきですか。"],
-    explanationRu: "Два варианта соединяются と, затем используется どちらが.",
+    acceptableAnswers: [
+      "なつとふゆとどちらがすきですか",
+      "なつとふゆとどちらがすきですか。",
+      "夏と冬ではどちらが好きですか",
+      "夏と冬ではどちらが好きですか。",
+      "なつとふゆではどちらがすきですか",
+      "なつとふゆではどちらがすきですか。"
+    ],
+    explanationRu: "Основная схема — AとBとどちらが. Вариант AとBではどちらが тоже принимается.",
   },
   {
     id: "exercise-fuyu-houga-input",
@@ -238,9 +255,16 @@ export const lesson016Exercises: Exercise[] = [
     type: "text-input",
     prompt: "Напиши по-японски: Из времён года больше всего мне нравится весна.",
     targetItemIds: ["grammar-ichiban-superlative", "word-kisetsu", "word-haru", "word-ichiban", "word-suki-na"],
-    correctAnswers: ["季節で春が一番好きです", "季節で春が一番好きです。"],
-    acceptableAnswers: ["きせつではるがいちばんすきです", "きせつではるがいちばんすきです。"],
-    explanationRu: "Полная модель: 季節で + 春が + 一番好きです.",
+    correctAnswers: ["季節では春が一番好きです", "季節では春が一番好きです。"],
+    acceptableAnswers: [
+      "きせつでははるがいちばんすきです",
+      "きせつでははるがいちばんすきです。",
+      "季節の中では春が一番好きです",
+      "季節の中では春が一番好きです。",
+      "季節で春が一番好きです",
+      "季節で春が一番好きです。"
+    ],
+    explanationRu: "Основной вариант: 季節では + 春が + 一番好きです. Развёрнуто можно сказать 季節の中では春が一番好きです.",
   },
 ];
 
@@ -270,6 +294,6 @@ export const lesson016Bundle: LessonBundle = {
     "сравнивать два объекта через AよりBのほうが",
     "задавать вопрос выбора из двух через どちらが",
     "отвечать моделью ～のほうが",
-    "выделять лучший вариант внутри группы через ～で一番",
+    "выделять лучший вариант внутри группы через ～では一番",
   ],
 };
