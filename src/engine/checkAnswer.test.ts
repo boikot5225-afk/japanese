@@ -62,3 +62,48 @@ test("Japanese numeral parser handles digits, place values and 万", () => {
   assert.equal(parseJapaneseInteger("二〇二四"), 2024);
   assert.equal(replaceJapaneseNumeralsWithArabic("午後九時です"), "午後9時です");
 });
+
+test("equivalent polite i-adjective negatives normalize to the taught form", () => {
+  assert.equal(
+    checkAnswer("高くありません", ["高くないです"]).status,
+    "correct",
+  );
+  assert.equal(
+    checkAnswer("寒くありませんでした", ["寒くなかったです"]).status,
+    "correct",
+  );
+  assert.equal(
+    checkAnswer("よくありません", ["よくないです"]).status,
+    "correct",
+  );
+});
+
+test("equivalent polite noun and na-adjective negatives normalize safely", () => {
+  assert.equal(
+    checkAnswer("静かじゃありません", ["静かではありません"]).status,
+    "correct",
+  );
+  assert.equal(
+    checkAnswer("静かじゃないです", ["静かではありません"]).status,
+    "correct",
+  );
+  assert.equal(
+    checkAnswer("便利じゃなかったです", ["便利ではありませんでした"]).status,
+    "correct",
+  );
+});
+
+test("malformed adjective forms remain incorrect after normalization", () => {
+  assert.equal(
+    checkAnswer("高いではありません", ["高くないです"]).status,
+    "incorrect",
+  );
+  assert.equal(
+    checkAnswer("寒くないでした", ["寒くなかったです"]).status,
+    "incorrect",
+  );
+  assert.equal(
+    checkAnswer("静かくないです", ["静かではありません"]).status,
+    "incorrect",
+  );
+});

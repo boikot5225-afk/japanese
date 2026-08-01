@@ -95,7 +95,7 @@ test("свободное повторение пройденного урока 
   const existing = commitLessonReviewItems({
     items: [],
     exercises,
-    attempts: [attempts[0]],
+    attempts: [{ exerciseId: "exercise-one", status: "correct" }],
     lessonId: "lesson-test",
     mode: "learning",
     passed: true,

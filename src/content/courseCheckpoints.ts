@@ -35,11 +35,34 @@ export const courseCheckpoints: readonly CourseCheckpoint[] = [
   {
     id: "checkpoint-unit-003",
     unitId: "unit-003",
-    title: "Итоговая проверка блока N5",
+    title: "Контрольная точка: время и формы",
     description:
       "Проверка уроков 7–10: время, распорядок, отрицательные и прошедшие формы です／ます.",
     lessonIds: ["lesson-007", "lesson-008", "lesson-009", "lesson-010"],
+    unlockLessonId: "lesson-011",
     questionCount: 18,
+    passPercent: 80,
+  },
+  {
+    id: "checkpoint-unit-004",
+    unitId: "unit-004",
+    title: "Контрольная точка: описание предметов и мест",
+    description:
+      "Проверка уроков 11–13: い- и な-прилагательные, отрицание, прошедшее время и формы いい／よい.",
+    lessonIds: ["lesson-011", "lesson-012", "lesson-013"],
+    unlockLessonId: "lesson-014",
+    questionCount: 15,
+    passPercent: 80,
+  },
+  {
+    id: "checkpoint-unit-005",
+    unitId: "unit-005",
+    title: "Контрольная точка: состояния и сравнение",
+    description:
+      "Проверка уроков 14–16: состояния, предпочтения и способности с が, сравнение через より／ほうが и выбор через 一番.",
+    lessonIds: ["lesson-014", "lesson-015", "lesson-016"],
+    unlockLessonId: "lesson-017",
+    questionCount: 15,
     passPercent: 80,
   },
 ];

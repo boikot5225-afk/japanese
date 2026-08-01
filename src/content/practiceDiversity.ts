@@ -70,6 +70,33 @@ const inferSentenceContentKey = (
   return sentence ? `sentence:${sentence.id}` : undefined;
 };
 
+const inferVocabularyContentKey = (
+  bundle: LessonBundle,
+  exercise: Exercise,
+): string | undefined => {
+  if (exercise.targetItemIds.length !== 1) return undefined;
+
+  const wordId = exercise.targetItemIds[0];
+  if (!wordId?.startsWith("word-")) return undefined;
+  const word = bundle.vocabulary.find((item) => item.id === wordId);
+  if (!word) return undefined;
+
+  const answers = unique([
+    ...exercise.correctAnswers,
+    ...(exercise.acceptableAnswers ?? []),
+  ]).map(normalizeText);
+  const reading = normalizeText(word.reading);
+  const written = normalizeText(word.writtenForm);
+  const meanings = word.meaningsRu.map(normalizeText);
+
+  if (answers.includes(reading)) return `vocabulary:${word.id}:reading`;
+  if (answers.includes(written)) return `vocabulary:${word.id}:written`;
+  if (answers.some((answer) => meanings.includes(answer))) {
+    return `vocabulary:${word.id}:meaning`;
+  }
+  return undefined;
+};
+
 const normalizeExistingExercise = (
   bundle: LessonBundle,
   exercise: Exercise,
@@ -77,6 +104,7 @@ const normalizeExistingExercise = (
   const contentKey =
     exercise.contentKey ??
     inferSentenceContentKey(bundle, exercise) ??
+    inferVocabularyContentKey(bundle, exercise) ??
     `exercise:${exercise.id}`;
   return {
     ...exercise,
@@ -145,7 +173,7 @@ const createVocabularyExercises = (
   const readingKey = `vocabulary:${word.id}:reading`;
   const writtenKey = `vocabulary:${word.id}:written`;
 
-  return [
+  const exercises: Exercise[] = [
     {
       id: vocabularyExerciseId(bundle, word, "meaning-choice"),
       type: "multiple-choice",
@@ -228,6 +256,12 @@ const createVocabularyExercises = (
       confusionItemIds: confusions,
     },
   ];
+
+  return exercises.filter(
+    (exercise) =>
+      exercise.type !== "listening" ||
+      normalizeText(exercise.audioText ?? "").length >= 2,
+  );
 };
 
 const createGrammarExercises = (

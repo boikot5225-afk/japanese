@@ -1,0 +1,39 @@
+name: Course Quality Check
+
+on:
+  push:
+    branches:
+      - "agent/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CI: "1"
+
+jobs:
+  test-and-typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run full test suite
+        run: npm test
+
+      - name: Run application TypeScript check
+        run: npm run typecheck
+
+      - name: Run test TypeScript check
+        run: npm run typecheck:tests

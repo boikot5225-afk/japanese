@@ -1,6 +1,6 @@
 {
   "name": "japanese-tutor",
-  "version": "0.10.2",
+  "version": "0.11.3",
   "private": true,
   "main": "expo/AppEntry.js",
   "scripts": {
@@ -18,9 +18,10 @@
     "test:numbers": "node --experimental-strip-types --test src/engine/numberTrainer.test.ts",
     "test:speech": "node --experimental-strip-types --test src/audio/japaneseSpeechText.test.ts",
     "test:exercise-speech": "node --experimental-strip-types --test src/audio/exerciseSpeechText.test.ts",
-    "test:content": "tsx --test src/content/courseCatalog.test.ts",
+    "test:content": "tsx --test src/content/*.test.ts",
     "test": "npm run test:review && npm run test:lesson-review && npm run test:practice-queue && npm run test:checkpoint && npm run test:answer && npm run test:kana && npm run test:kana-words && npm run test:katakana && npm run test:numbers && npm run test:speech && npm run test:exercise-speech && npm run test:content",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "typecheck:tests": "tsc --noEmit -p tsconfig.tests.json"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -31,6 +32,7 @@
     "react-native": "0.81.4"
   },
   "devDependencies": {
+    "@types/node": "^22.0.0",
     "@types/react": "~19.1.10",
     "tsx": "^4.23.1",
     "typescript": "~5.9.2"

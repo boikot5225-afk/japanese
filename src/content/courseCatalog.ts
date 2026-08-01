@@ -14,6 +14,12 @@ import { lesson007Bundle } from "./lesson007";
 import { lesson008Bundle } from "./lesson008";
 import { lesson009Bundle } from "./lesson009";
 import { lesson010Bundle } from "./lesson010";
+import { lesson011Bundle } from "./lesson011";
+import { lesson012Bundle } from "./lesson012";
+import { lesson013Bundle } from "./lesson013";
+import { lesson014Bundle } from "./lesson014";
+import { lesson015Bundle } from "./lesson015";
+import { lesson016Bundle } from "./lesson016";
 import type { Lesson } from "../domain/course";
 import type { LessonBundle } from "./lessonBundle";
 import { diversifyLessonPractice } from "./practiceDiversity";
@@ -51,15 +57,59 @@ const baseLessonBundles: readonly LessonBundle[] = [
   lesson008Bundle,
   lesson009Bundle,
   lesson010Bundle,
+  lesson011Bundle,
+  lesson012Bundle,
+  lesson013Bundle,
+  lesson014Bundle,
+  lesson015Bundle,
+  lesson016Bundle,
 ];
 
 const expandedLessonBundles: readonly LessonBundle[] = baseLessonBundles.map((bundle) =>
   expandLessonPractice(bundle, baseLessonBundles),
 );
 
-export const lessonBundles: readonly LessonBundle[] = expandedLessonBundles.map((bundle) =>
-  diversifyLessonPractice(bundle, expandedLessonBundles),
-);
+const exerciseMinutes = (bundle: LessonBundle): number =>
+  bundle.exercises.reduce((total, exercise) => {
+    switch (exercise.type) {
+      case "multiple-choice":
+        return total + 0.45;
+      case "listening":
+        return total + 0.7;
+      case "sentence-builder":
+      case "particle-gap":
+      case "conjugation":
+        return total + 0.9;
+      case "text-input":
+        return total + 1.15;
+      case "handwriting":
+        return total + 1.4;
+      default:
+        return total + 0.8;
+    }
+  }, 0);
+
+const withReviewedDuration = (bundle: LessonBundle): LessonBundle => {
+  if (bundle.lesson.order <= 10) return bundle;
+
+  const studyMinutes =
+    bundle.grammar.length * 1.1 +
+    bundle.vocabulary.length * 0.2 +
+    bundle.sentences.length * 0.35;
+  const estimatedMinutes = Math.ceil(studyMinutes + exerciseMinutes(bundle));
+
+  return {
+    ...bundle,
+    lesson: {
+      ...bundle.lesson,
+      estimatedMinutes,
+    },
+  };
+};
+
+export const lessonBundles: readonly LessonBundle[] = expandedLessonBundles
+  .map((bundle) => diversifyLessonPractice(bundle, expandedLessonBundles))
+  .map(withReviewedDuration);
 
 export const lesson001Bundle = lessonBundles[0] ?? lesson001BaseBundle;
 
@@ -109,6 +159,30 @@ export const courseUnits: CourseUnit[] = [
       requireLesson("lesson-008"),
       requireLesson("lesson-009"),
       requireLesson("lesson-010"),
+    ],
+  },
+  {
+    id: "unit-004",
+    title: "Описание предметов и мест",
+    description:
+      "い- и な-прилагательные: описание, отрицание, прошедшее время и особая форма いい／よい.",
+    jlptLevel: "N5",
+    lessons: [
+      requireLesson("lesson-011"),
+      requireLesson("lesson-012"),
+      requireLesson("lesson-013"),
+    ],
+  },
+  {
+    id: "unit-005",
+    title: "Состояния, предпочтения и сравнение",
+    description:
+      "Прошедшие формы な-прилагательных, симпатии и навыки с が, сравнение через より／ほうが и выбор через 一番.",
+    jlptLevel: "N5",
+    lessons: [
+      requireLesson("lesson-014"),
+      requireLesson("lesson-015"),
+      requireLesson("lesson-016"),
     ],
   },
 ];

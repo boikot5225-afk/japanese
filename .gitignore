@@ -3,6 +3,7 @@ node_modules/
 dist/
 android/
 ios/
+builds/
 *.jks
 *.keystore
 .env
