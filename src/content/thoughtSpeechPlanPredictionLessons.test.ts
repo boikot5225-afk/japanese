@@ -66,7 +66,10 @@ test("intention practice separates positive negative and past intentions from wi
   );
   assert.ok(
     lesson039Bundle.grammar.some(
-      (grammar) => grammar.id === "grammar-tai-vs-tsumori" && grammar.explanationRu.includes("решение"),
+      (grammar) =>
+        grammar.id === "grammar-tai-vs-tsumori" &&
+        grammar.explanationRu.includes("Желание") &&
+        grammar.explanationRu.includes("つもり сообщает"),
     ),
   );
 });
