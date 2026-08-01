@@ -36,7 +36,7 @@ export const lesson039Grammar: GrammarPoint[] = [
     explanationRu: "日本へ行きたいです означает «хочу поехать в Японию». 日本へ行くつもりです означает «собираюсь / намерен поехать». Желание может остаться мечтой, а つもり сообщает о решении.",
     formation: ["行きたいです — хочу пойти", "行くつもりです — собираюсь пойти"],
     cautions: ["Не используй つもり для случайной сиюминутной хотелки, если решение ещё не принято."],
-    relatedGrammarIds: ["grammar-tai-form", "grammar-dictionary-tsumori"], jlptLevel: "N4",
+    relatedGrammarIds: ["grammar-tai-desire", "grammar-dictionary-tsumori"], jlptLevel: "N4",
   },
 ];
 
@@ -45,7 +45,7 @@ export const lesson039Sentences: ExampleSentence[] = [
   { id: "sentence-39-study-japanese", type: "sentence", japanese: "毎日日本語を勉強するつもりです。", reading: "まいにちにほんごをべんきょうするつもりです。", translationRu: "Я намерен каждый день заниматься японским.", grammarIds: ["grammar-dictionary-tsumori", "grammar-time-without-ni", "grammar-o-object"], vocabularyIds: ["word-mainichi", "word-nihongo", "word-benkyoushimasu"] },
   { id: "sentence-39-not-buy-car", type: "sentence", japanese: "車を買わないつもりです。", reading: "くるまをかわないつもりです。", translationRu: "Я не собираюсь покупать машину.", grammarIds: ["grammar-nai-tsumori", "grammar-nai-form-group1", "grammar-o-object"], vocabularyIds: ["word-kuruma", "word-kaimasu-22"] },
   { id: "sentence-39-planned-rest", type: "sentence", japanese: "今日は休むつもりでした。", reading: "きょうはやすむつもりでした。", translationRu: "Сегодня я собирался отдохнуть.", grammarIds: ["grammar-tsumori-deshita", "grammar-dictionary-form-group1", "grammar-time-without-ni"], vocabularyIds: ["word-kyou", "word-yasumimasu"] },
-  { id: "sentence-39-want-vs-intend", type: "sentence", japanese: "日本へ行きたいですが、まだ行くつもりはありません。", reading: "にほんへいきたいですが、まだいくつもりはありません。", translationRu: "Я хочу поехать в Японию, но пока не собираюсь ехать.", grammarIds: ["grammar-tai-vs-tsumori", "grammar-tai-form", "grammar-dictionary-tsumori"], vocabularyIds: ["word-nihon-36", "word-ikimasu"] },
+  { id: "sentence-39-want-vs-intend", type: "sentence", japanese: "日本へ行きたいです。来年、行くつもりです。", reading: "にほんへいきたいです。らいねん、いくつもりです。", translationRu: "Я хочу поехать в Японию. В следующем году намерен поехать.", grammarIds: ["grammar-tai-vs-tsumori", "grammar-tai-desire", "grammar-dictionary-tsumori"], vocabularyIds: ["word-nihon-36", "word-rainen-39", "word-ikimasu"] },
 ];
 
 const confusions = ["grammar-dictionary-tsumori", "grammar-nai-tsumori", "grammar-tsumori-deshita", "grammar-tai-vs-tsumori"];
