@@ -255,7 +255,11 @@ const createVocabularyExercises = (
       difficulty: 2,
       confusionItemIds: confusions,
     },
-  ];
+  ].filter(
+    (exercise) =>
+      exercise.type !== "listening" ||
+      normalizeText(exercise.audioText ?? "").length >= 2,
+  );
 };
 
 const createGrammarExercises = (
