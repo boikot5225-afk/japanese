@@ -128,7 +128,11 @@ const withReviewedDuration = (bundle: LessonBundle): LessonBundle => {
     bundle.grammar.length * 1.1 +
     bundle.vocabulary.length * 0.2 +
     bundle.sentences.length * 0.35;
-  const estimatedMinutes = Math.ceil(studyMinutes + exerciseMinutes(bundle));
+  const guidedReviewMinutes = 1.5;
+  const calculatedMinutes = Math.ceil(
+    studyMinutes + exerciseMinutes(bundle) + guidedReviewMinutes,
+  );
+  const estimatedMinutes = Math.min(19, Math.max(14, calculatedMinutes));
 
   return {
     ...bundle,
