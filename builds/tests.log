@@ -10,61 +10,61 @@ TAP version 13
 # Subtest: правильные ответы увеличивают интервалы 1 → 3 → 7+ дней
 ok 1 - правильные ответы увеличивают интервалы 1 → 3 → 7+ дней
   ---
-  duration_ms: 1.341536
+  duration_ms: 1.343672
   type: 'test'
   ...
 # Subtest: ошибка возвращает знание в сегодняшнюю очередь
 ok 2 - ошибка возвращает знание в сегодняшнюю очередь
   ---
-  duration_ms: 0.197697
+  duration_ms: 0.190703
   type: 'test'
   ...
 # Subtest: при одинаковом сроке более слабое знание идёт первым
 ok 3 - при одинаковом сроке более слабое знание идёт первым
   ---
-  duration_ms: 0.241944
+  duration_ms: 0.216321
   type: 'test'
   ...
 # Subtest: ошибочный элемент перестаёт считаться слабым после трёх уверенных ответов
 ok 4 - ошибочный элемент перестаёт считаться слабым после трёх уверенных ответов
   ---
-  duration_ms: 0.888395
+  duration_ms: 0.844963
   type: 'test'
   ...
 # Subtest: одно слово хранит отдельные интервалы для разных навыков
 ok 5 - одно слово хранит отдельные интервалы для разных навыков
   ---
-  duration_ms: 0.304338
+  duration_ms: 0.322909
   type: 'test'
   ...
 # Subtest: выбор упражнения избегает только что показанного содержания
 ok 6 - выбор упражнения избегает только что показанного содержания
   ---
-  duration_ms: 0.351238
+  duration_ms: 0.357931
   type: 'test'
   ...
 # Subtest: одна фраза закрывает несколько знаний и не дублируется в сессии
 ok 7 - одна фраза закрывает несколько знаний и не дублируется в сессии
   ---
-  duration_ms: 0.638139
+  duration_ms: 0.596595
   type: 'test'
   ...
 # Subtest: недавно показанная фраза уступает свежей альтернативе
 ok 8 - недавно показанная фраза уступает свежей альтернативе
   ---
-  duration_ms: 0.282674
+  duration_ms: 0.288798
   type: 'test'
   ...
 # Subtest: журнал попыток сохраняет смысловой ключ упражнения
 ok 9 - журнал попыток сохраняет смысловой ключ упражнения
   ---
-  duration_ms: 0.341163
+  duration_ms: 0.312454
   type: 'test'
   ...
 # Subtest: старые записи упражнений разворачиваются в отдельные знания
 ok 10 - старые записи упражнений разворачиваются в отдельные знания
   ---
-  duration_ms: 0.533682
+  duration_ms: 0.536345
   type: 'test'
   ...
 1..10
@@ -75,7 +75,7 @@ ok 10 - старые записи упражнений разворачиваю�
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 227.36643
+# duration_ms 219.133172
 
 > japanese-tutor@0.11.0 test:lesson-review
 > tsx --test src/engine/lessonReview.test.ts
@@ -84,25 +84,25 @@ TAP version 13
 # Subtest: успешно завершённый новый урок добавляет знания и навыки в SRS
 ok 1 - успешно завершённый новый урок добавляет знания и навыки в SRS
   ---
-  duration_ms: 2.091303
+  duration_ms: 2.049038
   type: 'test'
   ...
 # Subtest: несколько заданий одного урока не накручивают интервал одного знания
 ok 2 - несколько заданий одного урока не накручивают интервал одного знания
   ---
-  duration_ms: 0.197567
+  duration_ms: 0.194288
   type: 'test'
   ...
 # Subtest: незавершённый урок не засоряет долгосрочную очередь
 ok 3 - незавершённый урок не засоряет долгосрочную очередь
   ---
-  duration_ms: 0.130666
+  duration_ms: 0.148721
   type: 'test'
   ...
 # Subtest: свободное повторение пройденного урока не меняет SRS
 ok 4 - свободное повторение пройденного урока не меняет SRS
   ---
-  duration_ms: 0.165378
+  duration_ms: 0.158685
   type: 'test'
   ...
 1..4
@@ -113,32 +113,32 @@ ok 4 - свободное повторение пройденного урока
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 206.030364
+# duration_ms 208.19904
 
 > japanese-tutor@0.11.0 test:practice-queue
 > node --experimental-strip-types --test src/engine/practiceQueue.test.ts
 
 TAP version 13
-# (node:2846) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/runner/work/japanese/japanese/src/engine/practiceQueue.test.ts is not specified and it doesn't parse as CommonJS.
+# (node:2722) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/runner/work/japanese/japanese/src/engine/practiceQueue.test.ts is not specified and it doesn't parse as CommonJS.
 # Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 # To eliminate this warning, add "type": "module" to /home/runner/work/japanese/japanese/package.json.
 # (Use `node --trace-warnings ...` to show where the warning was created)
 # Subtest: корректирующее задание ставится после двух других вопросов
 ok 1 - корректирующее задание ставится после двух других вопросов
   ---
-  duration_ms: 1.002077
+  duration_ms: 1.016898
   type: 'test'
   ...
 # Subtest: одно и то же корректирующее задание не планируется повторно
 ok 2 - одно и то же корректирующее задание не планируется повторно
   ---
-  duration_ms: 0.381303
+  duration_ms: 0.487754
   type: 'test'
   ...
 # Subtest: без группы вариантов очередь не меняется
 ok 3 - без группы вариантов очередь не меняется
   ---
-  duration_ms: 0.482806
+  duration_ms: 0.572359
   type: 'test'
   ...
 1..3
@@ -149,7 +149,7 @@ ok 3 - без группы вариантов очередь не меняетс
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 106.537306
+# duration_ms 118.909861
 
 > japanese-tutor@0.11.0 test:checkpoint
 > tsx --test src/engine/checkpointEngine.test.ts
@@ -158,43 +158,43 @@ TAP version 13
 # Subtest: checkpoint queue mixes exercises from the whole unit without semantic duplicates
 ok 1 - checkpoint queue mixes exercises from the whole unit without semantic duplicates
   ---
-  duration_ms: 1.52316
+  duration_ms: 1.484981
   type: 'test'
   ...
 # Subtest: every checkpoint can fill its requested size with unique content
 ok 2 - every checkpoint can fill its requested size with unique content
   ---
-  duration_ms: 0.620502
+  duration_ms: 0.595733
   type: 'test'
   ...
 # Subtest: manual handwriting self-assessment is excluded from graded checkpoints
 ok 3 - manual handwriting self-assessment is excluded from graded checkpoints
   ---
-  duration_ms: 0.785901
+  duration_ms: 0.745785
   type: 'test'
   ...
 # Subtest: checkpoint uses an 80 percent pass boundary
 ok 4 - checkpoint uses an 80 percent pass boundary
   ---
-  duration_ms: 0.217557
+  duration_ms: 0.218524
   type: 'test'
   ...
 # Subtest: the whole next unit stays locked until its checkpoint is passed
 ok 5 - the whole next unit stays locked until its checkpoint is passed
   ---
-  duration_ms: 0.621164
+  duration_ms: 0.616404
   type: 'test'
   ...
 # Subtest: later lessons require every earlier checkpoint
 ok 6 - later lessons require every earlier checkpoint
   ---
-  duration_ms: 0.201643
+  duration_ms: 0.198023
   type: 'test'
   ...
 # Subtest: a passed checkpoint is not revoked by a weaker retry
 ok 7 - a passed checkpoint is not revoked by a weaker retry
   ---
-  duration_ms: 0.247321
+  duration_ms: 0.205154
   type: 'test'
   ...
 1..7
@@ -205,7 +205,7 @@ ok 7 - a passed checkpoint is not revoked by a weaker retry
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 339.932738
+# duration_ms 355.269624
 
 > japanese-tutor@0.11.0 test:answer
 > tsx --test src/engine/checkAnswer.test.ts
@@ -214,43 +214,43 @@ TAP version 13
 # Subtest: lesson 4 accepts これは学校です as a natural reading of the Russian prompt
 ok 1 - lesson 4 accepts これは学校です as a natural reading of the Russian prompt
   ---
-  duration_ms: 1.415157
+  duration_ms: 1.354279
   type: 'test'
   ...
 # Subtest: mixed kanji and hiragana remain equivalent to the taught answer
 ok 2 - mixed kanji and hiragana remain equivalent to the taught answer
   ---
-  duration_ms: 0.419701
+  duration_ms: 0.400263
   type: 'test'
   ...
 # Subtest: time answers accept Arabic digits and optional 今は
 ok 3 - time answers accept Arabic digits and optional 今は
   ---
-  duration_ms: 0.584689
+  duration_ms: 0.579739
   type: 'test'
   ...
 # Subtest: Japanese numeral parser handles digits, place values and 万
 ok 4 - Japanese numeral parser handles digits, place values and 万
   ---
-  duration_ms: 0.31949
+  duration_ms: 0.328768
   type: 'test'
   ...
 # Subtest: equivalent polite i-adjective negatives normalize to the taught form
 ok 5 - equivalent polite i-adjective negatives normalize to the taught form
   ---
-  duration_ms: 0.355464
+  duration_ms: 0.264592
   type: 'test'
   ...
 # Subtest: equivalent polite noun and na-adjective negatives normalize safely
 ok 6 - equivalent polite noun and na-adjective negatives normalize safely
   ---
-  duration_ms: 0.377718
+  duration_ms: 0.214198
   type: 'test'
   ...
 # Subtest: malformed adjective forms remain incorrect after normalization
 ok 7 - malformed adjective forms remain incorrect after normalization
   ---
-  duration_ms: 0.306901
+  duration_ms: 0.304492
   type: 'test'
   ...
 1..7
@@ -261,62 +261,62 @@ ok 7 - malformed adjective forms remain incorrect after normalization
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 276.333309
+# duration_ms 270.816634
 
 > japanese-tutor@0.11.0 test:kana
 > node --experimental-strip-types --test src/engine/kanaEngine.test.ts
 
 TAP version 13
-# (node:2967) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/runner/work/japanese/japanese/src/engine/kanaEngine.test.ts is not specified and it doesn't parse as CommonJS.
+# (node:2844) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/runner/work/japanese/japanese/src/engine/kanaEngine.test.ts is not specified and it doesn't parse as CommonJS.
 # Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 # To eliminate this warning, add "type": "module" to /home/runner/work/japanese/japanese/package.json.
 # (Use `node --trace-warnings ...` to show where the warning was created)
 # Subtest: hiragana sets have the expected number of unique learning units
 ok 1 - hiragana sets have the expected number of unique learning units
   ---
-  duration_ms: 2.177152
+  duration_ms: 2.253331
   type: 'test'
   ...
 # Subtest: correct and incorrect answers update only the selected skill
 ok 2 - correct and incorrect answers update only the selected skill
   ---
-  duration_ms: 0.374784
+  duration_ms: 0.42515
   type: 'test'
   ...
 # Subtest: session prioritizes unseen or weaker symbols inside the selected set
 ok 3 - session prioritizes unseen or weaker symbols inside the selected set
   ---
-  duration_ms: 0.879472
+  duration_ms: 0.93761
   type: 'test'
   ...
 # Subtest: standard reading and keyboard input are not confused
 ok 4 - standard reading and keyboard input are not confused
   ---
-  duration_ms: 0.469916
+  duration_ms: 0.504848
   type: 'test'
   ...
 # Subtest: indistinguishable spellings are excluded from isolated listening
 ok 5 - indistinguishable spellings are excluded from isolated listening
   ---
-  duration_ms: 0.835696
+  duration_ms: 0.908056
   type: 'test'
   ...
 # Subtest: common alternative romanizations remain accepted where appropriate
 ok 6 - common alternative romanizations remain accepted where appropriate
   ---
-  duration_ms: 0.293952
+  duration_ms: 0.28989
   type: 'test'
   ...
 # Subtest: mastery ignores an impossible isolated-listening requirement
 ok 7 - mastery ignores an impossible isolated-listening requirement
   ---
-  duration_ms: 0.333711
+  duration_ms: 0.371691
   type: 'test'
   ...
 # Subtest: known-hiragana profile marks the basic set mastered
 ok 8 - known-hiragana profile marks the basic set mastered
   ---
-  duration_ms: 0.621864
+  duration_ms: 0.699006
   type: 'test'
   ...
 1..8
@@ -327,50 +327,50 @@ ok 8 - known-hiragana profile marks the basic set mastered
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 134.971072
+# duration_ms 125.20998
 
 > japanese-tutor@0.11.0 test:kana-words
 > node --experimental-strip-types --test src/engine/kanaWordEngine.test.ts
 
 TAP version 13
-# (node:2992) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/runner/work/japanese/japanese/src/engine/kanaWordEngine.test.ts is not specified and it doesn't parse as CommonJS.
+# (node:2869) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/runner/work/japanese/japanese/src/engine/kanaWordEngine.test.ts is not specified and it doesn't parse as CommonJS.
 # Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 # To eliminate this warning, add "type": "module" to /home/runner/work/japanese/japanese/package.json.
 # (Use `node --trace-warnings ...` to show where the warning was created)
 # Subtest: word practice contains unique and internally consistent words
 ok 1 - word practice contains unique and internally consistent words
   ---
-  duration_ms: 1.326745
+  duration_ms: 1.348319
   type: 'test'
   ...
 # Subtest: word token pool preserves repeated kana
 ok 2 - word token pool preserves repeated kana
   ---
-  duration_ms: 0.298608
+  duration_ms: 0.384009
   type: 'test'
   ...
 # Subtest: no word builder opens with the complete answer already laid out
 ok 3 - no word builder opens with the complete answer already laid out
   ---
-  duration_ms: 0.409426
+  duration_ms: 0.550857
   type: 'test'
   ...
 # Subtest: builder checks the complete kana sequence
 ok 4 - builder checks the complete kana sequence
   ---
-  duration_ms: 0.16607
+  duration_ms: 0.22943
   type: 'test'
   ...
 # Subtest: incorrect words lose mastery and gain priority
 ok 5 - incorrect words lose mastery and gain priority
   ---
-  duration_ms: 0.346962
+  duration_ms: 0.503526
   type: 'test'
   ...
 # Subtest: word mastery summary tracks started and mastered words
 ok 6 - word mastery summary tracks started and mastered words
   ---
-  duration_ms: 0.255774
+  duration_ms: 0.30971
   type: 'test'
   ...
 1..6
@@ -381,50 +381,50 @@ ok 6 - word mastery summary tracks started and mastered words
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 115.379012
+# duration_ms 111.600782
 
 > japanese-tutor@0.11.0 test:katakana
 > node --experimental-strip-types --test src/engine/katakanaEngine.test.ts
 
 TAP version 13
-# (node:3017) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/runner/work/japanese/japanese/src/engine/katakanaEngine.test.ts is not specified and it doesn't parse as CommonJS.
+# (node:2894) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/runner/work/japanese/japanese/src/engine/katakanaEngine.test.ts is not specified and it doesn't parse as CommonJS.
 # Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 # To eliminate this warning, add "type": "module" to /home/runner/work/japanese/japanese/package.json.
 # (Use `node --trace-warnings ...` to show where the warning was created)
 # Subtest: katakana datasets contain complete unique sets
 ok 1 - katakana datasets contain complete unique sets
   ---
-  duration_ms: 1.201836
+  duration_ms: 1.041855
   type: 'test'
   ...
 # Subtest: contrast set contains exactly シ ツ ソ ン
 ok 2 - contrast set contains exactly シ ツ ソ ン
   ---
-  duration_ms: 1.568007
+  duration_ms: 1.450851
   type: 'test'
   ...
 # Subtest: ヲ separates pronunciation from keyboard input and skips isolated listening
 ok 3 - ヲ separates pronunciation from keyboard input and skips isolated listening
   ---
-  duration_ms: 1.048516
+  duration_ms: 0.987754
   type: 'test'
   ...
 # Subtest: known-katakana profile marks all 46 basic symbols mastered
 ok 4 - known-katakana profile marks all 46 basic symbols mastered
   ---
-  duration_ms: 0.635495
+  duration_ms: 0.632178
   type: 'test'
   ...
 # Subtest: katakana word content matches tokens and teaches long marks in context
 ok 5 - katakana word content matches tokens and teaches long marks in context
   ---
-  duration_ms: 0.555846
+  duration_ms: 0.731574
   type: 'test'
   ...
 # Subtest: loanword exercises cover small ッ, ュ and ォ
 ok 6 - loanword exercises cover small ッ, ュ and ォ
   ---
-  duration_ms: 0.265449
+  duration_ms: 0.305984
   type: 'test'
   ...
 1..6
@@ -435,62 +435,62 @@ ok 6 - loanword exercises cover small ッ, ュ and ォ
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 144.687741
+# duration_ms 146.995702
 
 > japanese-tutor@0.11.0 test:numbers
 > node --experimental-strip-types --test src/engine/numberTrainer.test.ts
 
 TAP version 13
-# (node:3042) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/runner/work/japanese/japanese/src/engine/numberTrainer.test.ts is not specified and it doesn't parse as CommonJS.
+# (node:2919) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/runner/work/japanese/japanese/src/engine/numberTrainer.test.ts is not specified and it doesn't parse as CommonJS.
 # Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 # To eliminate this warning, add "type": "module" to /home/runner/work/japanese/japanese/package.json.
 # (Use `node --trace-warnings ...` to show where the warning was created)
 # Subtest: number readings cover regular and irregular place values
 ok 1 - number readings cover regular and irregular place values
   ---
-  duration_ms: 2.873589
+  duration_ms: 1.939335
   type: 'test'
   ...
 # Subtest: counter readings include important phonetic exceptions
 ok 2 - counter readings include important phonetic exceptions
   ---
-  duration_ms: 0.46596
+  duration_ms: 0.358521
   type: 'test'
   ...
 # Subtest: each module builds a full session without repeating a value
 ok 3 - each module builds a full session without repeating a value
   ---
-  duration_ms: 16.345187
+  duration_ms: 15.205445
   type: 'test'
   ...
 # Subtest: mixed practice uses multiple modules and unique meanings
 ok 4 - mixed practice uses multiple modules and unique meanings
   ---
-  duration_ms: 0.614113
+  duration_ms: 1.352255
   type: 'test'
   ...
 # Subtest: answer checking accepts formatting, kanji numerals and common variants
 ok 5 - answer checking accepts formatting, kanji numerals and common variants
   ---
-  duration_ms: 0.995747
+  duration_ms: 0.992302
   type: 'test'
   ...
 # Subtest: kanji does not silently replace a requested pronunciation answer
 ok 6 - kanji does not silently replace a requested pronunciation answer
   ---
-  duration_ms: 1.089348
+  duration_ms: 0.270712
   type: 'test'
   ...
 # Subtest: remediation uses a different value in the same skill
 ok 7 - remediation uses a different value in the same skill
   ---
-  duration_ms: 0.401754
+  duration_ms: 0.359563
   type: 'test'
   ...
 # Subtest: progress remains separate for each module and skill
 ok 8 - progress remains separate for each module and skill
   ---
-  duration_ms: 0.544428
+  duration_ms: 0.437749
   type: 'test'
   ...
 1..8
@@ -501,38 +501,38 @@ ok 8 - progress remains separate for each module and skill
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 148.365499
+# duration_ms 147.975897
 
 > japanese-tutor@0.11.0 test:speech
 > node --experimental-strip-types --test src/audio/japaneseSpeechText.test.ts
 
 TAP version 13
-# (node:3067) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/runner/work/japanese/japanese/src/audio/japaneseSpeechText.test.ts is not specified and it doesn't parse as CommonJS.
+# (node:2944) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/runner/work/japanese/japanese/src/audio/japaneseSpeechText.test.ts is not specified and it doesn't parse as CommonJS.
 # Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 # To eliminate this warning, add "type": "module" to /home/runner/work/japanese/japanese/package.json.
 # (Use `node --trace-warnings ...` to show where the warning was created)
 # Subtest: удаляет русские заполнители из грамматической формулы
 ok 1 - удаляет русские заполнители из грамматической формулы
   ---
-  duration_ms: 1.128396
+  duration_ms: 1.111838
   type: 'test'
   ...
 # Subtest: оставляет только японскую часть смешанного заголовка
 ok 2 - оставляет только японскую часть смешанного заголовка
   ---
-  duration_ms: 0.209775
+  duration_ms: 0.204644
   type: 'test'
   ...
 # Subtest: не меняет естественное японское предложение
 ok 3 - не меняет естественное японское предложение
   ---
-  duration_ms: 0.144147
+  duration_ms: 0.132016
   type: 'test'
   ...
 # Subtest: не запускает японский голос для текста без японских символов
 ok 4 - не запускает японский голос для текста без японских символов
   ---
-  duration_ms: 0.162114
+  duration_ms: 0.159977
   type: 'test'
   ...
 1..4
@@ -543,38 +543,38 @@ ok 4 - не запускает японский голос для текста �
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 100.86756
+# duration_ms 106.290919
 
 > japanese-tutor@0.11.0 test:exercise-speech
 > node --experimental-strip-types --test src/audio/exerciseSpeechText.test.ts
 
 TAP version 13
-# (node:3092) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/runner/work/japanese/japanese/src/audio/exerciseSpeechText.test.ts is not specified and it doesn't parse as CommonJS.
+# (node:2969) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/runner/work/japanese/japanese/src/audio/exerciseSpeechText.test.ts is not specified and it doesn't parse as CommonJS.
 # Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 # To eliminate this warning, add "type": "module" to /home/runner/work/japanese/japanese/package.json.
 # (Use `node --trace-warnings ...` to show where the warning was created)
 # Subtest: particle choices are spoken inside the complete sentence
 ok 1 - particle choices are spoken inside the complete sentence
   ---
-  duration_ms: 1.153925
+  duration_ms: 1.077408
   type: 'test'
   ...
 # Subtest: multiple particle gaps reconstruct the complete sentence
 ok 2 - multiple particle gaps reconstruct the complete sentence
   ---
-  duration_ms: 0.203085
+  duration_ms: 0.194288
   type: 'test'
   ...
 # Subtest: mixed Russian answer labels are never offered to Japanese TTS
 ok 3 - mixed Russian answer labels are never offered to Japanese TTS
   ---
-  duration_ms: 0.137607
+  duration_ms: 0.198775
   type: 'test'
   ...
 # Subtest: sentence builders are spoken as one sentence
 ok 4 - sentence builders are spoken as one sentence
   ---
-  duration_ms: 0.118869
+  duration_ms: 0.12798
   type: 'test'
   ...
 1..4
@@ -585,7 +585,7 @@ ok 4 - sentence builders are spoken as one sentence
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 102.191971
+# duration_ms 101.518103
 
 > japanese-tutor@0.11.0 test:content
 > tsx --test src/content/*.test.ts
@@ -594,286 +594,267 @@ TAP version 13
 # Subtest: lesson 11 keeps i-adjective predicate, noun and negative models separate
 ok 1 - lesson 11 keeps i-adjective predicate, noun and negative models separate
   ---
-  duration_ms: 1.183279
+  duration_ms: 1.141753
   type: 'test'
   ...
 # Subtest: lesson 12 teaches past i-adjectives and the irregular ii/yoi paradigm
 ok 2 - lesson 12 teaches past i-adjectives and the irregular ii/yoi paradigm
   ---
-  duration_ms: 0.350497
+  duration_ms: 0.359283
   type: 'test'
   ...
 # Subtest: lesson 13 treats kirei as a na-adjective and uses noun-style negation
 ok 3 - lesson 13 treats kirei as a na-adjective and uses noun-style negation
   ---
-  duration_ms: 0.258809
+  duration_ms: 0.267717
   type: 'test'
   ...
 # Subtest: all adjective lessons expose twelve mixed exercises after expansion
 ok 4 - all adjective lessons expose twelve mixed exercises after expansion
   ---
-  duration_ms: 0.259119
+  duration_ms: 0.296429
   type: 'test'
   ...
 # Subtest: lesson order is contiguous and each lesson appears in one matching unit
 ok 5 - lesson order is contiguous and each lesson appears in one matching unit
   ---
-  duration_ms: 1.962801
+  duration_ms: 2.533596
   type: 'test'
   ...
 # Subtest: all course ids are globally unique
 ok 6 - all course ids are globally unique
   ---
-  duration_ms: 0.207332
+  duration_ms: 0.279955
   type: 'test'
   ...
 # Subtest: lesson manifests match their bundle contents
 ok 7 - lesson manifests match their bundle contents
   ---
-  duration_ms: 0.494874
+  duration_ms: 0.662923
   type: 'test'
   ...
 # Subtest: sentence and exercise references resolve to real course items
 ok 8 - sentence and exercise references resolve to real course items
   ---
-  duration_ms: 0.967094
+  duration_ms: 1.153971
   type: 'test'
   ...
 # Subtest: lesson six remains the mixed-practice reference lesson
 ok 9 - lesson six remains the mixed-practice reference lesson
   ---
-  duration_ms: 0.245159
+  duration_ms: 0.240347
   type: 'test'
   ...
 # Subtest: every lesson has twelve semantically unique mixed exercises
 ok 10 - every lesson has twelve semantically unique mixed exercises
   ---
-  duration_ms: 0.679211
+  duration_ms: 0.615883
   type: 'test'
   ...
 # Subtest: remediation groups connect different content instead of cloning one sentence
 ok 11 - remediation groups connect different content instead of cloning one sentence
   ---
-  duration_ms: 0.611659
+  duration_ms: 0.563656
   type: 'test'
   ...
 # Subtest: generated listening uses full sentences and generated recall accepts readings
 ok 12 - generated listening uses full sentences and generated recall accepts readings
   ---
-  duration_ms: 0.386641
+  duration_ms: 0.309409
   type: 'test'
   ...
 # Subtest: new time and tense lessons keep noun and verb paradigms separate
 ok 13 - new time and tense lessons keep noun and verb paradigms separate
   ---
-  duration_ms: 0.643537
+  duration_ms: 0.655922
   type: 'test'
   ...
 # Subtest: final lesson sessions contain no repeated semantic or normalized tasks
 ok 14 - final lesson sessions contain no repeated semantic or normalized tasks
   ---
-  duration_ms: 4.95648
+  duration_ms: 4.492572
   type: 'test'
   ...
 # Subtest: multiple-choice distractors stay wrong after the same normalization as user answers
 ok 15 - multiple-choice distractors stay wrong after the same normalization as user answers
   ---
-  duration_ms: 23.644718
+  duration_ms: 22.51312
   type: 'test'
   ...
 # Subtest: particle feedback never speaks an isolated particle
 ok 16 - particle feedback never speaks an isolated particle
   ---
-  duration_ms: 1.471051
+  duration_ms: 1.477961
   type: 'test'
   ...
 # Subtest: listening exercises never use empty or one-character audio clips
-not ok 17 - listening exercises never use empty or one-character audio clips
+ok 17 - listening exercises never use empty or one-character audio clips
   ---
-  duration_ms: 4.590109
+  duration_ms: 0.678106
   type: 'test'
-  location: '/home/runner/work/japanese/japanese/src/content/courseQualityRegression.test.ts:2:3622'
-  failureType: 'testCodeFailure'
-  error: 'lesson-007-diverse-word-go-number-meaning-listening audio is too short'
-  code: 'ERR_ASSERTION'
-  name: 'AssertionError'
-  expected: true
-  actual: false
-  operator: '=='
-  stack: |-
-    <anonymous> (/home/runner/work/japanese/japanese/src/content/courseQualityRegression.test.ts:98:16)
-    Array.forEach (<anonymous>)
-    <anonymous> (/home/runner/work/japanese/japanese/src/content/courseQualityRegression.test.ts:96:8)
-    Array.forEach (<anonymous>)
-    TestContext.<anonymous> (/home/runner/work/japanese/japanese/src/content/courseQualityRegression.test.ts:93:17)
-    Test.runInAsyncScope (node:async_hooks:214:14)
-    Test.run (node:internal/test_runner/test:1047:25)
-    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
-    Test.postRun (node:internal/test_runner/test:1173:19)
-    Test.run (node:internal/test_runner/test:1101:12)
   ...
 # Subtest: sentence production accepts the taught kana reading
 ok 18 - sentence production accepts the taught kana reading
   ---
-  duration_ms: 9.516583
+  duration_ms: 9.158329
   type: 'test'
   ...
 # Subtest: previous kore/sore context regression stays fixed
 ok 19 - previous kore/sore context regression stays fixed
   ---
-  duration_ms: 0.53268
+  duration_ms: 0.528954
   type: 'test'
   ...
 # Subtest: destination tasks continue accepting both ni and e
 ok 20 - destination tasks continue accepting both ni and e
   ---
-  duration_ms: 1.53642
+  duration_ms: 1.610157
   type: 'test'
   ...
 # Subtest: comparison lesson accepts natural equivalent constructions
 ok 21 - comparison lesson accepts natural equivalent constructions
   ---
-  duration_ms: 0.896017
+  duration_ms: 1.158308
   type: 'test'
   ...
 # Subtest: new lesson durations are derived from their real study and practice load
 ok 22 - new lesson durations are derived from their real study and practice load
   ---
-  duration_ms: 0.451939
+  duration_ms: 0.452421
   type: 'test'
   ...
 # Subtest: new course answers do not contain known malformed adjective patterns
 ok 23 - new course answers do not contain known malformed adjective patterns
   ---
-  duration_ms: 0.686972
+  duration_ms: 0.718275
   type: 'test'
   ...
 # Subtest: kirei example chooses one contextual meaning instead of claiming both
 ok 24 - kirei example chooses one contextual meaning instead of claiming both
   ---
-  duration_ms: 0.218348
+  duration_ms: 0.186397
   type: 'test'
   ...
 # Subtest: superlative example uses the reviewed group pattern
 ok 25 - superlative example uses the reviewed group pattern
   ---
-  duration_ms: 0.143055
+  duration_ms: 0.14872
   type: 'test'
   ...
 # Subtest: busy and genki examples use one clear contextual Russian meaning
 ok 26 - busy and genki examples use one clear contextual Russian meaning
   ---
-  duration_ms: 0.91791
+  duration_ms: 1.269252
   type: 'test'
   ...
 # Subtest: kirei example does not merge beautiful and clean into one claim
 ok 27 - kirei example does not merge beautiful and clean into one claim
   ---
-  duration_ms: 0.147772
+  duration_ms: 0.194648
   type: 'test'
   ...
 # Subtest: formal i-adjective past negative remains accepted
 ok 28 - formal i-adjective past negative remains accepted
   ---
-  duration_ms: 0.746603
+  duration_ms: 1.050938
   type: 'test'
   ...
 # Subtest: conversational na-adjective negatives remain accepted
 ok 29 - conversational na-adjective negatives remain accepted
   ---
-  duration_ms: 0.471458
+  duration_ms: 0.783312
   type: 'test'
   ...
 # Subtest: handwriting is an explicit interactive practice mode
 ok 30 - handwriting is an explicit interactive practice mode
   ---
-  duration_ms: 1.189628
+  duration_ms: 1.114533
   type: 'test'
   ...
 # Subtest: handwriting self-check records success or schedules honest remediation
 ok 31 - handwriting self-check records success or schedules honest remediation
   ---
-  duration_ms: 0.912912
+  duration_ms: 0.599979
   type: 'test'
   ...
 # Subtest: handwriting with no reference can never be marked correct accidentally
 ok 32 - handwriting with no reference can never be marked correct accidentally
   ---
-  duration_ms: 0.258348
+  duration_ms: 0.158245
   type: 'test'
   ...
 # Subtest: edge swipe goes back without stealing an interior handwriting stroke
 ok 33 - edge swipe goes back without stealing an interior handwriting stroke
   ---
-  duration_ms: 0.399089
+  duration_ms: 0.290671
   type: 'test'
   ...
 # Subtest: vertical scrolling and short accidental movement never navigate
 ok 34 - vertical scrolling and short accidental movement never navigate
   ---
-  duration_ms: 0.208424
+  duration_ms: 0.135782
   type: 'test'
   ...
 # Subtest: lesson pages support deliberate left swipe forward
 ok 35 - lesson pages support deliberate left swipe forward
   ---
-  duration_ms: 0.217918
+  duration_ms: 0.153747
   type: 'test'
   ...
 # Subtest: manual vocabulary reading practice suppresses its generated duplicate
 ok 36 - manual vocabulary reading practice suppresses its generated duplicate
   ---
-  duration_ms: 1.085031
+  duration_ms: 1.168092
   type: 'test'
   ...
 # Subtest: lessons 11-16 retain unique sentence-building practice
 ok 37 - lessons 11-16 retain unique sentence-building practice
   ---
-  duration_ms: 0.237727
+  duration_ms: 0.30335
   type: 'test'
   ...
 # Subtest: lesson 14 applies noun-style past forms to na-adjectives
 ok 38 - lesson 14 applies noun-style past forms to na-adjectives
   ---
-  duration_ms: 0.894204
+  duration_ms: 0.866485
   type: 'test'
   ...
 # Subtest: lesson 15 distinguishes preference and skill patterns with ga
 ok 39 - lesson 15 distinguishes preference and skill patterns with ga
   ---
-  duration_ms: 0.206921
+  duration_ms: 0.185826
   type: 'test'
   ...
 # Subtest: lesson 15 accepts equivalent dislike wording and an omitted understood topic
 ok 40 - lesson 15 accepts equivalent dislike wording and an omitted understood topic
   ---
-  duration_ms: 1.978273
+  duration_ms: 2.210708
   type: 'test'
   ...
 # Subtest: lesson 16 keeps comparison direction, binary choice and superlative distinct
 ok 41 - lesson 16 keeps comparison direction, binary choice and superlative distinct
   ---
-  duration_ms: 0.170716
+  duration_ms: 0.176302
   type: 'test'
   ...
 # Subtest: lesson 16 accepts natural comparison alternatives without replacing the taught model
 ok 42 - lesson 16 accepts natural comparison alternatives without replacing the taught model
   ---
-  duration_ms: 0.993914
+  duration_ms: 0.938822
   type: 'test'
   ...
 # Subtest: lessons 14-16 expose twelve mixed exercises after expansion
 ok 43 - lessons 14-16 expose twelve mixed exercises after expansion
   ---
-  duration_ms: 0.20601
+  duration_ms: 0.206527
   type: 'test'
   ...
 1..43
 # tests 43
 # suites 0
-# pass 42
-# fail 1
+# pass 43
+# fail 0
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 1040.459147
+# duration_ms 1026.888885
