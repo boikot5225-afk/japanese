@@ -26,7 +26,7 @@ export const lesson032Grammar: GrammarPoint[] = [
     explanationRu: "Возьми ～ない-форму, замени ない на なくて и добавь もいいです: 行かない→行かなくてもいいです — «Можно не идти / не обязательно идти». Это разрешение отказаться от действия.",
     formation: ["[～ない без い] + くてもいいです", "行かない → 行かなくてもいいです", "しない → しなくてもいいです"],
     cautions: ["～なくてもいいです не означает запрет. Оно говорит, что действие можно не выполнять."],
-    relatedGrammarIds: ["grammar-nai-form-role", "grammar-te-mo-ii-permission", "grammar-nakereba-narimasen"], jlptLevel: "N5",
+    relatedGrammarIds: ["grammar-nai-form-role", "grammar-te-mo-ii", "grammar-nakereba-narimasen"], jlptLevel: "N5",
   },
   {
     id: "grammar-no-need-vs-prohibition", type: "grammar", title: "«Не обязательно» и «нельзя»",
@@ -49,7 +49,7 @@ export const lesson032Sentences: ExampleSentence[] = [
 
 const confusions = ["grammar-nakereba-narimasen", "grammar-nakereba-formation", "grammar-nakute-mo-ii", "grammar-no-need-vs-prohibition", "grammar-te-wa-ikemasen"];
 export const lesson032Exercises: Exercise[] = [
-  { id: "exercise-32-suru-duty", type: "conjugation", prompt: "Закончи обязанность: する → ...なければなりません.", targetItemIds: ["grammar-nakereba-formation", "word-shukudai-25"], correctAnswers: ["し"], distractors: ["しない", "して", "する"], explanationRu: "しない без конечного い даёт し + なければなりません.", variantGroup: "lesson-032:duty", difficulty: 1, confusionItemIds: confusions },
+  { id: "exercise-32-suru-duty", type: "conjugation", prompt: "Поставь する в форму ～なければなりません.", targetItemIds: ["grammar-nakereba-formation", "word-shukudai-25"], correctAnswers: ["しなければなりません"], distractors: ["しないければなりません", "してなりません", "しなくてもいいです"], explanationRu: "する→しない→しなければなりません.", variantGroup: "lesson-032:duty", difficulty: 1, confusionItemIds: confusions },
   { id: "exercise-32-iku-duty", type: "conjugation", prompt: "Поставь 行く в форму ～なければなりません.", targetItemIds: ["grammar-nakereba-narimasen", "word-ikimasu"], correctAnswers: ["行かなければなりません"], acceptableAnswers: ["いかなければなりません"], distractors: ["行かないければなりません", "行ってなりません", "行かなくてもいいです"], explanationRu: "行く→行かない→行かなければなりません.", variantGroup: "lesson-032:duty", difficulty: 2, confusionItemIds: confusions },
   { id: "exercise-32-motsu-no-need", type: "conjugation", prompt: "Поставь 持つ в форму «можно не брать».", targetItemIds: ["grammar-nakute-mo-ii", "word-mochimasu-28"], correctAnswers: ["持たなくてもいいです"], acceptableAnswers: ["もたなくてもいいです"], distractors: ["持たないてもいいです", "持ってはいけません", "持たなければなりません"], explanationRu: "持つ→持たない→持たなくてもいいです.", variantGroup: "lesson-032:no-need", difficulty: 2, confusionItemIds: confusions },
   { id: "exercise-32-meaning-contrast", type: "multiple-choice", prompt: "Что означает テレビを見なくてもいいです?", targetItemIds: ["grammar-no-need-vs-prohibition", "word-terebi", "word-mimasu"], correctAnswers: ["Телевизор можно не смотреть"], distractors: ["Телевизор смотреть нельзя", "Телевизор нужно посмотреть", "Я не умею смотреть телевизор"], explanationRu: "～なくてもいいです снимает обязанность, но не запрещает действие.", variantGroup: "lesson-032:contrast", difficulty: 1, confusionItemIds: confusions },
