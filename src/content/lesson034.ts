@@ -47,7 +47,7 @@ export const lesson034Sentences: ExampleSentence[] = [
   { id: "sentence-34-food-question", type: "sentence", japanese: "もう日本料理を食べましたか。", reading: "もうにほんりょうりをたべましたか。", translationRu: "Вы уже ели японскую кухню?", grammarIds: ["grammar-mou-mashita-ka", "grammar-masu-past", "grammar-ka-question", "grammar-o-object"], vocabularyIds: ["word-mou-34", "word-ryouri", "word-tabemasu"] },
   { id: "sentence-34-not-yet-short", type: "sentence", japanese: "いいえ、まだです。", reading: "いいえ、まだです。", translationRu: "Нет, ещё нет.", grammarIds: ["grammar-mou-mashita-ka", "grammar-desu"], vocabularyIds: ["word-mada-34"] },
   { id: "sentence-34-homework-not-yet", type: "sentence", japanese: "まだ宿題をしていません。", reading: "まだしゅくだいをしていません。", translationRu: "Я ещё не сделал домашнее задание.", grammarIds: ["grammar-mada-te-imasen", "grammar-te-form-group2-irregular", "grammar-o-object"], vocabularyIds: ["word-mada-34", "word-shukudai-25"] },
-  { id: "sentence-34-rain-still", type: "sentence", japanese: "まだ雨が降っています。", reading: "まだあめがふっています。", translationRu: "Дождь всё ещё идёт.", grammarIds: ["grammar-mada-continuing", "grammar-te-imasu-ongoing", "grammar-ga-subject"], vocabularyIds: ["word-mada-34", "word-ame-28", "word-furimasu-34"] },
+  { id: "sentence-34-rain-still", type: "sentence", japanese: "まだ雨が降っています。", reading: "まだあめがふっています。", translationRu: "Дождь всё ещё идёт.", grammarIds: ["grammar-mada-continuing", "grammar-te-imasu-ongoing"], vocabularyIds: ["word-mada-34", "word-ame-28", "word-furimasu-34"] },
 ];
 
 const confusions = ["grammar-mou-past", "grammar-mada-te-imasen", "grammar-mada-continuing", "grammar-mou-mashita-ka", "grammar-masu-past", "grammar-te-imasu-ongoing"];
