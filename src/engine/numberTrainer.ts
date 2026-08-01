@@ -1,3 +1,5 @@
+import { parseJapaneseInteger } from "./japaneseNumerals.ts";
+
 export type NumberSetId =
   | "basic"
   | "tens"
@@ -329,13 +331,14 @@ const normalizeKana = (value: string): string =>
       String.fromCharCode(character.charCodeAt(0) - 0x60),
     );
 
-const normalizeDigits = (value: string): string =>
-  value
+const normalizeNumericValue = (value: string): string => {
+  const cleaned = value
     .trim()
-    .replace(/[０-９]/gu, (character) =>
-      String.fromCharCode(character.charCodeAt(0) - 0xfee0),
-    )
+    .normalize("NFKC")
     .replace(/[\s　,，._]/gu, "");
+  const parsed = parseJapaneseInteger(cleaned);
+  return parsed === null ? cleaned : String(parsed);
+};
 
 const seededRandom = (seed: number): (() => number) => {
   let state = seed >>> 0 || 0x9e3779b9;
@@ -455,8 +458,8 @@ export function createNumberQuestion(
     return {
       ...common,
       prompt: set.section === "counters"
-        ? `Сколько предметов или единиц обозначает ${reading}? Введи только число.`
-        : `Какое число записано: ${reading}?`,
+        ? `Сколько предметов или единиц обозначает ${reading}? Введи число цифрами или кандзи.`
+        : `Какое число записано: ${reading}? Введи цифрами или кандзи.`,
       displayText: reading,
       keyboard: "numeric",
       correctAnswers: [String(value)],
@@ -466,8 +469,8 @@ export function createNumberQuestion(
     return {
       ...common,
       prompt: set.section === "counters"
-        ? "Прослушай количество и введи только число."
-        : "Прослушай число и введи его цифрами.",
+        ? "Прослушай количество и введи число цифрами или кандзи."
+        : "Прослушай число и введи его цифрами или кандзи.",
       keyboard: "numeric",
       correctAnswers: [String(value)],
     };
@@ -557,25 +560,34 @@ export function checkNumberAnswer(
   question: NumberQuestion,
   answer: string,
 ): NumberAnswerResult {
-  const expectsDigits =
+  const expectsNumericValue =
     question.mode === "kana-to-digits" || question.mode === "listening-to-digits";
-  const normalize = expectsDigits ? normalizeDigits : normalizeKana;
+  const normalize = expectsNumericValue ? normalizeNumericValue : normalizeKana;
   const normalizedAnswer = normalize(answer);
   const correct = question.correctAnswers.map(normalize).includes(normalizedAnswer);
   if (correct) {
+    const usedKanjiNumeral =
+      expectsNumericValue && /[〇零一二三四五六七八九十百千万]/u.test(answer);
     return {
       correct: true,
       correctAnswer: question.correctAnswers[0] ?? "",
-      feedback: "Верно.",
+      feedback: usedKanjiNumeral
+        ? "Верно. Японская запись числа тоже засчитывается."
+        : "Верно.",
     };
   }
 
   let feedback = "Получилось другое значение.";
-  if (expectsDigits) {
-    if (!/^\d+$/u.test(normalizedAnswer)) feedback = "Здесь нужны только арабские цифры.";
-    else if (normalizedAnswer.length !== String(question.value).length) {
+  if (expectsNumericValue) {
+    if (parseJapaneseInteger(answer) === null) {
+      feedback = "Введи число арабскими цифрами или японскими числительными, например 9 или 九.";
+    } else if (normalizedAnswer.length !== String(question.value).length) {
       feedback = "Проверь разрядность: возможно, потерян или добавлен ноль.";
-    } else feedback = "Проверь порядок разрядов числа.";
+    } else {
+      feedback = "Проверь порядок разрядов числа.";
+    }
+  } else if (parseJapaneseInteger(answer) === question.value) {
+    feedback = `Число выбрано верно, но здесь проверяется произношение. Напиши хираганой: ${question.correctAnswers[0] ?? ""}.`;
   } else if (isCounterSet(question.sourceSetId)) {
     feedback = "Основа числа узнаваема, но проверь изменение звука у счётного слова.";
   } else if (["hundreds", "thousands"].includes(question.sourceSetId)) {
