@@ -31,10 +31,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          mkdir -p exported
           gh release download build-0.11.0-preview \
             --repo "$GITHUB_REPOSITORY" \
-            --pattern "Japanese-0.11.0-debug.apk" \
+            --pattern "*.apk" \
             --dir exported
+          DOWNLOADED_APK="$(find exported -maxdepth 1 -type f -name '*.apk' | head -n 1)"
+          test -n "$DOWNLOADED_APK"
+          mv "$DOWNLOADED_APK" exported/Japanese-0.11.0-debug.apk
 
       - name: Upload APK artifact
         id: upload
