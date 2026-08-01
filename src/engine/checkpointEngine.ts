@@ -171,6 +171,38 @@ export function updateCheckpointProgress(
   return [updated, ...progress.filter((item) => item.checkpointId !== checkpointId)];
 }
 
+export function reconcileCheckpointProgress(
+  progress: readonly CheckpointProgress[],
+  completedLessonIds: readonly string[],
+): CheckpointProgress[] {
+  const completedIndexes = completedLessonIds
+    .map((lessonId) => lessonBundles.findIndex((bundle) => bundle.lesson.id === lessonId))
+    .filter((index) => index >= 0);
+  if (completedIndexes.length === 0) return [...progress];
+
+  const furthestCompletedIndex = Math.max(...completedIndexes);
+  return courseCheckpoints.reduce<CheckpointProgress[]>((items, checkpoint) => {
+    if (!checkpoint.unlockLessonId) return items;
+    const unlockIndex = lessonBundles.findIndex(
+      (bundle) => bundle.lesson.id === checkpoint.unlockLessonId,
+    );
+    if (unlockIndex < 0 || furthestCompletedIndex < unlockIndex) return items;
+
+    const existing = items.find((item) => item.checkpointId === checkpoint.id);
+    if (existing?.passed) return items;
+
+    const inferred: CheckpointProgress = {
+      checkpointId: checkpoint.id,
+      passed: true,
+      bestPercent: 100,
+      lastPercent: existing?.lastPercent ?? 100,
+      attemptCount: Math.max(existing?.attemptCount ?? 0, 1),
+      lastAttemptAt: existing?.lastAttemptAt ?? new Date(0).toISOString(),
+    };
+    return [inferred, ...items.filter((item) => item.checkpointId !== checkpoint.id)];
+  }, [...progress]);
+}
+
 export const isCheckpointPassed = (
   checkpointId: string,
   progress: readonly CheckpointProgress[],
