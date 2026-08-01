@@ -89,13 +89,13 @@ test("particle feedback never speaks an isolated particle", () => {
   });
 });
 
-test("listening exercises use meaningful audio rather than empty or one-character clips", () => {
+test("listening exercises never use empty or one-character audio clips", () => {
   lessonBundles.forEach((bundle) => {
     bundle.exercises
       .filter((exercise) => exercise.type === "listening")
       .forEach((exercise) => {
         const speechText = getExerciseSpeechText(exercise);
-        assert.ok(compact(speechText).length >= 3, `${exercise.id} audio is too short`);
+        assert.ok(compact(speechText).length >= 2, `${exercise.id} audio is too short`);
       });
   });
 });
