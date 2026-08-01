@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { courseCheckpoints } from "../content/courseCheckpoints";
+import {
+  courseCheckpoints,
+  type CourseCheckpoint,
+} from "../content/courseCheckpoints";
 import { lessonBundles } from "../content/courseCatalog";
+import type { LessonBundle } from "../content/lessonBundle";
 import {
   buildCheckpointQueue,
   calculateCheckpointResult,
@@ -40,6 +44,57 @@ test("every checkpoint can fill its requested size with unique content", () => {
       checkpoint.id,
     );
   });
+});
+
+test("manual handwriting self-assessment is excluded from graded checkpoints", () => {
+  const checkpoint: CourseCheckpoint = {
+    id: "checkpoint-handwriting-safety",
+    unitId: "unit-test",
+    title: "Проверка объективной оценки",
+    description: "Ручная самооценка не должна влиять на проходной балл.",
+    lessonIds: ["lesson-handwriting-safety"],
+    questionCount: 2,
+    passPercent: 80,
+  };
+  const bundle: LessonBundle = {
+    lesson: {
+      id: "lesson-handwriting-safety",
+      unitId: "unit-test",
+      order: 999,
+      title: "Тест",
+      description: "Тест",
+      theory: [],
+      itemIds: ["word-test"],
+      exerciseIds: ["objective-question", "manual-writing-question"],
+      estimatedMinutes: 1,
+    },
+    vocabulary: [],
+    grammar: [],
+    sentences: [],
+    exercises: [
+      {
+        id: "objective-question",
+        type: "multiple-choice",
+        prompt: "Выбери ответ",
+        targetItemIds: ["word-test"],
+        correctAnswers: ["正"],
+        distractors: ["誤"],
+      },
+      {
+        id: "manual-writing-question",
+        type: "handwriting",
+        prompt: "Напиши знак",
+        targetItemIds: ["word-test"],
+        correctAnswers: ["字"],
+        difficulty: 4,
+      },
+    ],
+    outcomes: [],
+  };
+
+  const queue = buildCheckpointQueue(checkpoint, [bundle], ["word-test"]);
+  assert.deepEqual(queue.map((question) => question.exercise.id), ["objective-question"]);
+  assert.ok(queue.every((question) => question.exercise.type !== "handwriting"));
 });
 
 test("checkpoint uses an 80 percent pass boundary", () => {
