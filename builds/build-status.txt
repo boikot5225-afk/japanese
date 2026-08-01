@@ -1,0 +1,8 @@
+source_commit=501340096820d6e6cca8b793c9c332f063c65b2d
+install=success
+tests=failure
+typecheck_app=skipped
+typecheck_tests=skipped
+prebuild=skipped
+gradle=skipped
+release=skipped
