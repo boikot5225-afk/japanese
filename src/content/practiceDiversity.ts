@@ -173,7 +173,7 @@ const createVocabularyExercises = (
   const readingKey = `vocabulary:${word.id}:reading`;
   const writtenKey = `vocabulary:${word.id}:written`;
 
-  return [
+  const exercises: Exercise[] = [
     {
       id: vocabularyExerciseId(bundle, word, "meaning-choice"),
       type: "multiple-choice",
@@ -255,7 +255,9 @@ const createVocabularyExercises = (
       difficulty: 2,
       confusionItemIds: confusions,
     },
-  ].filter(
+  ];
+
+  return exercises.filter(
     (exercise) =>
       exercise.type !== "listening" ||
       normalizeText(exercise.audioText ?? "").length >= 2,
