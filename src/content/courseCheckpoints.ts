@@ -120,6 +120,17 @@ export const courseCheckpoints: readonly CourseCheckpoint[] = [
     questionCount: 18,
     passPercent: 80,
   },
+  {
+    id: "checkpoint-unit-011",
+    unitId: "unit-011",
+    title: "Контрольная точка: мысли, речь и планы",
+    description:
+      "Проверка уроков 37–40: ～と思います, прямая и косвенная речь с と言います, намерение ～つもり, план ～予定 и вероятность ～でしょう.",
+    lessonIds: ["lesson-037", "lesson-038", "lesson-039", "lesson-040"],
+    unlockLessonId: "lesson-041",
+    questionCount: 18,
+    passPercent: 80,
+  },
 ];
 
 export const findCheckpoint = (checkpointId: string): CourseCheckpoint | undefined =>
