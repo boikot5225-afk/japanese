@@ -42,25 +42,62 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install dependencies
-        run: npm install
+        id: install
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p builds
+          set -o pipefail
+          npm install 2>&1 | tee builds/install.log
 
       - name: Run full test suite
-        run: npm test
+        id: tests
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee builds/tests.log
 
       - name: Run application TypeScript check
-        run: npm run typecheck
+        id: app_types
+        if: steps.tests.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run typecheck 2>&1 | tee builds/typecheck-app.log
 
       - name: Run test TypeScript check
-        run: npm run typecheck:tests
+        id: test_types
+        if: steps.app_types.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run typecheck:tests 2>&1 | tee builds/typecheck-tests.log
 
       - name: Generate Android project
-        run: npx expo prebuild --platform android --no-install
+        id: prebuild
+        if: steps.test_types.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npx expo prebuild --platform android --no-install 2>&1 | tee builds/prebuild.log
 
       - name: Build debug APK
-        working-directory: android
-        run: ./gradlew app:assembleDebug --no-daemon --stacktrace
+        id: gradle
+        if: steps.prebuild.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          cd android
+          ./gradlew app:assembleDebug --no-daemon --stacktrace 2>&1 | tee ../builds/gradle.log
 
-      - name: Upload APK
+      - name: Upload workflow APK artifact
+        if: steps.gradle.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: Japanese-debug-apk
@@ -68,17 +105,73 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish branch APK
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/agent/')
+      - name: Publish preview release
+        id: release
+        if: steps.gradle.outcome == 'success' && github.event_name == 'push' && startsWith(github.ref, 'refs/heads/agent/')
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          TAG="build-0.11.0-preview"
+          APK="android/app/build/outputs/apk/debug/app-debug.apk"
+          gh release delete "$TAG" --cleanup-tag --yes >/dev/null 2>&1 || true
+          gh release create "$TAG" "$APK#Japanese-0.11.0-debug.apk" \
+            --target "$GITHUB_SHA" \
+            --title "Japanese Tutor 0.11.0 preview" \
+            --notes "Тестовая Android-сборка уроков 1–16, исправленного текстового ввода и навигации жестами." \
+            --prerelease
+
+      - name: Publish build report to branch
+        if: always() && github.event_name == 'push' && startsWith(github.ref, 'refs/heads/agent/')
+        env:
+          INSTALL_OUTCOME: ${{ steps.install.outcome }}
+          TESTS_OUTCOME: ${{ steps.tests.outcome }}
+          APP_TYPES_OUTCOME: ${{ steps.app_types.outcome }}
+          TEST_TYPES_OUTCOME: ${{ steps.test_types.outcome }}
+          PREBUILD_OUTCOME: ${{ steps.prebuild.outcome }}
+          GRADLE_OUTCOME: ${{ steps.gradle.outcome }}
+          RELEASE_OUTCOME: ${{ steps.release.outcome }}
+        shell: bash
         run: |
           mkdir -p builds
-          cp android/app/build/outputs/apk/debug/app-debug.apk builds/Japanese-0.11.0-debug.apk
+          {
+            echo "source_commit=$GITHUB_SHA"
+            echo "install=$INSTALL_OUTCOME"
+            echo "tests=$TESTS_OUTCOME"
+            echo "typecheck_app=$APP_TYPES_OUTCOME"
+            echo "typecheck_tests=$TEST_TYPES_OUTCOME"
+            echo "prebuild=$PREBUILD_OUTCOME"
+            echo "gradle=$GRADLE_OUTCOME"
+            echo "release=$RELEASE_OUTCOME"
+          } > builds/build-status.txt
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- builds/Japanese-0.11.0-debug.apk
+          git add -- builds/build-status.txt builds/*.log
           if git diff --cached --quiet; then
-            echo "APK unchanged"
             exit 0
           fi
-          git commit -m "Publish Japanese 0.11.0 APK [skip build]"
+          git commit -m "Report Japanese 0.11.0 build [skip build]"
           git push
+
+      - name: Enforce successful build
+        if: always()
+        env:
+          INSTALL_OUTCOME: ${{ steps.install.outcome }}
+          TESTS_OUTCOME: ${{ steps.tests.outcome }}
+          APP_TYPES_OUTCOME: ${{ steps.app_types.outcome }}
+          TEST_TYPES_OUTCOME: ${{ steps.test_types.outcome }}
+          PREBUILD_OUTCOME: ${{ steps.prebuild.outcome }}
+          GRADLE_OUTCOME: ${{ steps.gradle.outcome }}
+          RELEASE_OUTCOME: ${{ steps.release.outcome }}
+        shell: bash
+        run: |
+          test "$INSTALL_OUTCOME" = success
+          test "$TESTS_OUTCOME" = success
+          test "$APP_TYPES_OUTCOME" = success
+          test "$TEST_TYPES_OUTCOME" = success
+          test "$PREBUILD_OUTCOME" = success
+          test "$GRADLE_OUTCOME" = success
+          if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF" == refs/heads/agent/* ]]; then
+            test "$RELEASE_OUTCOME" = success
+          fi
