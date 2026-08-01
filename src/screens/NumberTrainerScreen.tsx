@@ -50,6 +50,9 @@ const sessionTitle = (sessionId: NumberSessionId): string =>
 const sectionLabel = (section: NumberTrainingSet["section"]): string =>
   section === "numbers" ? "Числа и разряды" : "Счётные слова";
 
+const isReadingFormatMismatch = (result: NumberAnswerResult): boolean =>
+  !result.correct && result.feedback.startsWith("Число выбрано верно");
+
 export function NumberTrainerScreen({ onCourse }: NumberTrainerScreenProps) {
   const [hydrated, setHydrated] = useState(false);
   const [progress, setProgress] = useState<NumberProgressMap>({});
@@ -115,6 +118,9 @@ export function NumberTrainerScreen({ onCourse }: NumberTrainerScreenProps) {
     if (!currentQuestion || answerResult || answer.trim().length === 0) return;
     const checked = checkNumberAnswer(currentQuestion, answer);
     setAnswerResult(checked);
+
+    if (isReadingFormatMismatch(checked)) return;
+
     setStats((previous) => ({
       correct: previous.correct + (checked.correct ? 1 : 0),
       total: previous.total + 1,
@@ -200,6 +206,9 @@ export function NumberTrainerScreen({ onCourse }: NumberTrainerScreenProps) {
 
   if (viewMode === "session" && currentQuestion) {
     const selectedChoice = currentQuestion.choices?.includes(answer) ?? false;
+    const readingFormatMismatch = answerResult
+      ? isReadingFormatMismatch(answerResult)
+      : false;
     const canPlaySpeech = Boolean(
       currentQuestion.speechText &&
         (currentQuestion.mode === "listening-to-digits" || answerResult),
@@ -287,28 +296,37 @@ export function NumberTrainerScreen({ onCourse }: NumberTrainerScreenProps) {
                 <View
                   style={[
                     numberStyles.feedback,
-                    answerResult.correct
+                    answerResult.correct || readingFormatMismatch
                       ? numberStyles.feedbackCorrect
                       : numberStyles.feedbackIncorrect,
                   ]}
                 >
                   <Text style={numberStyles.feedbackTitle}>
-                    {answerResult.correct ? "Верно" : "Нужно поправить"}
+                    {answerResult.correct
+                      ? "Верно"
+                      : readingFormatMismatch
+                        ? "Число распознано"
+                        : "Нужно поправить"}
                   </Text>
                   <Text style={numberStyles.feedbackBody}>{answerResult.feedback}</Text>
                   {!answerResult.correct && (
                     <Text style={numberStyles.correctAnswer}>
-                      Правильный ответ: {answerResult.correctAnswer}
+                      {readingFormatMismatch ? "Напиши хираганой" : "Правильный ответ"}:{" "}
+                      {answerResult.correctAnswer}
                     </Text>
                   )}
                   <Text style={numberStyles.feedbackBody}>{currentQuestion.explanation}</Text>
                 </View>
                 <TouchableOpacity
                   style={numberStyles.continueButton}
-                  onPress={continueSession}
+                  onPress={readingFormatMismatch ? resetQuestionState : continueSession}
                 >
                   <Text style={numberStyles.continueButtonText}>
-                    {queue[questionIndex + 1] ? "Дальше" : "Завершить"}
+                    {readingFormatMismatch
+                      ? "Ввести чтение"
+                      : queue[questionIndex + 1]
+                        ? "Дальше"
+                        : "Завершить"}
                   </Text>
                 </TouchableOpacity>
               </>

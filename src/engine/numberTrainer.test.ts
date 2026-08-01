@@ -57,7 +57,7 @@ test("mixed practice uses multiple modules and unique meanings", () => {
   assert.equal(new Set(queue.map((question) => question.semanticKey)).size, queue.length);
 });
 
-test("answer checking accepts formatting and common variants", () => {
+test("answer checking accepts formatting, kanji numerals and common variants", () => {
   const numberQuestion = createNumberQuestion("hundreds", 600, "digits-to-kana");
   assert.equal(checkNumberAnswer(numberQuestion, "ろっぴゃく。 ").correct, true);
 
@@ -70,6 +70,20 @@ test("answer checking accepts formatting and common variants", () => {
   const listeningQuestion = createNumberQuestion("man", 23456, "listening-to-digits");
   assert.equal(checkNumberAnswer(listeningQuestion, "23 456").correct, true);
   assert.equal(checkNumberAnswer(listeningQuestion, "２３４５６").correct, true);
+  assert.equal(
+    checkNumberAnswer(listeningQuestion, "二万三千四百五十六").correct,
+    true,
+  );
+
+  const hourQuestion = createNumberQuestion("hours", 9, "kana-to-digits");
+  assert.equal(checkNumberAnswer(hourQuestion, "九").correct, true);
+});
+
+test("kanji does not silently replace a requested pronunciation answer", () => {
+  const readingQuestion = createNumberQuestion("hours", 9, "digits-to-kana");
+  const result = checkNumberAnswer(readingQuestion, "九");
+  assert.equal(result.correct, false);
+  assert.match(result.feedback, /произношение/u);
 });
 
 test("remediation uses a different value in the same skill", () => {
