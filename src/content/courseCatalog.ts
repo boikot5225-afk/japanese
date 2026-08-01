@@ -28,6 +28,10 @@ import { lesson021Bundle } from "./lesson021";
 import { lesson022Bundle } from "./lesson022";
 import { lesson023Bundle } from "./lesson023";
 import { lesson024Bundle } from "./lesson024";
+import { lesson025Bundle } from "./lesson025";
+import { lesson026Bundle } from "./lesson026";
+import { lesson027Bundle } from "./lesson027";
+import { lesson028Bundle } from "./lesson028";
 import type { Lesson } from "../domain/course";
 import type { LessonBundle } from "./lessonBundle";
 import { diversifyLessonPractice } from "./practiceDiversity";
@@ -79,6 +83,10 @@ const baseLessonBundles: readonly LessonBundle[] = [
   lesson022Bundle,
   lesson023Bundle,
   lesson024Bundle,
+  lesson025Bundle,
+  lesson026Bundle,
+  lesson027Bundle,
+  lesson028Bundle,
 ];
 
 const expandedLessonBundles: readonly LessonBundle[] = baseLessonBundles.map((bundle) =>
@@ -225,6 +233,19 @@ export const courseUnits: CourseUnit[] = [
       requireLesson("lesson-022"),
       requireLesson("lesson-023"),
       requireLesson("lesson-024"),
+    ],
+  },
+  {
+    id: "unit-008",
+    title: "Прошлое, порядок и причины",
+    description:
+      "Простое прошедшее ～た, отрицание ～なかった, действия до и после, объяснение причины через から.",
+    jlptLevel: "N5",
+    lessons: [
+      requireLesson("lesson-025"),
+      requireLesson("lesson-026"),
+      requireLesson("lesson-027"),
+      requireLesson("lesson-028"),
     ],
   },
 ];
