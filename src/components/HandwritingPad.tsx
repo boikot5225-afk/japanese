@@ -105,39 +105,51 @@ export function HandwritingPad({
       >
         <View pointerEvents="none" style={styles.verticalGuide} />
         <View pointerEvents="none" style={styles.horizontalGuide} />
-        <Text
-          pointerEvents="none"
-          style={[
-            styles.reference,
-            displayReference.length > 2 && styles.referenceCompact,
-            showReference ? styles.referenceVisible : styles.referenceGhost,
-          ]}
-        >
-          {displayReference}
-        </Text>
-        {strokes.flatMap((stroke, strokeIndex) =>
-          stroke.slice(1).map((point, pointIndex) => {
-            const previous = stroke[pointIndex];
-            if (!previous) return null;
-            const length = pointDistance(previous, point);
-            const angle = Math.atan2(point.y - previous.y, point.x - previous.x);
-            return (
+        <View pointerEvents="none" style={styles.referenceLayer}>
+          <Text
+            style={[
+              styles.reference,
+              displayReference.length > 2 && styles.referenceCompact,
+              showReference ? styles.referenceVisible : styles.referenceGhost,
+            ]}
+          >
+            {displayReference}
+          </Text>
+        </View>
+        {strokes.map((stroke, strokeIndex) => {
+          const first = stroke[0];
+          if (!first) return null;
+          return (
+            <View key={`stroke-${strokeIndex}`} pointerEvents="none" style={styles.strokeLayer}>
               <View
-                key={`${strokeIndex}-${pointIndex}`}
-                pointerEvents="none"
                 style={[
-                  styles.segment,
-                  {
-                    left: (previous.x + point.x) / 2 - length / 2,
-                    top: (previous.y + point.y) / 2 - 4,
-                    width: Math.max(length, 5),
-                    transform: [{ rotateZ: `${angle}rad` }],
-                  },
+                  styles.strokeDot,
+                  { left: first.x - 4, top: first.y - 4 },
                 ]}
               />
-            );
-          }),
-        )}
+              {stroke.slice(1).map((point, pointIndex) => {
+                const previous = stroke[pointIndex];
+                if (!previous) return null;
+                const length = pointDistance(previous, point);
+                const angle = Math.atan2(point.y - previous.y, point.x - previous.x);
+                return (
+                  <View
+                    key={`${strokeIndex}-${pointIndex}`}
+                    style={[
+                      styles.segment,
+                      {
+                        left: (previous.x + point.x) / 2 - length / 2,
+                        top: (previous.y + point.y) / 2 - 4,
+                        width: Math.max(length, 5),
+                        transform: [{ rotateZ: `${angle}rad` }],
+                      },
+                    ]}
+                  />
+                );
+              })}
+            </View>
+          );
+        })}
       </View>
       <View style={styles.actions}>
         <TouchableOpacity
@@ -197,6 +209,13 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: "#dbe3ea",
   },
+  referenceLayer: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+  },
   reference: {
     position: "absolute",
     width: "100%",
@@ -216,6 +235,20 @@ const styles = StyleSheet.create({
   },
   referenceVisible: {
     opacity: 0.48,
+  },
+  strokeLayer: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+  },
+  strokeDot: {
+    position: "absolute",
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#111827",
   },
   segment: {
     position: "absolute",
