@@ -2,8 +2,3 @@
 > japanese-tutor@0.11.0 typecheck
 > tsc --noEmit
 
-src/content/practiceDiversity.ts(176,3): error TS2322: Type '({ id: string; type: string; prompt: string; targetItemIds: string[]; correctAnswers: string[]; acceptableAnswers: string[]; distractors: string[]; explanationRu: string; variantGroup: string; contentKey: string; difficulty: number; confusionItemIds: string[] | undefined; audioText?: undefined; } | { ...; } | { ...;...' is not assignable to type 'Exercise[]'.
-  Type '{ id: string; type: string; prompt: string; targetItemIds: string[]; correctAnswers: string[]; acceptableAnswers: string[]; distractors: string[]; explanationRu: string; variantGroup: string; contentKey: string; difficulty: number; confusionItemIds: string[] | undefined; audioText?: undefined; } | { ...; } | { ...; ...' is not assignable to type 'Exercise'.
-    Type '{ id: string; type: string; prompt: string; targetItemIds: string[]; correctAnswers: string[]; acceptableAnswers: string[]; distractors: string[]; explanationRu: string; variantGroup: string; contentKey: string; difficulty: number; confusionItemIds: string[] | undefined; audioText?: undefined; }' is not assignable to type 'Exercise'.
-      Types of property 'type' are incompatible.
-        Type 'string' is not assignable to type 'ExerciseType'.

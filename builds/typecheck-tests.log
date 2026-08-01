@@ -1,0 +1,6 @@
+
+> japanese-tutor@0.11.0 typecheck:tests
+> tsc --noEmit -p tsconfig.tests.json
+
+src/engine/lessonReview.test.ts(98,16): error TS2322: Type '{ exerciseId: string; status: "correct"; } | { exerciseId: string; status: "acceptable"; } | undefined' is not assignable to type 'LessonReviewAttempt'.
+  Type 'undefined' is not assignable to type 'LessonReviewAttempt'.
