@@ -47,38 +47,24 @@ test("all 103 N5 kanji are distributed through lessons 1-36", () => {
   assert.equal(new Set(introduced.map((item) => item.id)).size, 103);
 });
 
-test("visible lessons stay compact while review keeps all kanji skills and displaced practice", () => {
+test("exact lesson Learn preserves language practice while review keeps all kanji skills", () => {
   const n5Bundles = lessonBundles.filter((bundle) => bundle.lesson.order <= 36);
   const targetedKanji = new Set<string>();
 
   n5Bundles.forEach((bundle) => {
     assert.equal(bundle.exercises.length, 12, `${bundle.lesson.id} no longer has a compact session`);
-
-    const kanjiExercises = bundle.exercises.filter((exercise) =>
-      exercise.contentKey?.startsWith("kanji:"),
-    );
-    const kanjiCount = bundle.kanji?.length ?? 0;
-    const expectedKanjiExerciseCount = 1 + kanjiCount;
     assert.equal(
-      kanjiExercises.length,
-      expectedKanjiExerciseCount,
-      `${bundle.lesson.id} has the wrong number of guided kanji checks`,
+      bundle.exercises.filter((exercise) => exercise.contentKey?.startsWith("kanji:")).length,
+      0,
+      `${bundle.lesson.id} still contains obsolete approximate kanji quizzes`,
     );
 
-    const skills = new Set(kanjiExercises.map(inferExerciseSkill));
-    assert.ok(skills.has("recognition"), `${bundle.lesson.id} lacks kanji recognition`);
-    assert.ok(skills.has("reading"), `${bundle.lesson.id} lacks contextual kanji reading`);
-
-    kanjiExercises.forEach((exercise) => {
-      assert.ok(exercise.skill === "recognition" || exercise.skill === "reading");
-      exercise.targetItemIds.forEach((id) => targetedKanji.add(id));
-    });
-
+    const kanjiCount = bundle.kanji?.length ?? 0;
     const reviewExercises = bundle.reviewExercises ?? [];
     assert.equal(
       reviewExercises.length,
       12 + 3 * kanjiCount,
-      `${bundle.lesson.id} did not retain legacy practice and complete kanji skill triples`,
+      `${bundle.lesson.id} did not retain language practice and complete kanji skill triples`,
     );
     assert.equal(
       new Set(reviewExercises.map((exercise) => exercise.id)).size,
@@ -92,6 +78,7 @@ test("visible lessons stay compact while review keeps all kanji skills and displ
       );
     });
     (bundle.kanji ?? []).forEach((item) => {
+      targetedKanji.add(item.id);
       const itemSkills = new Set(
         reviewExercises
           .filter(
@@ -124,7 +111,7 @@ test("visible lessons stay compact while review keeps all kanji skills and displ
 
 test("explicit exercise skill overrides the generic interaction type", () => {
   const readingExercise = lessonBundles
-    .flatMap((bundle) => bundle.exercises)
+    .flatMap((bundle) => bundle.reviewExercises ?? bundle.exercises)
     .find((exercise) => exercise.skill === "reading");
   assert.ok(readingExercise);
   assert.equal(readingExercise.type, "text-input");
