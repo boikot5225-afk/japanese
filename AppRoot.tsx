@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { SafeAreaView, Text, TouchableOpacity, View } from "react-native";
 
+import type { KanjiTracingResult } from "./src/components/KanjiTracingPad";
+
 import {
   findCheckpoint,
   type CourseCheckpoint,
 } from "./src/content/courseCheckpoints";
 import { findLessonBundle, lessonBundles } from "./src/content/courseCatalog";
+import { createKanjiWritingExercise } from "./src/content/kanjiCurriculum";
 import type { LessonBundle } from "./src/content/lessonBundle";
-import type { Exercise, Skill } from "./src/domain/course";
+import type { Exercise, KanjiItem, Skill } from "./src/domain/course";
 import { checkAnswer, type AnswerCheckResult } from "./src/engine/checkAnswer";
 import {
   buildCheckpointQueue,
@@ -583,6 +586,46 @@ export default function App() {
     setScreen("review-result");
   };
 
+  const recordKanjiWriting = (
+    item: KanjiItem,
+    tracing: KanjiTracingResult,
+  ) => {
+    const exercise = createKanjiWritingExercise(
+      item.introducedInLessonId,
+      item,
+    );
+    const now = new Date();
+    const status: AnswerCheckResult["status"] =
+      tracing.mistakes === 0 ? "correct" : "acceptable";
+
+    setReviewItems((previous) => {
+      const key = reviewItemKey({ itemId: item.id, skill: "writing" });
+      const existing = previous.find((entry) => reviewItemKey(entry) === key);
+      return upsertReviewItem(
+        previous,
+        scheduleItemReview(
+          existing,
+          item.id,
+          "writing",
+          exercise,
+          item.introducedInLessonId,
+          status,
+          now,
+        ),
+      );
+    });
+    setAttemptHistory((previous) => [
+      createAttemptLogEntry(
+        exercise,
+        item.introducedInLessonId,
+        status,
+        "practice",
+        now,
+      ),
+      ...previous,
+    ].slice(0, 200));
+  };
+
   const sentenceBuilderTokens = useMemo(() => {
     if (!currentExercise || currentExercise.type !== "sentence-builder") return [];
     const correct = currentExercise.correctAnswers[0];
@@ -649,6 +692,7 @@ export default function App() {
       <CourseScreen
         completedLessonIds={completedLessonIds}
         checkpointProgress={checkpointProgress}
+        reviewItems={reviewItems}
         todayBundle={todayBundle}
         dueReviewCount={dueReviewItems.length}
         weakTargetCount={weakTargetCount}
@@ -661,6 +705,7 @@ export default function App() {
         onStartCheckpoint={startCheckpoint}
         onStartReview={startReview}
         onOpenKana={() => setScreen("kana")}
+        onRecordKanjiWriting={recordKanjiWriting}
       />
     );
   }
