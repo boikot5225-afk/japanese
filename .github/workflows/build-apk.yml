@@ -11,11 +11,10 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  statuses: write
+  contents: read
 
 concurrency:
-  group: writing-audit-${{ github.ref }}
+  group: build-apk-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -27,7 +26,7 @@ jobs:
       CI: "1"
 
     steps:
-      - name: Checkout branch head
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: ${{ github.head_ref || github.ref }}
@@ -37,39 +36,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      - name: Apply audited fixes
-        shell: bash
-        run: |
-          if [[ "$(node -p "require('./package.json').version")" == "0.21.0" ]]; then
-            node scripts/fix-writing-audit-script.mjs
-            node scripts/apply-writing-audit.mjs
-            node scripts/apply-writing-audit-hotfix.mjs
-          fi
-          node scripts/apply-writing-grade-cap-ui.mjs
-
-      - name: Persist audited fixes
-        env:
-          TARGET_BRANCH: ${{ github.head_ref || github.ref_name }}
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- \
-            package.json app.json AppRoot.tsx \
-            src/engine/writingSession.ts \
-            src/engine/writingSession.test.ts \
-            src/engine/lessonSession.ts \
-            src/engine/lessonReview.ts \
-            src/engine/lessonReview.test.ts \
-            src/components/SkritterWritingPad.tsx \
-            src/components/KanjiWritingPanel.tsx \
-            src/screens/KanjiScreen.tsx
-          if git diff --cached --quiet; then
-            exit 0
-          fi
-          git commit -m "Enforce audited writing grade limits [skip build]"
-          git push origin "HEAD:${TARGET_BRANCH}"
 
       - name: Read version
         run: echo "APP_VERSION=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
@@ -86,7 +52,7 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run full tests
+      - name: Run full test suite
         run: npm test
 
       - name: Typecheck application
@@ -107,16 +73,18 @@ jobs:
           mkdir -p builds
           APK="android/app/build/outputs/apk/release/app-release.apk"
           test -s "$APK"
+          unzip -l "$APK" | tee builds/apk-contents.log
           unzip -l "$APK" | grep -q "assets/index.android.bundle"
           cp "$APK" "builds/Japanese-${APP_VERSION}-standalone.apk"
-          sha256sum "builds/Japanese-${APP_VERSION}-standalone.apk" > builds/apk.sha256
+          sha256sum "builds/Japanese-${APP_VERSION}-standalone.apk" | tee builds/apk.sha256
 
-      - name: Upload APK
+      - name: Upload standalone APK
         uses: actions/upload-artifact@v4
         with:
           name: Japanese-${{ env.APP_VERSION }}-standalone
           path: |
             builds/Japanese-${{ env.APP_VERSION }}-standalone.apk
             builds/apk.sha256
+            builds/apk-contents.log
           if-no-files-found: error
           retention-days: 14
