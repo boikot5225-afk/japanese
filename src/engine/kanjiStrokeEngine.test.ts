@@ -38,6 +38,27 @@ const hooked: KanjiStrokeVector = {
   length: 105,
 };
 
+const complex: KanjiStrokeVector = {
+  path: "M10,10 L45,10 L45,45 L80,45",
+  start: { x: 10, y: 10 },
+  end: { x: 80, y: 45 },
+  samples: [
+    ...Array.from({ length: 10 }, (_, index) => ({
+      x: 10 + (35 * index) / 9,
+      y: 10,
+    })),
+    ...Array.from({ length: 9 }, (_, index) => ({
+      x: 45,
+      y: 10 + (35 * (index + 1)) / 9,
+    })),
+    ...Array.from({ length: 9 }, (_, index) => ({
+      x: 45 + (35 * (index + 1)) / 9,
+      y: 45,
+    })),
+  ],
+  length: 105,
+};
+
 const padLine = (
   startX: number,
   startY: number,
@@ -74,13 +95,11 @@ test("resamples a stroke while preserving its endpoints", () => {
 });
 
 test("ShortStraw keeps a straight line as two corners", () => {
-  const corners = findStrokeCorners(horizontal.samples);
-  assert.equal(corners.length, 2);
+  assert.equal(findStrokeCorners(horizontal.samples).length, 2);
 });
 
 test("ShortStraw detects the turn in a hooked stroke", () => {
-  const corners = findStrokeCorners(hooked.samples);
-  assert.ok(corners.length >= 3);
+  assert.ok(findStrokeCorners(hooked.samples).length >= 3);
 });
 
 test("accepts a natural close stroke without requiring exact endpoints", () => {
@@ -123,7 +142,7 @@ test("rejects a stroke whose center is too far from the target", () => {
   assert.equal(result.issue, "wrong-position");
 });
 
-test("rejects a missing corner in a hooked stroke", () => {
+test("rejects a missing corner in a simple hooked stroke", () => {
   const result = assessKanjiStroke(
     padLine(115, 115, 345, 365),
     hooked,
@@ -139,8 +158,16 @@ test("accepts a naturally drawn hooked stroke", () => {
     ...padLine(115, 115, 340, 118).slice(0, -1),
     ...padLine(340, 118, 342, 368),
   ];
-  const result = assessKanjiStroke(points, hooked, 500, 500);
-  assert.equal(result.accepted, true);
+  assert.equal(assessKanjiStroke(points, hooked, 500, 500).accepted, true);
+});
+
+test("does not excuse a missing complex corner when geometry also changes", () => {
+  const shortcut = [
+    ...padLine(46, 46, 206, 46).slice(0, -1),
+    ...padLine(206, 46, 367, 207),
+  ];
+  const result = assessKanjiStroke(shortcut, complex, 500, 500);
+  assert.equal(result.accepted, false);
 });
 
 test("accepts every canonical N5 stroke with small hand jitter", () => {
@@ -156,7 +183,7 @@ test("accepts every canonical N5 stroke with small hand jitter", () => {
   });
 });
 
-test("all five strokes of 古 are writable without triggering a false rejection", () => {
+test("all five strokes of 古 are writable without false rejection", () => {
   const old = kanjiStrokeDataByLiteral["古"];
   assert.ok(old);
   assert.equal(old.strokes.length, 5);
