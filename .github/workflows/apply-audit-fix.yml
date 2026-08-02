@@ -32,7 +32,7 @@ jobs:
       - name: Remove one-time transport
         shell: bash
         run: |
-          git rm -- .github/audit-patch.part00 .github/audit-patch.part01 .github/workflows/apply-audit-fix.yml
+          git rm -- .github/audit-patch.part00 .github/audit-patch.part01 .github/audit-trigger .github/workflows/apply-audit-fix.yml
 
       - name: Commit audited fixes
         shell: bash
