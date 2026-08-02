@@ -1,229 +1,328 @@
 import { useMemo, useState } from "react";
-import {
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-import type { Exercise, KanjiItem } from "../domain/course";
-import type { AnswerStatus } from "../engine/checkAnswer";
+import { speakJapanese } from "../audio/japaneseSpeech";
+import type { KanjiItem } from "../domain/course";
 import type { KanjiProgressSummary } from "../engine/kanjiProgress";
 import {
-  buildKanjiStudyQuestions,
-  checkKanjiStudyAnswer,
+  buildKanjiStudyQueue,
+  buildKanjiStudyResult,
+  kanjiStudyPartLabel,
+  requeueKanjiStudyCard,
+  type KanjiStudyCard,
   type KanjiStudyResult,
 } from "../engine/kanjiStudySession";
+import type { ReviewItem } from "../engine/reviewEngine";
+import {
+  WRITING_GRADE_DEFINITIONS,
+  type WritingGrade,
+} from "../engine/writingSession";
+import { KanjiWritingPanel } from "./KanjiWritingPanel";
+import type { SkritterWritingResult } from "./SkritterWritingPad";
 
 interface KanjiStudyPanelProps {
-  item: KanjiItem;
   catalog: readonly KanjiItem[];
-  exercises: readonly Exercise[];
-  progress: KanjiProgressSummary;
-  strokeCount: number | null;
-  onRecord: (result: KanjiStudyResult) => void;
+  progress: readonly KanjiProgressSummary[];
+  reviewItems: readonly ReviewItem[];
+  onRecordStudy: (item: KanjiItem, result: KanjiStudyResult) => void;
+  onRecordWriting: (item: KanjiItem, result: SkritterWritingResult) => void;
+  onExit: () => void;
 }
 
-const statusMessage = (correct: boolean, recorded: boolean): string => {
-  if (!correct) {
-    return recorded
-      ? "Пока нет. Посмотри объяснение: это знание вернётся в ближайшее повторение."
-      : "Пока нет. Посмотри объяснение и затем попробуй вспомнить чтение без вариантов.";
-  }
-  return recorded
-    ? "Верно. Связь записана в интервальное повторение."
-    : "Верно. Это тренировочная подсказка; прогресс подтвердит следующий ответ без вариантов.";
+interface SessionStats {
+  reviewed: number;
+  forgot: number;
+  hard: number;
+  known: number;
+  easy: number;
+}
+
+const emptyStats: SessionStats = {
+  reviewed: 0,
+  forgot: 0,
+  hard: 0,
+  known: 0,
+  easy: 0,
 };
 
-export function KanjiStudyPanel({
-  item,
-  catalog,
-  exercises,
-  progress,
-  strokeCount,
-  onRecord,
-}: KanjiStudyPanelProps) {
-  const questions = useMemo(
-    () => buildKanjiStudyQuestions(item, exercises, catalog),
-    [catalog, exercises, item],
-  );
-  const [phase, setPhase] = useState(-1);
-  const [answer, setAnswer] = useState("");
-  const [status, setStatus] = useState<AnswerStatus | null>(null);
-  const question = phase >= 0 ? questions[phase] : undefined;
-  const complete = phase >= questions.length;
-  const example = item.examples[0];
+const updateStats = (stats: SessionStats, grade: WritingGrade): SessionStats => ({
+  ...stats,
+  reviewed: stats.reviewed + 1,
+  forgot: stats.forgot + (grade === 1 ? 1 : 0),
+  hard: stats.hard + (grade === 2 ? 1 : 0),
+  known: stats.known + (grade === 3 ? 1 : 0),
+  easy: stats.easy + (grade === 4 ? 1 : 0),
+});
 
-  const resetAnswer = () => {
-    setAnswer("");
-    setStatus(null);
-  };
-
-  const submit = (value: string) => {
-    if (!question || status || value.trim().length === 0) return;
-    const nextStatus = checkKanjiStudyAnswer(question, value);
-    setAnswer(value);
-    setStatus(nextStatus);
-    if (question.recordResult) {
-      onRecord({
-        questionId: question.id,
-        exercise: question.exercise,
-        answer: value,
-        status: nextStatus,
-      });
-    }
-  };
-
-  if (phase < 0) {
-    return (
-      <View style={styles.card}>
-        <View style={styles.header}>
-          <View style={styles.glyphBox}>
-            <Text style={styles.glyph}>{item.literal}</Text>
-          </View>
-          <View style={styles.headerText}>
-            <Text style={styles.eyebrow}>Первое изучение</Text>
-            <Text style={styles.title}>Свяжи знак со знакомым словом</Text>
-            <Text style={styles.meta}>
-              {strokeCount ? `${strokeCount} черт · ` : ""}значение {progress.meaning.mastery}% · чтение {progress.reading.mastery}%
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.memoryCard}>
-          <Text style={styles.memoryLabel}>Образ</Text>
-          <Text style={styles.memoryText}>
-            {item.literal} — {item.meaningsRu.join(", ")}. Сначала запомни общий образ,
-            затем закрепи конкретное чтение только внутри слова.
-          </Text>
-        </View>
-
-        {example && (
-          <View style={styles.wordCard}>
-            <Text style={styles.word}>{example.written}</Text>
-            <Text style={styles.reading}>{example.reading}</Text>
-            <Text style={styles.meaning}>{example.meaningRu}</Text>
-            <Text style={styles.focus}>
-              В этом слове {item.literal} читается {example.kanjiReading}.
-            </Text>
-          </View>
-        )}
-
-        <Text style={styles.note}>
-          Цикл короткий: узнавание значения → подсказанное чтение → чтение без вариантов.
-          После него переходи к письму ниже.
-        </Text>
-        <TouchableOpacity style={styles.primaryButton} onPress={() => setPhase(0)}>
-          <Text style={styles.primaryButtonText}>
-            {progress.meaning.attempts + progress.reading.attempts > 0
-              ? "Повторить значение и чтение"
-              : "Начать изучение"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    );
+const partInstruction = (card: KanjiStudyCard): string => {
+  switch (card.part) {
+    case "preview":
+      return "Посмотри на знак и слово целиком. Это знакомство, оценка пока не нужна.";
+    case "meaning":
+      return "Вспомни основное значение знака, затем открой ответ и оцени себя честно.";
+    case "reading":
+      return "Вспомни чтение выделенного кандзи именно в этом слове.";
+    case "writing":
+      return "Напиши знак. Порядок черт, подсказки и ошибки ограничат доступную оценку.";
   }
+};
 
-  if (complete) {
-    return (
-      <View style={[styles.card, styles.completeCard]}>
-        <Text style={styles.eyebrow}>Этап завершён</Text>
-        <Text style={styles.title}>Значение и чтение записаны</Text>
-        <Text style={styles.note}>
-          Теперь напиши {item.literal} в тренажёре ниже. Все три навыка хранятся раздельно,
-          поэтому знакомое значение не маскирует слабое письмо или чтение.
-        </Text>
+function GradeButtons({ onGrade }: { onGrade: (grade: WritingGrade) => void }) {
+  return (
+    <View style={styles.gradeRow}>
+      {WRITING_GRADE_DEFINITIONS.map((definition) => (
         <TouchableOpacity
-          style={styles.secondaryButton}
-          onPress={() => {
-            setPhase(-1);
-            resetAnswer();
-          }}
+          key={definition.grade}
+          style={[styles.gradeButton, styles[`grade${definition.grade}`]]}
+          onPress={() => onGrade(definition.grade)}
+          accessibilityLabel={`Оценка ${definition.grade}: ${definition.label}`}
         >
-          <Text style={styles.secondaryButtonText}>Пройти цикл ещё раз</Text>
+          <Text style={styles.gradeNumber}>{definition.grade}</Text>
+          <Text style={styles.gradeLabel}>{definition.label}</Text>
         </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
+
+export function KanjiStudyPanel({
+  catalog,
+  progress,
+  reviewItems,
+  onRecordStudy,
+  onRecordWriting,
+  onExit,
+}: KanjiStudyPanelProps) {
+  const itemById = useMemo(
+    () => new Map(catalog.map((item) => [item.id, item])),
+    [catalog],
+  );
+  const progressById = useMemo(
+    () => new Map(progress.map((entry) => [entry.itemId, entry])),
+    [progress],
+  );
+  const [queue, setQueue] = useState<KanjiStudyCard[]>(() =>
+    buildKanjiStudyQueue(catalog, progress, reviewItems),
+  );
+  const [revealed, setRevealed] = useState(false);
+  const [handled, setHandled] = useState(0);
+  const [stats, setStats] = useState<SessionStats>(emptyStats);
+
+  const card = queue[0];
+  const item = card ? itemById.get(card.itemId) : undefined;
+  const example = item?.examples[0];
+  const itemProgress = item ? progressById.get(item.id) : undefined;
+  const writingReviewItem = item
+    ? reviewItems.find(
+        (reviewItem) =>
+          reviewItem.itemId === item.id && reviewItem.skill === "writing",
+      )
+    : undefined;
+
+  const restart = () => {
+    setQueue(buildKanjiStudyQueue(catalog, progress, reviewItems));
+    setRevealed(false);
+    setHandled(0);
+    setStats(emptyStats);
+  };
+
+  const continueAfterPreview = () => {
+    setQueue((previous) => previous.slice(1));
+    setHandled((previous) => previous + 1);
+    setRevealed(false);
+  };
+
+  const skipNewItem = () => {
+    if (!item) return;
+    setQueue((previous) => previous.filter((entry) => entry.itemId !== item.id));
+    setHandled((previous) => previous + 1);
+    setRevealed(false);
+  };
+
+  const finishCard = (grade: WritingGrade) => {
+    if (!card || !item || card.part === "preview") return;
+    onRecordStudy(item, buildKanjiStudyResult(card, item, grade));
+    setStats((previous) => updateStats(previous, grade));
+    setHandled((previous) => previous + 1);
+    setQueue((previous) =>
+      requeueKanjiStudyCard(previous.slice(1), card, grade),
+    );
+    setRevealed(false);
+  };
+
+  const finishWriting = (result: SkritterWritingResult) => {
+    if (!card || !item || card.part !== "writing") return;
+    onRecordWriting(item, result);
+    setStats((previous) => updateStats(previous, result.grade));
+    setHandled((previous) => previous + 1);
+    setQueue((previous) =>
+      requeueKanjiStudyCard(previous.slice(1), card, result.grade),
+    );
+    setRevealed(false);
+  };
+
+  if (!card || !item) {
+    return (
+      <View style={styles.completeCard}>
+        <Text style={styles.eyebrow}>Сессия завершена</Text>
+        <Text style={styles.completeTitle}>Очередь разобрана</Text>
+        <Text style={styles.completeBody}>
+          Проверено навыков: {stats.reviewed}. Забыл: {stats.forgot}, трудно: {stats.hard},
+          знаю: {stats.known}, легко: {stats.easy}.
+        </Text>
+        <View style={styles.completeActions}>
+          <TouchableOpacity style={styles.secondaryButton} onPress={onExit}>
+            <Text style={styles.secondaryButtonText}>К списку N5</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.primaryButton} onPress={restart}>
+            <Text style={styles.primaryButtonText}>Ещё занятие</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
 
-  if (!question) return null;
-  const successful = status === "correct" || status === "acceptable";
+  const remaining = queue.length;
+  const total = handled + remaining;
 
   return (
-    <View style={styles.card}>
-      <View style={styles.stepHeader}>
-        <Text style={styles.eyebrow}>{question.title}</Text>
-        <Text style={styles.stepCounter}>{phase + 1}/{questions.length}</Text>
-      </View>
-      <Text style={styles.question}>{question.prompt}</Text>
-
-      {question.choices.length > 0 ? (
-        <View style={styles.choices}>
-          {question.choices.map((choice) => {
-            const selected = answer === choice;
-            return (
-              <TouchableOpacity
-                key={choice}
-                disabled={Boolean(status)}
-                style={[
-                  styles.choice,
-                  selected && (successful ? styles.choiceCorrect : styles.choiceIncorrect),
-                ]}
-                onPress={() => submit(choice)}
-              >
-                <Text style={styles.choiceText}>{choice}</Text>
-              </TouchableOpacity>
-            );
-          })}
+    <View style={styles.session}>
+      <View style={styles.sessionHeader}>
+        <TouchableOpacity style={styles.exitButton} onPress={onExit}>
+          <Text style={styles.exitButtonText}>×</Text>
+        </TouchableOpacity>
+        <View style={styles.headerCopy}>
+          <Text style={styles.eyebrow}>JLPT N5 · {kanjiStudyPartLabel(card.part)}</Text>
+          <Text style={styles.counter}>
+            {handled + 1} / {total} · в очереди {remaining}
+          </Text>
         </View>
-      ) : (
-        <View style={styles.inputGroup}>
-          <TextInput
-            value={answer}
-            editable={!status}
-            onChangeText={setAnswer}
-            onSubmitEditing={() => submit(answer)}
-            placeholder="Введи чтение хираганой"
-            placeholderTextColor="#7b8794"
-            autoCapitalize="none"
-            autoCorrect={false}
-            style={styles.input}
-          />
-          {!status && (
-            <TouchableOpacity
-              style={[styles.primaryButton, answer.trim().length === 0 && styles.disabled]}
-              disabled={answer.trim().length === 0}
-              onPress={() => submit(answer)}
-            >
-              <Text style={styles.primaryButtonText}>Проверить</Text>
+        {card.remediation ? (
+          <Text style={styles.retryBadge}>повтор</Text>
+        ) : card.isNew ? (
+          <Text style={styles.newBadge}>новое</Text>
+        ) : (
+          <Text style={styles.reviewBadge}>SRS</Text>
+        )}
+      </View>
+
+      <View style={styles.progressTrack}>
+        <View
+          style={[
+            styles.progressFill,
+            { width: `${Math.round((handled / Math.max(total, 1)) * 100)}%` as `${number}%` },
+          ]}
+        />
+      </View>
+
+      <Text style={styles.instruction}>{partInstruction(card)}</Text>
+
+      {card.part === "preview" && (
+        <View style={styles.studyCard}>
+          <Text style={styles.previewGlyph}>{item.literal}</Text>
+          <Text style={styles.previewMeaning}>{item.meaningsRu.join(", ")}</Text>
+          {example && (
+            <View style={styles.answerBox}>
+              <View style={styles.wordRow}>
+                <View style={styles.wordCopy}>
+                  <Text style={styles.word}>{example.written}</Text>
+                  <Text style={styles.reading}>{example.reading}</Text>
+                  <Text style={styles.translation}>{example.meaningRu}</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.soundButton}
+                  onPress={() => void speakJapanese(example.reading)}
+                >
+                  <Text style={styles.soundButtonText}>🔊</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.focusReading}>
+                {item.literal} здесь читается {example.kanjiReading}
+              </Text>
+            </View>
+          )}
+          <Text style={styles.masteryNote}>
+            Значение {itemProgress?.meaning.mastery ?? 0}% · чтение {itemProgress?.reading.mastery ?? 0}% · письмо {itemProgress?.writing.mastery ?? 0}%
+          </Text>
+          <TouchableOpacity style={styles.primaryButton} onPress={continueAfterPreview}>
+            <Text style={styles.primaryButtonText}>Продолжить обучение</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.linkButton} onPress={skipNewItem}>
+            <Text style={styles.linkButtonText}>Не добавлять этот кандзи сейчас</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {card.part === "meaning" && (
+        <View style={styles.studyCard}>
+          <Text style={styles.promptLabel}>Что означает этот кандзи?</Text>
+          <Text style={styles.questionGlyph}>{item.literal}</Text>
+          {!revealed ? (
+            <TouchableOpacity style={styles.revealButton} onPress={() => setRevealed(true)}>
+              <Text style={styles.revealButtonText}>Показать ответ</Text>
             </TouchableOpacity>
+          ) : (
+            <View style={styles.revealedArea}>
+              <View style={styles.answerBox}>
+                <Text style={styles.answerTitle}>{item.meaningsRu.join(", ")}</Text>
+                {example && (
+                  <Text style={styles.answerDetail}>
+                    {example.written}（{example.reading}）— {example.meaningRu}
+                  </Text>
+                )}
+              </View>
+              <Text style={styles.gradePrompt}>Насколько хорошо вспомнил?</Text>
+              <GradeButtons onGrade={finishCard} />
+            </View>
           )}
         </View>
       )}
 
-      {status && (
-        <View style={[styles.feedback, successful ? styles.feedbackCorrect : styles.feedbackIncorrect]}>
-          <Text style={styles.feedbackTitle}>
-            {statusMessage(successful, question.recordResult)}
-          </Text>
-          <Text style={styles.feedbackBody}>{question.exercise.explanationRu}</Text>
-          {!question.recordResult && (
-            <Text style={styles.guidedNote}>
-              Это была подсказанная ступень: в SRS попадёт следующий ответ без вариантов.
-            </Text>
+      {card.part === "reading" && (
+        <View style={styles.studyCard}>
+          <Text style={styles.promptLabel}>Как читается выделенный знак?</Text>
+          <Text style={styles.questionWord}>{example?.written ?? item.literal}</Text>
+          {example && <Text style={styles.translation}>{example.meaningRu}</Text>}
+          {!revealed ? (
+            <TouchableOpacity style={styles.revealButton} onPress={() => setRevealed(true)}>
+              <Text style={styles.revealButtonText}>Показать чтение</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.revealedArea}>
+              <View style={styles.answerBox}>
+                <View style={styles.wordRow}>
+                  <View style={styles.wordCopy}>
+                    <Text style={styles.answerTitle}>{example?.kanjiReading ?? "—"}</Text>
+                    <Text style={styles.answerDetail}>
+                      Всё слово: {example?.reading ?? item.literal}
+                    </Text>
+                  </View>
+                  {example && (
+                    <TouchableOpacity
+                      style={styles.soundButton}
+                      onPress={() => void speakJapanese(example.reading)}
+                    >
+                      <Text style={styles.soundButtonText}>🔊</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+              <Text style={styles.gradePrompt}>Насколько хорошо вспомнил?</Text>
+              <GradeButtons onGrade={finishCard} />
+            </View>
           )}
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={() => {
-              setPhase((current) => current + 1);
-              resetAnswer();
-            }}
-          >
-            <Text style={styles.primaryButtonText}>
-              {phase + 1 >= questions.length ? "Перейти к письму" : "Дальше"}
-            </Text>
-          </TouchableOpacity>
+        </View>
+      )}
+
+      {card.part === "writing" && itemProgress && (
+        <View style={styles.writingCard}>
+          <KanjiWritingPanel
+            key={card.id}
+            item={item}
+            progress={itemProgress.writing}
+            reviewItem={writingReviewItem}
+            onComplete={finishWriting}
+          />
         </View>
       )}
     </View>
@@ -231,57 +330,75 @@ export function KanjiStudyPanel({
 }
 
 const styles = StyleSheet.create({
-  card: {
-    gap: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#cbd9e3",
-    borderRadius: 20,
-    backgroundColor: "#f8fbfd",
+  session: { gap: 14 },
+  sessionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
   },
-  completeCard: { borderColor: "#9bc9ae", backgroundColor: "#f0faf4" },
-  header: { flexDirection: "row", alignItems: "center", gap: 14 },
-  glyphBox: {
-    width: 72,
-    height: 72,
+  exitButton: {
+    width: 42,
+    height: 42,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 18,
+    borderRadius: 21,
     backgroundColor: "#e7eef5",
   },
-  glyph: { color: "#15202b", fontSize: 48, fontWeight: "500" },
-  headerText: { flex: 1, gap: 4 },
-  eyebrow: { color: "#31546f", fontSize: 12, fontWeight: "900", letterSpacing: 0.8, textTransform: "uppercase" },
-  title: { color: "#15202b", fontSize: 20, lineHeight: 26, fontWeight: "900" },
-  meta: { color: "#66788a", fontSize: 13, lineHeight: 18 },
-  memoryCard: { gap: 4, padding: 13, borderRadius: 15, backgroundColor: "#fff4d8" },
-  memoryLabel: { color: "#7a4f00", fontSize: 12, fontWeight: "900", textTransform: "uppercase" },
-  memoryText: { color: "#59420f", fontSize: 14, lineHeight: 21 },
-  wordCard: { gap: 2, padding: 14, borderRadius: 16, backgroundColor: "#ffffff" },
-  word: { color: "#15202b", fontSize: 25, fontWeight: "900" },
-  reading: { color: "#31546f", fontSize: 16 },
-  meaning: { color: "#66788a", fontSize: 14 },
-  focus: { marginTop: 5, color: "#183153", fontSize: 14, lineHeight: 20, fontWeight: "800" },
-  note: { color: "#52606d", fontSize: 14, lineHeight: 21 },
-  primaryButton: { alignItems: "center", paddingVertical: 13, paddingHorizontal: 16, borderRadius: 14, backgroundColor: "#183153" },
+  exitButtonText: { color: "#183153", fontSize: 27, lineHeight: 30, fontWeight: "500" },
+  headerCopy: { flex: 1, gap: 2 },
+  eyebrow: {
+    color: "#31546f",
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  counter: { color: "#66788a", fontSize: 13, fontWeight: "700" },
+  newBadge: { color: "#7a4f00", backgroundColor: "#fff1c7", paddingVertical: 5, paddingHorizontal: 9, borderRadius: 999, overflow: "hidden", fontSize: 11, fontWeight: "900" },
+  retryBadge: { color: "#9c2f2f", backgroundColor: "#fde7e7", paddingVertical: 5, paddingHorizontal: 9, borderRadius: 999, overflow: "hidden", fontSize: 11, fontWeight: "900" },
+  reviewBadge: { color: "#1f6a45", backgroundColor: "#dff5e9", paddingVertical: 5, paddingHorizontal: 9, borderRadius: 999, overflow: "hidden", fontSize: 11, fontWeight: "900" },
+  progressTrack: { height: 7, overflow: "hidden", borderRadius: 999, backgroundColor: "#e1e8ee" },
+  progressFill: { height: "100%", borderRadius: 999, backgroundColor: "#183153" },
+  instruction: { color: "#52606d", fontSize: 14, lineHeight: 21 },
+  studyCard: { gap: 16, padding: 18, borderWidth: 1, borderColor: "#d7e0e8", borderRadius: 24, backgroundColor: "#ffffff" },
+  writingCard: { padding: 18, borderWidth: 1, borderColor: "#d7e0e8", borderRadius: 24, backgroundColor: "#ffffff" },
+  previewGlyph: { textAlign: "center", color: "#15202b", fontSize: 108, lineHeight: 128, fontWeight: "500" },
+  previewMeaning: { textAlign: "center", color: "#15202b", fontSize: 22, lineHeight: 29, fontWeight: "900" },
+  promptLabel: { textAlign: "center", color: "#52606d", fontSize: 15, fontWeight: "800" },
+  questionGlyph: { textAlign: "center", color: "#15202b", fontSize: 126, lineHeight: 146, fontWeight: "500" },
+  questionWord: { textAlign: "center", color: "#15202b", fontSize: 50, lineHeight: 64, fontWeight: "800" },
+  answerBox: { gap: 7, padding: 15, borderRadius: 18, backgroundColor: "#f1f6f9" },
+  answerTitle: { color: "#15202b", fontSize: 23, lineHeight: 30, fontWeight: "900" },
+  answerDetail: { color: "#52606d", fontSize: 15, lineHeight: 22 },
+  wordRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  wordCopy: { flex: 1, gap: 2 },
+  word: { color: "#15202b", fontSize: 28, fontWeight: "900" },
+  reading: { color: "#31546f", fontSize: 17 },
+  translation: { textAlign: "center", color: "#66788a", fontSize: 15, lineHeight: 21 },
+  focusReading: { color: "#183153", fontSize: 14, lineHeight: 20, fontWeight: "800" },
+  soundButton: { width: 46, height: 46, alignItems: "center", justifyContent: "center", borderRadius: 23, backgroundColor: "#dfeaf1" },
+  soundButtonText: { fontSize: 19 },
+  masteryNote: { textAlign: "center", color: "#66788a", fontSize: 12, lineHeight: 18 },
+  revealButton: { alignItems: "center", paddingVertical: 17, paddingHorizontal: 18, borderRadius: 16, backgroundColor: "#183153" },
+  revealButtonText: { color: "#ffffff", fontSize: 17, fontWeight: "900" },
+  revealedArea: { gap: 13 },
+  gradePrompt: { textAlign: "center", color: "#52606d", fontSize: 13, fontWeight: "800" },
+  gradeRow: { flexDirection: "row", gap: 7 },
+  gradeButton: { flex: 1, minHeight: 67, alignItems: "center", justifyContent: "center", gap: 2, paddingVertical: 9, paddingHorizontal: 4, borderWidth: 1, borderRadius: 14 },
+  grade1: { borderColor: "#d98989", backgroundColor: "#fdecec" },
+  grade2: { borderColor: "#dfbd72", backgroundColor: "#fff4d8" },
+  grade3: { borderColor: "#83bfa0", backgroundColor: "#e7f7ee" },
+  grade4: { borderColor: "#75a9c0", backgroundColor: "#e4f2f8" },
+  gradeNumber: { color: "#15202b", fontSize: 18, fontWeight: "900" },
+  gradeLabel: { color: "#42596d", fontSize: 10, fontWeight: "800" },
+  primaryButton: { alignItems: "center", paddingVertical: 14, paddingHorizontal: 18, borderRadius: 15, backgroundColor: "#183153" },
   primaryButtonText: { color: "#ffffff", fontSize: 15, fontWeight: "900" },
-  secondaryButton: { alignItems: "center", paddingVertical: 12, paddingHorizontal: 16, borderWidth: 1, borderColor: "#9eb0bf", borderRadius: 14, backgroundColor: "#ffffff" },
+  secondaryButton: { alignItems: "center", paddingVertical: 13, paddingHorizontal: 17, borderWidth: 1, borderColor: "#afbdc9", borderRadius: 15, backgroundColor: "#ffffff" },
   secondaryButtonText: { color: "#183153", fontSize: 14, fontWeight: "800" },
-  stepHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
-  stepCounter: { color: "#66788a", fontSize: 13, fontWeight: "800" },
-  question: { color: "#15202b", fontSize: 18, lineHeight: 25, fontWeight: "800" },
-  choices: { gap: 9 },
-  choice: { paddingVertical: 13, paddingHorizontal: 14, borderWidth: 1, borderColor: "#c7d3dd", borderRadius: 14, backgroundColor: "#ffffff" },
-  choiceCorrect: { borderColor: "#3e9b6a", backgroundColor: "#e7f7ee" },
-  choiceIncorrect: { borderColor: "#c85454", backgroundColor: "#fdecec" },
-  choiceText: { color: "#15202b", fontSize: 16, fontWeight: "700" },
-  inputGroup: { gap: 10 },
-  input: { paddingVertical: 13, paddingHorizontal: 14, borderWidth: 1, borderColor: "#c7d3dd", borderRadius: 14, backgroundColor: "#ffffff", color: "#15202b", fontSize: 17 },
-  disabled: { opacity: 0.45 },
-  feedback: { gap: 9, padding: 13, borderRadius: 15 },
-  feedbackCorrect: { backgroundColor: "#e7f7ee" },
-  feedbackIncorrect: { backgroundColor: "#fdecec" },
-  feedbackTitle: { color: "#15202b", fontSize: 14, lineHeight: 20, fontWeight: "900" },
-  feedbackBody: { color: "#52606d", fontSize: 14, lineHeight: 21 },
-  guidedNote: { color: "#31546f", fontSize: 13, lineHeight: 19, fontWeight: "700" },
+  linkButton: { alignItems: "center", paddingVertical: 8 },
+  linkButtonText: { color: "#66788a", fontSize: 13, fontWeight: "700" },
+  completeCard: { gap: 14, padding: 22, borderWidth: 1, borderColor: "#9bc9ae", borderRadius: 24, backgroundColor: "#f0faf4" },
+  completeTitle: { color: "#15202b", fontSize: 27, fontWeight: "900" },
+  completeBody: { color: "#52606d", fontSize: 15, lineHeight: 23 },
+  completeActions: { flexDirection: "row", gap: 10 },
 });
