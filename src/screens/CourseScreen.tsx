@@ -15,6 +15,7 @@ import {
 } from "../engine/checkpointEngine";
 import { styles } from "../theme/appStyles";
 import { kanaStyles } from "../theme/kanaStyles";
+import { KanjiScreen } from "./KanjiScreen";
 import { NumberTrainerScreen } from "./NumberTrainerScreen";
 
 interface CourseScreenProps {
@@ -52,10 +53,15 @@ export function CourseScreen({
   onStartReview,
   onOpenKana,
 }: CourseScreenProps) {
+  const [kanjiOpen, setKanjiOpen] = useState(false);
   const [numbersOpen, setNumbersOpen] = useState(false);
   const todayCompleted = todayBundle
     ? completedLessonIds.includes(todayBundle.lesson.id)
     : false;
+
+  if (kanjiOpen) {
+    return <KanjiScreen onCourse={() => setKanjiOpen(false)} />;
+  }
 
   if (numbersOpen) {
     return <NumberTrainerScreen onCourse={() => setNumbersOpen(false)} />;
@@ -108,6 +114,26 @@ export function CourseScreen({
           </Text>
           <TouchableOpacity style={kanaStyles.primaryButton} onPress={onOpenKana}>
             <Text style={kanaStyles.primaryButtonText}>Открыть азбуки</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={kanaStyles.courseKanaCard}>
+          <View style={kanaStyles.courseKanaHeader}>
+            <View>
+              <Text style={styles.reviewEyebrow}>Письменность</Text>
+              <Text style={kanaStyles.courseKanaTitle}>Кандзи N5</Text>
+            </View>
+            <Text style={kanaStyles.courseKanaGlyph}>日 語</Text>
+          </View>
+          <Text style={kanaStyles.courseKanaBody}>
+            103 знака из текущего курса: значение, чтение в слове, отдельный
+            прогресс навыков и экран слабых кандзи.
+          </Text>
+          <TouchableOpacity
+            style={kanaStyles.primaryButton}
+            onPress={() => setKanjiOpen(true)}
+          >
+            <Text style={kanaStyles.primaryButtonText}>Открыть кандзи</Text>
           </TouchableOpacity>
         </View>
 
