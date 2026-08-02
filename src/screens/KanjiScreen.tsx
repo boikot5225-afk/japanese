@@ -12,16 +12,11 @@ import {
 
 import { speakJapanese } from "../audio/japaneseSpeech";
 import { KanjiStudyPanel } from "../components/KanjiStudyPanel";
-import { KanjiWritingPanel } from "../components/KanjiWritingPanel";
 import type { SkritterWritingResult } from "../components/SkritterWritingPad";
 import { lessonBundles } from "../content/courseCatalog";
 import { n5KanjiCatalog } from "../content/kanjiCatalog";
 import { kanjiStrokeDataByLiteral } from "../content/kanjiStrokeData";
 import type { KanjiItem } from "../domain/course";
-import {
-  isLessonUnlocked,
-  type CheckpointProgress,
-} from "../engine/checkpointEngine";
 import {
   buildKanjiProgressCatalog,
   type KanjiProgressSummary,
@@ -29,8 +24,13 @@ import {
   type KanjiSkillState,
   type KanjiStudyStatus,
 } from "../engine/kanjiProgress";
-import type { KanjiStudyResult } from "../engine/kanjiStudySession";
+import {
+  countDueKanjiCards,
+  countNewKanji,
+  type KanjiStudyResult,
+} from "../engine/kanjiStudySession";
 import type { ReviewItem } from "../engine/reviewEngine";
+import type { CheckpointProgress } from "../engine/checkpointEngine";
 
 interface KanjiScreenProps {
   completedLessonIds: string[];
@@ -41,27 +41,26 @@ interface KanjiScreenProps {
   onRecordStudy: (item: KanjiItem, result: KanjiStudyResult) => void;
 }
 
-type CatalogFilter = "available" | "weak" | "all";
+type CatalogFilter = "all" | "new" | "due" | "weak";
 
 interface CatalogEntry {
   item: KanjiItem;
   progress: KanjiProgressSummary;
   lessonOrder: number;
-  available: boolean;
-  completedLesson: boolean;
+  due: boolean;
 }
 
 const statusLabels: Record<KanjiStudyStatus, string> = {
   new: "не начат",
   learning: "изучается",
-  review: "закреплён",
+  review: "в повторении",
   weak: "слабое место",
 };
 
 const skillStateLabels: Record<KanjiSkillState, string> = {
   new: "не начато",
   learning: "в работе",
-  review: "закреплено",
+  review: "в повторении",
   weak: "нужно повторить",
 };
 
@@ -74,21 +73,20 @@ const normalizeSearch = (value: string): string =>
 
 const matchesSearch = (item: KanjiItem, query: string): boolean => {
   if (!query) return true;
-  const example = item.examples[0];
   return [
     item.literal,
     ...item.meaningsRu,
-    example?.written,
-    example?.reading,
-    example?.kanjiReading,
-    example?.meaningRu,
-  ]
-    .filter((value): value is string => Boolean(value))
-    .some((value) => value.toLocaleLowerCase("ru-RU").includes(query));
+    ...item.examples.flatMap((example) => [
+      example.written,
+      example.reading,
+      example.kanjiReading,
+      example.meaningRu,
+    ]),
+  ].some((value) => value.toLocaleLowerCase("ru-RU").includes(query));
 };
 
 const formatDue = (value: string | null): string => {
-  if (!value) return "ещё не назначено";
+  if (!value) return "после первой оценки";
   const date = new Date(value);
   const today = new Date();
   const tomorrow = new Date(today);
@@ -97,8 +95,13 @@ const formatDue = (value: string | null): string => {
     left.getFullYear() === right.getFullYear() &&
     left.getMonth() === right.getMonth() &&
     left.getDate() === right.getDate();
-
-  if (sameDay(date, today)) return "сегодня";
+  if (date.getTime() <= Date.now()) return "сейчас";
+  if (sameDay(date, today)) {
+    return `сегодня в ${date.toLocaleTimeString("ru-RU", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })}`;
+  }
   if (sameDay(date, tomorrow)) return "завтра";
   return date.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
 };
@@ -129,15 +132,7 @@ const fillStyle = (state: KanjiSkillState) => {
   }
 };
 
-function SkillCard({
-  title,
-  progress,
-  note,
-}: {
-  title: string;
-  progress: KanjiSkillProgress;
-  note: string;
-}) {
+function SkillCard({ title, progress }: { title: string; progress: KanjiSkillProgress }) {
   return (
     <View style={styles.skillCard}>
       <View style={styles.skillHeader}>
@@ -155,77 +150,82 @@ function SkillCard({
           ]}
         />
       </View>
-      <Text style={styles.masteryValue}>{progress.mastery}%</Text>
       <Text style={styles.skillMeta}>
         {progress.attempts > 0
-          ? `${progress.correctCount} верно · ${progress.incorrectCount} ошибок · повторение ${formatDue(progress.dueAt)}`
-          : note}
+          ? `${progress.mastery}% · ${progress.correctCount} верно · ${progress.incorrectCount} ошибок · ${formatDue(progress.dueAt)}`
+          : "Ещё не проверялось"}
       </Text>
     </View>
   );
 }
 
-export function KanjiScreen({
-  completedLessonIds,
-  checkpointProgress,
-  reviewItems,
-  onCourse,
-  onRecordWriting,
-  onRecordStudy,
-}: KanjiScreenProps) {
-  const [filter, setFilter] = useState<CatalogFilter>("available");
+export function KanjiScreen(props: KanjiScreenProps) {
+  const {
+    reviewItems,
+    onCourse,
+    onRecordWriting,
+    onRecordStudy,
+  } = props;
+  const [sessionOpen, setSessionOpen] = useState(false);
+  const [filter, setFilter] = useState<CatalogFilter>("all");
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const entries = useMemo<CatalogEntry[]>(() => {
-    const completedLessonIdSet = new Set(completedLessonIds);
-    const availableLessonIds = new Set(
-      lessonBundles
-        .filter((bundle) => bundle.lesson.order <= 36)
-        .filter(
-          (bundle) =>
-            completedLessonIdSet.has(bundle.lesson.id) ||
-            isLessonUnlocked(
-              bundle.lesson.id,
-              completedLessonIds,
-              checkpointProgress,
-            ),
-        )
-        .map((bundle) => bundle.lesson.id),
+  const progressCatalog = useMemo(
+    () => buildKanjiProgressCatalog(n5KanjiCatalog, reviewItems),
+    [reviewItems],
+  );
+  const progressById = useMemo(
+    () => new Map(progressCatalog.map((entry) => [entry.itemId, entry])),
+    [progressCatalog],
+  );
+  const dueItemIds = useMemo(() => {
+    const now = Date.now();
+    return new Set(
+      reviewItems
+        .filter((item) => new Date(item.dueAt).getTime() <= now)
+        .map((item) => item.itemId),
     );
-    const progressById = new Map(
-      buildKanjiProgressCatalog(n5KanjiCatalog, reviewItems).map((progress) => [
-        progress.itemId,
-        progress,
-      ]),
-    );
+  }, [reviewItems]);
 
-    return n5KanjiCatalog.map((item) => {
-      const progress = progressById.get(item.id);
-      if (!progress) throw new Error(`Нет прогресса для ${item.id}`);
-      return {
-        item,
-        progress,
-        lessonOrder: lessonOrderById.get(item.introducedInLessonId) ?? 999,
-        available: availableLessonIds.has(item.introducedInLessonId),
-        completedLesson: completedLessonIdSet.has(item.introducedInLessonId),
-      };
-    });
-  }, [checkpointProgress, completedLessonIds, reviewItems]);
+  const entries = useMemo<CatalogEntry[]>(
+    () =>
+      n5KanjiCatalog.map((item) => {
+        const progress = progressById.get(item.id);
+        if (!progress) throw new Error(`Нет прогресса для ${item.id}`);
+        return {
+          item,
+          progress,
+          lessonOrder: lessonOrderById.get(item.introducedInLessonId) ?? 999,
+          due: dueItemIds.has(item.id),
+        };
+      }),
+    [dueItemIds, progressById],
+  );
+
+  const dueCount = countDueKanjiCards(n5KanjiCatalog, reviewItems);
+  const newCount = countNewKanji(n5KanjiCatalog, progressCatalog);
+  const learningCount = progressCatalog.filter(
+    (entry) => entry.status === "learning" || entry.status === "weak",
+  ).length;
+  const reviewCount = progressCatalog.filter((entry) => entry.status === "review").length;
+  const weakCount = progressCatalog.filter((entry) => entry.weak).length;
 
   const normalizedQuery = normalizeSearch(query);
   const filteredEntries = useMemo(() => {
     const candidates = entries.filter((entry) => {
-      if (filter === "available" && !entry.available) return false;
-      if (filter === "weak" && (!entry.available || !entry.progress.weak)) return false;
+      if (filter === "new" && entry.progress.status !== "new") return false;
+      if (filter === "due" && !entry.due) return false;
+      if (filter === "weak" && !entry.progress.weak) return false;
       return matchesSearch(entry.item, normalizedQuery);
     });
-
     return [...candidates].sort((left, right) => {
-      if (filter === "weak") {
-        const masteryDifference =
-          left.progress.overallMastery - right.progress.overallMastery;
-        if (masteryDifference !== 0) return masteryDifference;
+      if (left.due !== right.due) return left.due ? -1 : 1;
+      if (left.progress.weak !== right.progress.weak) {
+        return left.progress.weak ? -1 : 1;
+      }
+      if (left.progress.overallMastery !== right.progress.overallMastery) {
+        return left.progress.overallMastery - right.progress.overallMastery;
       }
       return left.lessonOrder - right.lessonOrder;
     });
@@ -233,40 +233,33 @@ export function KanjiScreen({
 
   const selectedEntry =
     filteredEntries.find((entry) => entry.item.id === selectedId) ??
-    filteredEntries[0];
-  const availableEntries = entries.filter((entry) => entry.available);
-  const startedCount = availableEntries.filter(
-    (entry) => entry.progress.status !== "new",
-  ).length;
-  const reviewCount = availableEntries.filter(
-    (entry) => entry.progress.status === "review",
-  ).length;
-  const weakCount = availableEntries.filter((entry) => entry.progress.weak).length;
-  const advanceToNextAvailableEntry = () => {
-    if (!selectedEntry || filteredEntries.length < 2) return;
-    const currentIndex = filteredEntries.findIndex(
-      (entry) => entry.item.id === selectedEntry.item.id,
-    );
-    const ordered = [
-      ...filteredEntries.slice(currentIndex + 1),
-      ...filteredEntries.slice(0, currentIndex),
-    ];
-    const next = ordered.find((entry) => entry.available);
-    if (next) setSelectedId(next.item.id);
-  };
+    filteredEntries[0] ??
+    entries[0];
+  const example = selectedEntry?.item.examples[0];
+  const strokeCount = selectedEntry
+    ? kanjiStrokeDataByLiteral[selectedEntry.item.literal]?.strokes.length ?? null
+    : null;
 
-  const selectedLessonBundle = selectedEntry
-    ? lessonBundles.find(
-        (bundle) => bundle.lesson.id === selectedEntry.item.introducedInLessonId,
-      )
-    : undefined;
-  const selectedStudyExercises =
-    selectedLessonBundle?.reviewExercises ?? selectedLessonBundle?.exercises ?? [];
-  const selectedWritingReviewItem = selectedEntry
-    ? reviewItems.find(
-        (item) => item.itemId === selectedEntry.item.id && item.skill === "writing",
-      )
-    : undefined;
+  if (sessionOpen) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle="dark-content" />
+        <ScrollView
+          contentContainerStyle={styles.sessionContainer}
+          keyboardShouldPersistTaps="handled"
+        >
+          <KanjiStudyPanel
+            catalog={n5KanjiCatalog}
+            progress={progressCatalog}
+            reviewItems={reviewItems}
+            onRecordStudy={onRecordStudy}
+            onRecordWriting={onRecordWriting}
+            onExit={() => setSessionOpen(false)}
+          />
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -276,28 +269,61 @@ export function KanjiScreen({
           <TouchableOpacity style={styles.backButton} onPress={onCourse}>
             <Text style={styles.backButtonText}>‹ К курсу</Text>
           </TouchableOpacity>
-          <Text style={styles.levelBadge}>JLPT N5</Text>
+          <Text style={styles.levelBadge}>JLPT N5 · 103</Text>
         </View>
 
-        <Text style={styles.eyebrow}>漢字 · Kanji Study</Text>
-        <Text style={styles.title}>Кандзи: значение, чтение и письмо</Text>
+        <Text style={styles.eyebrow}>漢字 · Skritter-style</Text>
+        <Text style={styles.title}>Один список. Одна очередь.</Text>
         <Text style={styles.description}>
-          103 знака идут вместе с курсом: сначала знакомое слово и значение, затем
-          чтение с опорой и без вариантов, после этого письмо и раздельное повторение.
+          Все 103 кандзи N5 доступны сразу. Сначала идут просроченные навыки, затем до
+          пяти новых знаков: знакомство, значение, чтение в слове и письмо. Ответ
+          открывается вручную, оценка 1–4 решает, когда карточка вернётся.
         </Text>
+
+        <View style={styles.deckCard}>
+          <View style={styles.deckHeader}>
+            <View style={styles.deckTitleCopy}>
+              <Text style={styles.deckEyebrow}>Активный список</Text>
+              <Text style={styles.deckTitle}>JLPT N5 Kanji</Text>
+            </View>
+            <Text style={styles.deckGlyph}>日語</Text>
+          </View>
+          <View style={styles.deckStats}>
+            <View style={styles.deckStat}>
+              <Text style={styles.deckStatValue}>{dueCount}</Text>
+              <Text style={styles.deckStatLabel}>к повторению</Text>
+            </View>
+            <View style={styles.deckStat}>
+              <Text style={styles.deckStatValue}>{newCount}</Text>
+              <Text style={styles.deckStatLabel}>новых</Text>
+            </View>
+            <View style={styles.deckStat}>
+              <Text style={styles.deckStatValue}>{weakCount}</Text>
+              <Text style={styles.deckStatLabel}>слабых</Text>
+            </View>
+          </View>
+          <TouchableOpacity style={styles.primaryButton} onPress={() => setSessionOpen(true)}>
+            <Text style={styles.primaryButtonText}>
+              {dueCount > 0 ? `Повторить ${dueCount} карточек` : "Начать занятие"}
+            </Text>
+          </TouchableOpacity>
+          <Text style={styles.deckNote}>
+            За одну сессию: до 20 просроченных карточек и до 5 новых кандзи.
+          </Text>
+        </View>
 
         <View style={styles.summaryGrid}>
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryValue}>{availableEntries.length}</Text>
-            <Text style={styles.summaryLabel}>доступно</Text>
+            <Text style={styles.summaryValue}>{newCount}</Text>
+            <Text style={styles.summaryLabel}>не начато</Text>
           </View>
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryValue}>{startedCount}</Text>
-            <Text style={styles.summaryLabel}>начато</Text>
+            <Text style={styles.summaryValue}>{learningCount}</Text>
+            <Text style={styles.summaryLabel}>изучается</Text>
           </View>
           <View style={styles.summaryCard}>
             <Text style={styles.summaryValue}>{reviewCount}</Text>
-            <Text style={styles.summaryLabel}>закреплено</Text>
+            <Text style={styles.summaryLabel}>в повторении</Text>
           </View>
           <View style={styles.summaryCard}>
             <Text style={styles.summaryValue}>{weakCount}</Text>
@@ -317,9 +343,10 @@ export function KanjiScreen({
 
         <View style={styles.filters}>
           {([
-            ["available", `Доступные ${availableEntries.length}`],
+            ["all", `Все ${entries.length}`],
+            ["new", `Новые ${newCount}`],
+            ["due", `Сейчас ${dueCount}`],
             ["weak", `Слабые ${weakCount}`],
-            ["all", "Все 103"],
           ] as const).map(([value, label]) => (
             <TouchableOpacity
               key={value}
@@ -349,123 +376,60 @@ export function KanjiScreen({
                   {selectedEntry.item.meaningsRu.join(", ")}
                 </Text>
                 <Text style={styles.lessonLabel}>
-                  Урок {selectedEntry.lessonOrder} · {selectedEntry.completedLesson
-                    ? "встречался в пройденном уроке"
-                    : selectedEntry.available
-                      ? "открыт для текущего урока"
-                      : "пока закрыт"}
+                  Порядок в курсе: урок {selectedEntry.lessonOrder}
+                  {strokeCount ? ` · ${strokeCount} черт` : ""}
                 </Text>
                 <Text style={styles.statusLabel}>
-                  Статус: {statusLabels[selectedEntry.progress.status]} · общий прогресс {selectedEntry.progress.overallMastery}%
+                  {statusLabels[selectedEntry.progress.status]} · общий прогресс {selectedEntry.progress.overallMastery}%
                 </Text>
               </View>
             </View>
 
-            {selectedEntry.item.examples[0] && (
+            {example && (
               <View style={styles.exampleCard}>
                 <View style={styles.exampleText}>
-                  <Text style={styles.exampleWord}>
-                    {selectedEntry.item.examples[0].written}
-                  </Text>
-                  <Text style={styles.exampleReading}>
-                    {selectedEntry.item.examples[0].reading}
-                  </Text>
-                  <Text style={styles.exampleMeaning}>
-                    {selectedEntry.item.examples[0].meaningRu}
-                  </Text>
+                  <Text style={styles.exampleWord}>{example.written}</Text>
+                  <Text style={styles.exampleReading}>{example.reading}</Text>
+                  <Text style={styles.exampleMeaning}>{example.meaningRu}</Text>
                   <Text style={styles.contextReading}>
-                    Чтение знака здесь: {selectedEntry.item.examples[0].kanjiReading}
+                    {selectedEntry.item.literal} здесь читается {example.kanjiReading}
                   </Text>
                 </View>
                 <TouchableOpacity
-                  accessibilityLabel={`Прослушать ${selectedEntry.item.examples[0].written}`}
                   style={styles.soundButton}
-                  onPress={() =>
-                    void speakJapanese(selectedEntry.item.examples[0]?.reading ?? "")
-                  }
+                  onPress={() => void speakJapanese(example.reading)}
                 >
                   <Text style={styles.soundButtonText}>🔊</Text>
                 </TouchableOpacity>
               </View>
             )}
 
-            {selectedEntry.available ? (
-              <KanjiStudyPanel
-                key={"study-" + selectedEntry.item.id}
-                item={selectedEntry.item}
-                catalog={n5KanjiCatalog}
-                exercises={selectedStudyExercises}
-                progress={selectedEntry.progress}
-                strokeCount={
-                  kanjiStrokeDataByLiteral[selectedEntry.item.literal]?.strokes.length ?? null
-                }
-                onRecord={(study: KanjiStudyResult) =>
-                  onRecordStudy(selectedEntry.item, study)
-                }
-              />
-            ) : (
-              <Text style={styles.lockedWriting}>
-                Изучение откроется вместе с уроком {selectedEntry.lessonOrder}. Пример можно
-                посмотреть заранее, но значение, чтение и письмо не записываются в прогресс.
-              </Text>
-            )}
-            <SkillCard
-              title="Значение"
-              progress={selectedEntry.progress.meaning}
-              note="Появится после задания на узнавание или активное значение."
-            />
-            <SkillCard
-              title="Чтение в слове"
-              progress={selectedEntry.progress.reading}
-              note="Появится после задания на чтение знакомого слова."
-            />
-            <SkillCard
-              title="Письмо"
-              progress={selectedEntry.progress.writing}
-              note="Пройди полный цикл письма ниже: оценка 1–4 изменит интервал повторения."
-            />
+            <SkillCard title="Значение" progress={selectedEntry.progress.meaning} />
+            <SkillCard title="Чтение в слове" progress={selectedEntry.progress.reading} />
+            <SkillCard title="Письмо" progress={selectedEntry.progress.writing} />
 
-            {selectedEntry.available ? (
-              <KanjiWritingPanel
-                key={selectedEntry.item.id}
-                item={selectedEntry.item}
-                progress={selectedEntry.progress.writing}
-                reviewItem={selectedWritingReviewItem}
-                onComplete={(result: SkritterWritingResult) =>
-                  onRecordWriting(selectedEntry.item, result)
-                }
-                onAutoAdvance={advanceToNextAvailableEntry}
-              />
-            ) : (
-              <Text style={styles.lockedWriting}>
-                Письмо откроется вместе с уроком {selectedEntry.lessonOrder}. Полный каталог
-                можно просматривать заранее, но прогресс не перескакивает через курс.
-              </Text>
-            )}
-
-            <Text style={styles.nextReview}>
-              Ближайшее повторение: {formatDue(selectedEntry.progress.nextDueAt)}.
-            </Text>
+            <TouchableOpacity style={styles.secondaryButton} onPress={() => setSessionOpen(true)}>
+              <Text style={styles.secondaryButtonText}>Открыть учебную очередь</Text>
+            </TouchableOpacity>
           </View>
         )}
 
         <Text style={styles.sectionTitle}>
-          {filter === "weak"
-            ? "Слабые кандзи"
-            : filter === "all"
-              ? "Полный N5-каталог"
-              : "Открытые кандзи"}
+          {filter === "new"
+            ? "Новые кандзи"
+            : filter === "due"
+              ? "К повторению сейчас"
+              : filter === "weak"
+                ? "Слабые кандзи"
+                : "Полный список N5"}
         </Text>
 
         {filteredEntries.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>
-              {filter === "weak" ? "Слабых кандзи пока нет" : "Ничего не найдено"}
-            </Text>
+            <Text style={styles.emptyTitle}>Здесь пока пусто</Text>
             <Text style={styles.emptyBody}>
-              {filter === "weak"
-                ? "Слабые места появятся после реальных попыток в уроках, письме и повторении."
-                : "Попробуй искать по знаку, русскому значению или чтению."}
+              Смени фильтр или запрос. Пустая очередь повторения — редкий приятный вид
+              бюрократии: значит, на сейчас всё сделано.
             </Text>
           </View>
         ) : (
@@ -478,14 +442,16 @@ export function KanjiScreen({
                   style={[
                     styles.kanjiTile,
                     selected && styles.kanjiTileSelected,
-                    !entry.available && styles.kanjiTileLocked,
+                    entry.due && styles.kanjiTileDue,
                     entry.progress.weak && styles.kanjiTileWeak,
                   ]}
                   onPress={() => setSelectedId(entry.item.id)}
                 >
                   <Text style={styles.tileGlyph}>{entry.item.literal}</Text>
                   <Text style={styles.tileProgress}>{entry.progress.overallMastery}%</Text>
-                  <Text style={styles.tileLesson}>ур. {entry.lessonOrder}</Text>
+                  <Text style={styles.tileLesson}>
+                    {entry.due ? "сейчас" : `ур. ${entry.lessonOrder}`}
+                  </Text>
                 </TouchableOpacity>
               );
             })}
@@ -499,6 +465,7 @@ export function KanjiScreen({
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#f4f7fa" },
   container: { padding: 20, paddingBottom: 48, gap: 18 },
+  sessionContainer: { padding: 18, paddingBottom: 48 },
   topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   backButton: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 14, backgroundColor: "#e7eef5" },
   backButtonText: { color: "#183153", fontSize: 15, fontWeight: "700" },
@@ -506,6 +473,21 @@ const styles = StyleSheet.create({
   eyebrow: { color: "#52606d", fontSize: 13, fontWeight: "800", letterSpacing: 1.2, textTransform: "uppercase" },
   title: { color: "#15202b", fontSize: 31, lineHeight: 38, fontWeight: "900" },
   description: { color: "#52606d", fontSize: 16, lineHeight: 24 },
+  deckCard: { gap: 14, padding: 18, borderWidth: 1, borderColor: "#b9cbd8", borderRadius: 24, backgroundColor: "#eaf2f7" },
+  deckHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  deckTitleCopy: { flex: 1, gap: 3 },
+  deckEyebrow: { color: "#52606d", fontSize: 11, fontWeight: "900", letterSpacing: 0.8, textTransform: "uppercase" },
+  deckTitle: { color: "#15202b", fontSize: 24, fontWeight: "900" },
+  deckGlyph: { color: "#31546f", fontSize: 38, fontWeight: "700" },
+  deckStats: { flexDirection: "row", gap: 8 },
+  deckStat: { flex: 1, padding: 11, borderRadius: 14, backgroundColor: "#ffffff" },
+  deckStatValue: { color: "#15202b", fontSize: 22, fontWeight: "900" },
+  deckStatLabel: { color: "#66788a", fontSize: 11, fontWeight: "700" },
+  deckNote: { textAlign: "center", color: "#66788a", fontSize: 12, lineHeight: 18 },
+  primaryButton: { alignItems: "center", paddingVertical: 14, paddingHorizontal: 18, borderRadius: 15, backgroundColor: "#183153" },
+  primaryButtonText: { color: "#ffffff", fontSize: 16, fontWeight: "900" },
+  secondaryButton: { alignItems: "center", paddingVertical: 13, paddingHorizontal: 17, borderWidth: 1, borderColor: "#afbdc9", borderRadius: 15, backgroundColor: "#ffffff" },
+  secondaryButtonText: { color: "#183153", fontSize: 14, fontWeight: "800" },
   summaryGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   summaryCard: { minWidth: "47%", flexGrow: 1, padding: 14, borderWidth: 1, borderColor: "#d7e0e8", borderRadius: 16, backgroundColor: "#ffffff" },
   summaryValue: { color: "#15202b", fontSize: 26, fontWeight: "900" },
@@ -546,15 +528,12 @@ const styles = StyleSheet.create({
   fillLearning: { backgroundColor: "#d49b23" },
   fillReview: { backgroundColor: "#3e9b6a" },
   fillWeak: { backgroundColor: "#c85454" },
-  masteryValue: { color: "#183153", fontSize: 18, fontWeight: "900" },
   skillMeta: { color: "#66788a", fontSize: 13, lineHeight: 19 },
-  lockedWriting: { padding: 14, borderRadius: 16, backgroundColor: "#f1f4f7", color: "#66788a", fontSize: 13, lineHeight: 19 },
-  nextReview: { color: "#52606d", fontSize: 13, lineHeight: 19 },
   sectionTitle: { color: "#15202b", fontSize: 22, fontWeight: "900" },
   kanjiGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   kanjiTile: { width: 72, minHeight: 92, alignItems: "center", justifyContent: "center", gap: 2, padding: 8, borderWidth: 1, borderColor: "#d7e0e8", borderRadius: 16, backgroundColor: "#ffffff" },
   kanjiTileSelected: { borderWidth: 2, borderColor: "#183153" },
-  kanjiTileLocked: { opacity: 0.48 },
+  kanjiTileDue: { backgroundColor: "#fff8df" },
   kanjiTileWeak: { borderColor: "#c85454" },
   tileGlyph: { color: "#15202b", fontSize: 34, fontWeight: "600" },
   tileProgress: { color: "#31546f", fontSize: 12, fontWeight: "800" },
