@@ -8,6 +8,7 @@ import {
 } from "react-native";
 
 import type { Exercise, KanjiItem } from "../domain/course";
+import type { AnswerStatus } from "../engine/checkAnswer";
 import type { KanjiProgressSummary } from "../engine/kanjiProgress";
 import {
   buildKanjiStudyQuestions,
@@ -43,7 +44,7 @@ export function KanjiStudyPanel({
   );
   const [phase, setPhase] = useState(-1);
   const [answer, setAnswer] = useState("");
-  const [status, setStatus] = useState<"correct" | "acceptable" | "incorrect" | null>(null);
+  const [status, setStatus] = useState<AnswerStatus | null>(null);
   const question = phase >= 0 ? questions[phase] : undefined;
   const complete = phase >= questions.length;
   const example = item.examples[0];
