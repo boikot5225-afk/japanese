@@ -1,11 +1,18 @@
 import { useMemo, useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 import { speakJapanese } from "../audio/japaneseSpeech";
 import { getKanjiStrokeData } from "../content/kanjiStrokeData";
 import type { KanjiItem } from "../domain/course";
 import type { KanjiProgressSummary } from "../engine/kanjiProgress";
 import {
+  buildKanjiLearnKnowledgeResults,
   buildKanjiLearnQueue,
   buildKanjiReviewQueue,
   buildKanjiStudyResult,
@@ -56,6 +63,16 @@ const LEARN_PART_INDEX: Record<KanjiStudyCard["part"], number> = {
   "writing-recall": 6,
 };
 
+const MARK_LEARNED_WRITING: SkritterExactWritingResult = {
+  grade: 3,
+  mode: "recall",
+  mistakes: 0,
+  attempts: 0,
+  hints: 0,
+  revealAll: false,
+  completed: true,
+};
+
 const writingModeForPart = (
   part: KanjiStudyCard["part"],
 ): SkritterExactWritingMode | null => {
@@ -96,6 +113,24 @@ function BasicGradeButtons({
   );
 }
 
+function ReadingWord({
+  written,
+  literal,
+}: {
+  written: string;
+  literal: string;
+}) {
+  const index = written.indexOf(literal);
+  if (index < 0) return <Text style={styles.questionWord}>{written}</Text>;
+  return (
+    <Text style={styles.questionWord}>
+      {written.slice(0, index)}
+      <Text style={styles.highlightedKanji}>{literal}</Text>
+      {written.slice(index + literal.length)}
+    </Text>
+  );
+}
+
 export function KanjiStudyPanel({
   mode,
   catalog,
@@ -109,6 +144,10 @@ export function KanjiStudyPanel({
     () => new Map(catalog.map((item) => [item.id, item])),
     [catalog],
   );
+  const progressById = useMemo(
+    () => new Map(progress.map((entry) => [entry.itemId, entry])),
+    [progress],
+  );
   const [queue, setQueue] = useState<KanjiStudyCard[]>(() =>
     mode === "learn"
       ? buildKanjiLearnQueue(catalog, progress)
@@ -120,6 +159,7 @@ export function KanjiStudyPanel({
 
   const card = queue[0];
   const item = card ? itemById.get(card.itemId) : undefined;
+  const itemProgress = item ? progressById.get(item.id) : undefined;
   const example = item?.examples[0];
   const writingMode = card ? writingModeForPart(card.part) : null;
 
@@ -146,6 +186,56 @@ export function KanjiStudyPanel({
     loadNextLearnItem(item.id);
   };
 
+  /**
+   * Commit all missing skills only at the final Learn step. A killed process or
+   * deliberate exit before then leaves the kanji pending instead of corrupting
+   * the six-stage flow. Legacy partial records are completed without double-counting.
+   */
+  const completeLearnItem = (writing: SkritterExactWritingResult) => {
+    if (!item || mode !== "learn") return;
+    const [definitionResult, readingResult] = buildKanjiLearnKnowledgeResults(item);
+    if ((itemProgress?.meaning.attempts ?? 0) === 0 && definitionResult) {
+      onRecordStudy(item, definitionResult);
+    }
+    if ((itemProgress?.reading.attempts ?? 0) === 0 && readingResult) {
+      onRecordStudy(item, readingResult);
+    }
+    if ((itemProgress?.writing.attempts ?? 0) === 0) {
+      onRecordWriting(item, writing);
+    }
+    loadNextLearnItem(item.id);
+  };
+
+  const requestExit = () => {
+    if (mode === "review" || !card) {
+      onExit();
+      return;
+    }
+    Alert.alert(
+      "Прервать обучение?",
+      "Текущий кандзи останется в Learn и при следующем запуске начнётся заново.",
+      [
+        { text: "Продолжить учить", style: "cancel" },
+        { text: "Выйти", style: "destructive", onPress: onExit },
+      ],
+    );
+  };
+
+  const markAsLearned = () => {
+    if (!item) return;
+    Alert.alert(
+      "Уже знаешь этот кандзи?",
+      "Значение, чтение и письмо будут добавлены в повторение как известные.",
+      [
+        { text: "Отмена", style: "cancel" },
+        {
+          text: "Отметить изученным",
+          onPress: () => completeLearnItem(MARK_LEARNED_WRITING),
+        },
+      ],
+    );
+  };
+
   const finishReviewCard = (grade: WritingGrade) => {
     if (!card || !item || card.mode !== "review") return;
     onRecordStudy(item, buildKanjiStudyResult(card, item, grade));
@@ -165,21 +255,12 @@ export function KanjiStudyPanel({
     resetReveal();
   };
 
-  const finishLearnKnowledgePart = () => {
-    if (!card || !item || card.mode !== "learn") return;
-    if (card.part !== "definition" && card.part !== "reading") return;
-    onRecordStudy(item, buildKanjiStudyResult(card, item, 3));
-    advanceLearn();
-  };
-
   const finishWriting = (result: SkritterExactWritingResult) => {
     if (!card || !item || !writingMode) return;
 
     if (mode === "learn") {
-      if (card.part === "writing-recall") {
-        onRecordWriting(item, result);
-      }
-      advanceLearn();
+      if (card.part === "writing-recall") completeLearnItem(result);
+      else advanceLearn();
       return;
     }
 
@@ -212,7 +293,7 @@ export function KanjiStudyPanel({
         </Text>
         <Text style={styles.completeBody}>
           {mode === "learn"
-            ? "Все 103 кандзи списка JLPT N5 уже введены в обучение."
+            ? "Все 103 кандзи списка JLPT N5 введены в повторение."
             : `Ответов: ${stats.answered}. Забыл: ${stats.forgotten}. Знаю: ${stats.remembered}.`}
         </Text>
         <TouchableOpacity style={styles.primaryButton} onPress={onExit}>
@@ -228,7 +309,7 @@ export function KanjiStudyPanel({
   return (
     <View style={styles.session}>
       <View style={styles.sessionHeader}>
-        <TouchableOpacity style={styles.exitButton} onPress={onExit}>
+        <TouchableOpacity style={styles.exitButton} onPress={requestExit}>
           <Text style={styles.exitButtonText}>×</Text>
         </TouchableOpacity>
         <View style={styles.headerCopy}>
@@ -291,7 +372,10 @@ export function KanjiStudyPanel({
             </View>
           )}
           <TouchableOpacity style={styles.primaryButton} onPress={advanceLearn}>
-            <Text style={styles.primaryButtonText}>Начать</Text>
+            <Text style={styles.primaryButtonText}>Продолжить обучение</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.linkButton} onPress={markAsLearned}>
+            <Text style={styles.linkButtonText}>Уже знаю · отметить изученным</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -315,7 +399,7 @@ export function KanjiStudyPanel({
                 )}
               </View>
               {mode === "learn" ? (
-                <TouchableOpacity style={styles.primaryButton} onPress={finishLearnKnowledgePart}>
+                <TouchableOpacity style={styles.primaryButton} onPress={advanceLearn}>
                   <Text style={styles.primaryButtonText}>Дальше</Text>
                 </TouchableOpacity>
               ) : (
@@ -329,7 +413,7 @@ export function KanjiStudyPanel({
       {card.part === "reading" && (
         <View style={styles.studyCard}>
           <Text style={styles.promptLabel}>Как читается выделенный знак?</Text>
-          <Text style={styles.questionWord}>{example?.written ?? item.literal}</Text>
+          <ReadingWord written={example?.written ?? item.literal} literal={item.literal} />
           {example && <Text style={styles.translation}>{example.meaningRu}</Text>}
           {!revealed ? (
             <TouchableOpacity style={styles.revealButton} onPress={() => setRevealed(true)}>
@@ -356,7 +440,7 @@ export function KanjiStudyPanel({
                 </View>
               </View>
               {mode === "learn" ? (
-                <TouchableOpacity style={styles.primaryButton} onPress={finishLearnKnowledgePart}>
+                <TouchableOpacity style={styles.primaryButton} onPress={advanceLearn}>
                   <Text style={styles.primaryButtonText}>Дальше</Text>
                 </TouchableOpacity>
               ) : (
@@ -462,7 +546,7 @@ const styles = StyleSheet.create({
   wordCopy: { flex: 1, gap: 2 },
   word: { color: "#15202b", fontSize: 27, fontWeight: "900" },
   reading: { color: "#31546f", fontSize: 16 },
-  translation: { color: "#66788a", fontSize: 14 },
+  translation: { color: "#66788a", fontSize: 14, textAlign: "center" },
   focusReading: { color: "#183153", fontSize: 14, fontWeight: "800" },
   soundButton: {
     width: 46,
@@ -476,6 +560,7 @@ const styles = StyleSheet.create({
   promptLabel: { textAlign: "center", color: "#52606d", fontSize: 15, fontWeight: "800" },
   questionGlyph: { textAlign: "center", color: "#15202b", fontSize: 118, lineHeight: 138 },
   questionWord: { textAlign: "center", color: "#15202b", fontSize: 40, fontWeight: "900" },
+  highlightedKanji: { color: "#c44747", textDecorationLine: "underline" },
   revealButton: {
     minHeight: 54,
     alignItems: "center",
@@ -512,6 +597,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#183153",
   },
   primaryButtonText: { color: "#ffffff", fontSize: 15, fontWeight: "900" },
+  linkButton: { alignItems: "center", justifyContent: "center", paddingVertical: 8 },
+  linkButtonText: { color: "#52606d", fontSize: 13, fontWeight: "800" },
   completeCard: {
     gap: 12,
     padding: 22,
