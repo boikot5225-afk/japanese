@@ -18,6 +18,7 @@ interface KanjiLessonGate {
 let runtime: KanjiLessonRuntime | null = null;
 const gates = new Map<string, KanjiLessonGate>();
 const completedSkills = new Map<string, Set<KanjiStudySkill>>();
+const pendingOpenRequests = new Set<string>();
 
 export const registerKanjiLessonRuntime = (
   value: KanjiLessonRuntime,
@@ -45,6 +46,9 @@ export const registerKanjiLessonGate = (
   gate: KanjiLessonGate,
 ): (() => void) => {
   gates.set(lessonId, gate);
+  if (pendingOpenRequests.delete(lessonId) && !gate.complete) {
+    gate.openStudy();
+  }
   return () => {
     if (gates.get(lessonId) === gate) gates.delete(lessonId);
   };
@@ -55,7 +59,11 @@ export const requestKanjiLessonAdvance = (
   proceed: () => void,
 ): boolean => {
   const gate = gates.get(lessonId);
-  if (!gate || gate.complete) {
+  if (!gate) {
+    pendingOpenRequests.add(lessonId);
+    return false;
+  }
+  if (gate.complete) {
     proceed();
     return true;
   }
@@ -67,4 +75,5 @@ export const resetKanjiLessonBridgeForTests = (): void => {
   runtime = null;
   gates.clear();
   completedSkills.clear();
+  pendingOpenRequests.clear();
 };

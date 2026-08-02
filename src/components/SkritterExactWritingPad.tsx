@@ -28,7 +28,11 @@ import {
   isSkritterSwipeUp,
   SKRITTER_PRESS_HOLD_MS,
 } from "../engine/skritterWritingGestures";
-import type { WritingGrade, WritingMode } from "../engine/writingSession";
+import {
+  getHiddenLearnWritingGrade,
+  type WritingGrade,
+  type WritingMode,
+} from "../engine/writingSession";
 
 export type SkritterExactWritingMode = "teach" | "snap" | "recall";
 export type SkritterExactGrading = "none" | "basic" | "advanced";
@@ -118,11 +122,6 @@ const modeInstruction = (mode: SkritterExactWritingMode): string => {
   }
 };
 
-export const hiddenLearnWritingGrade = (
-  manualReveal: boolean,
-  revealAll: boolean,
-): WritingGrade => (manualReveal || revealAll ? 1 : 3);
-
 export function SkritterExactWritingPad({
   data,
   mode,
@@ -154,7 +153,6 @@ export function SkritterExactWritingPad({
   const rejectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const completionSentRef = useRef(false);
   const forcedForgottenRef = useRef(false);
-  const manualRevealRef = useRef(false);
   const hintsRef = useRef(0);
   const mistakesRef = useRef(0);
   const attemptsRef = useRef(0);
@@ -191,7 +189,6 @@ export function SkritterExactWritingPad({
       hintsRef.current = next;
       setHints(next);
       if (manual) {
-        manualRevealRef.current = true;
         setForgotten();
       }
       return next;
@@ -207,7 +204,6 @@ export function SkritterExactWritingPad({
     holdTriggeredRef.current = false;
     completionSentRef.current = false;
     forcedForgottenRef.current = false;
-    manualRevealRef.current = false;
     hintsRef.current = 0;
     mistakesRef.current = 0;
     attemptsRef.current = 0;
@@ -266,11 +262,16 @@ export function SkritterExactWritingPad({
   );
 
   const getHiddenGrade = useCallback(
-    (): WritingGrade => hiddenLearnWritingGrade(
-      manualRevealRef.current,
-      revealedAllRef.current,
-    ),
-    [],
+    (): WritingGrade => getHiddenLearnWritingGrade({
+      mode: resultMode(mode),
+      strokeCount: data.strokes.length,
+      mistakes: mistakesRef.current,
+      attempts: attemptsRef.current,
+      hints: hintsRef.current,
+      revealAll: revealedAllRef.current,
+      completed: true,
+    }),
+    [data.strokes.length, mode],
   );
 
   const finishCharacter = useCallback(() => {
@@ -287,6 +288,7 @@ export function SkritterExactWritingPad({
     const forgotten =
       forcedForgottenRef.current ||
       revealedAllRef.current ||
+      hintsRef.current > 0 ||
       mistakesRef.current > failureLimit(data.strokes.length);
     if (forgotten) setForgotten();
     setPhase("grading");

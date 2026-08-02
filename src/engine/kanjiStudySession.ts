@@ -23,6 +23,7 @@ export interface KanjiStudyCard {
   isNew: boolean;
   remediation: boolean;
   repetition: number;
+  availableAt?: number;
 }
 
 export interface KanjiStudyResult {
@@ -52,6 +53,7 @@ const createCard = (
   isNew: boolean,
   repetition = 0,
   remediation = false,
+  availableAt?: number,
 ): KanjiStudyCard => ({
   id: `${cardKey(itemId, part)}:${mode}:${repetition}`,
   itemId,
@@ -60,6 +62,7 @@ const createCard = (
   isNew,
   remediation,
   repetition,
+  ...(availableAt === undefined ? {} : { availableAt }),
 });
 
 const isDue = (item: ReviewItem, now: Date): boolean => {
@@ -213,6 +216,21 @@ export const buildKanjiReviewQueue = (
   return orderReviewCandidates(candidates).slice(0, limit);
 };
 
+export const findReadyKanjiCardIndex = (
+  cards: readonly KanjiStudyCard[],
+  nowMs = Date.now(),
+): number => cards.findIndex(
+  (card) => card.availableAt === undefined || card.availableAt <= nowMs,
+);
+
+export const findNextKanjiCardAvailableAt = (
+  cards: readonly KanjiStudyCard[],
+  nowMs = Date.now(),
+): number | null => cards.reduce<number | null>((earliest, card) => {
+  if (card.availableAt === undefined || card.availableAt <= nowMs) return earliest;
+  return earliest === null ? card.availableAt : Math.min(earliest, card.availableAt);
+}, null);
+
 export const countDueKanjiCards = (
   catalog: readonly KanjiItem[],
   reviewItems: readonly ReviewItem[],
@@ -309,6 +327,7 @@ export const requeueForgottenKanjiCard = (
   remaining: readonly KanjiStudyCard[],
   card: KanjiStudyCard,
   grade: WritingGrade,
+  nowMs = Date.now(),
 ): KanjiStudyCard[] => {
   if (card.mode !== "review" || grade !== 1) return [...remaining];
   return [
@@ -320,6 +339,7 @@ export const requeueForgottenKanjiCard = (
       false,
       card.repetition + 1,
       true,
+      nowMs + 30_000,
     ),
   ];
 };

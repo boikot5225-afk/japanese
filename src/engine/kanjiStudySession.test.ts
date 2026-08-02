@@ -9,7 +9,9 @@ import {
   buildKanjiReviewQueue,
   buildKanjiStudyResult,
   countNewKanji,
+  findNextKanjiCardAvailableAt,
   findNextNewKanjiId,
+  findReadyKanjiCardIndex,
   gradeKanjiStudyAnswer,
   isKanjiPendingLearn,
   requeueForgottenKanjiCard,
@@ -190,7 +192,7 @@ test("review avoids adjacent parts of the same kanji when another item is ready"
   assert.notEqual(queue[0]?.itemId, queue[1]?.itemId);
 });
 
-test("only forgotten review cards return at the end of the queue", () => {
+test("only forgotten review cards return after the 30-second boundary", () => {
   const current = {
     id: `${person.id}:definition:review:0`,
     itemId: person.id,
@@ -212,13 +214,34 @@ test("only forgotten review cards return at the end of the queue", () => {
     },
   ];
 
-  const forgotQueue = requeueForgottenKanjiCard(remaining, current, 1);
+  const nowMs = new Date("2026-08-02T00:00:00.000Z").getTime();
+  const forgotQueue = requeueForgottenKanjiCard(remaining, current, 1, nowMs);
   assert.equal(forgotQueue.at(-1)?.itemId, person.id);
   assert.equal(forgotQueue.at(-1)?.remediation, true);
+  assert.equal(forgotQueue.at(-1)?.availableAt, nowMs + 30_000);
 
   assert.deepEqual(requeueForgottenKanjiCard(remaining, current, 2), remaining);
   assert.deepEqual(requeueForgottenKanjiCard(remaining, current, 3), remaining);
   assert.deepEqual(requeueForgottenKanjiCard(remaining, current, 4), remaining);
+});
+
+test("forgotten cards are unavailable before 30 seconds and ready on the boundary", () => {
+  const current = {
+    id: `${person.id}:definition:review:0`,
+    itemId: person.id,
+    mode: "review" as const,
+    part: "definition" as const,
+    isNew: false,
+    remediation: false,
+    repetition: 0,
+  };
+  const nowMs = new Date("2026-08-02T00:00:00.000Z").getTime();
+  const queue = requeueForgottenKanjiCard([], current, 1, nowMs);
+
+  assert.equal(findReadyKanjiCardIndex(queue, nowMs + 29_999), -1);
+  assert.equal(findNextKanjiCardAvailableAt(queue, nowMs + 29_999), nowMs + 30_000);
+  assert.equal(findReadyKanjiCardIndex(queue, nowMs + 30_000), 0);
+  assert.equal(findNextKanjiCardAvailableAt(queue, nowMs + 30_000), null);
 });
 
 test("maps Skritter grades above one to successful SRS results", () => {

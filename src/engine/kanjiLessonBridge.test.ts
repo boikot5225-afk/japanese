@@ -33,6 +33,29 @@ test("lesson kanji gate blocks navigation and opens the exact study cycle", () =
   unregister();
 });
 
+test("lesson kanji gate fails closed before its effect registers", () => {
+  resetKanjiLessonBridgeForTests();
+  let opened = 0;
+  let advanced = 0;
+
+  assert.equal(
+    requestKanjiLessonAdvance("lesson-001", () => {
+      advanced += 1;
+    }),
+    false,
+  );
+  assert.equal(advanced, 0);
+
+  registerKanjiLessonGate("lesson-001", {
+    complete: false,
+    openStudy: () => {
+      opened += 1;
+    },
+  });
+  assert.equal(opened, 1);
+  assert.equal(advanced, 0);
+});
+
 test("lesson kanji gate allows navigation only after the cycle is complete", () => {
   resetKanjiLessonBridgeForTests();
   let advanced = 0;

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   StyleSheet,
@@ -16,7 +16,9 @@ import {
   buildKanjiLearnQueue,
   buildKanjiReviewQueue,
   buildKanjiStudyResult,
+  findNextKanjiCardAvailableAt,
   findNextNewKanjiId,
+  findReadyKanjiCardIndex,
   kanjiStudyPartLabel,
   requeueForgottenKanjiCard,
   type KanjiStudyCard,
@@ -200,12 +202,22 @@ export function KanjiStudyPanel({
   const [revealed, setRevealed] = useState(false);
   const [stats, setStats] = useState<ReviewStats>(emptyStats);
   const [incorrectPending, setIncorrectPending] = useState(0);
+  const [clockMs, setClockMs] = useState(() => Date.now());
 
-  const card = queue[0];
+  const readyCardIndex = findReadyKanjiCardIndex(queue, clockMs);
+  const card = readyCardIndex >= 0 ? queue[readyCardIndex] : undefined;
   const item = card ? itemById.get(card.itemId) : undefined;
   const itemProgress = item ? progressById.get(item.id) : undefined;
   const example = item?.examples[0];
   const writingMode = card ? writingModeForPart(card.part) : null;
+  const nextAvailableAt = findNextKanjiCardAvailableAt(queue, clockMs);
+
+  useEffect(() => {
+    if (nextAvailableAt === null) return;
+    const delay = Math.max(25, nextAvailableAt - Date.now());
+    const timer = setTimeout(() => setClockMs(Date.now()), delay);
+    return () => clearTimeout(timer);
+  }, [nextAvailableAt]);
 
   const resetReveal = () => setRevealed(false);
 
@@ -288,9 +300,10 @@ export function KanjiStudyPanel({
       if (grade === 3 && card.remediation) return Math.max(0, previous - 1);
       return previous;
     });
-    setQueue((previous) =>
-      requeueForgottenKanjiCard(previous.slice(1), card, grade),
-    );
+    setQueue((previous) => {
+      const remaining = previous.filter((_, index) => index !== readyCardIndex);
+      return requeueForgottenKanjiCard(remaining, card, grade, Date.now());
+    });
     resetReveal();
   };
 
@@ -315,11 +328,29 @@ export function KanjiStudyPanel({
       if (result.grade === 3 && card.remediation) return Math.max(0, previous - 1);
       return previous;
     });
-    setQueue((previous) =>
-      requeueForgottenKanjiCard(previous.slice(1), card, result.grade),
-    );
+    setQueue((previous) => {
+      const remaining = previous.filter((_, index) => index !== readyCardIndex);
+      return requeueForgottenKanjiCard(remaining, card, result.grade, Date.now());
+    });
     resetReveal();
   };
+
+  if ((!card || !item) && queue.length > 0 && nextAvailableAt !== null) {
+    const seconds = Math.max(1, Math.ceil((nextAvailableAt - clockMs) / 1000));
+    return (
+      <View style={styles.completeCard}>
+        <Text style={styles.eyebrow}>Review · пауза</Text>
+        <Text style={styles.completeTitle}>Карточка вернётся через {seconds} сек</Text>
+        <Text style={styles.completeBody}>
+          Оценка «Забыл» действительно выдерживает 30-секундную границу,
+          а не появляется сразу в хвосте. Экран обновится автоматически.
+        </Text>
+        <TouchableOpacity style={styles.linkButton} onPress={onExit}>
+          <Text style={styles.linkButtonText}>Выйти к списку</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   if (!card || !item) {
     return (

@@ -17,10 +17,8 @@ import {
 } from "../engine/practicePresentation";
 import { styles } from "../theme/appStyles";
 import { HandwritingPad } from "./HandwritingPad";
-import {
-  SkritterWritingPad,
-  type SkritterWritingResult,
-} from "./SkritterWritingPad";
+import { SkritterExactWritingPad } from "./SkritterExactWritingPad";
+import type { SkritterWritingResult } from "./SkritterWritingPad";
 
 interface PracticeCardProps {
   title: string;
@@ -252,13 +250,11 @@ export function PracticeCard({
         {interactionMode === "handwriting" && (
           <>
             {hasAutomaticHandwriting ? (
-              <SkritterWritingPad
+              <SkritterExactWritingPad
                 key={exercise.id}
                 data={getKanjiStrokeData(displayedAnswer)!}
-                initialMode="recall"
-                compact
-                allowModeSelection={false}
-                disabled={Boolean(result)}
+                mode="recall"
+                grading="advanced"
                 onComplete={(writing) => {
                   onWritingComplete(writing);
                 }}

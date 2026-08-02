@@ -25,29 +25,27 @@ const schedule = (grade: 1 | 2 | 3 | 4) =>
     "reading",
     exerciseForGrade(grade),
     "lesson-001",
-    grade <= 2 ? "incorrect" : grade === 3 ? "acceptable" : "correct",
+    grade === 1 ? "incorrect" : grade === 2 ? "acceptable" : "correct",
     now,
   );
 
-test("kanji self-grades create four distinct first intervals", () => {
+test("kanji self-grades match the Classic first intervals", () => {
   const forgot = schedule(1);
   const hard = schedule(2);
   const known = schedule(3);
   const easy = schedule(4);
 
-  assert.equal(new Date(forgot.dueAt).getTime() - now.getTime(), 10 * 60 * 1000);
-  assert.equal(new Date(hard.dueAt).getTime() - now.getTime(), 8 * 60 * 60 * 1000);
+  assert.equal(new Date(forgot.dueAt).getTime() - now.getTime(), 30 * 1000);
+  assert.equal(hard.intervalDays, 1);
   assert.equal(known.intervalDays, 1);
-  assert.equal(easy.intervalDays, 4);
+  assert.ok(easy.intervalDays >= 25.9 && easy.intervalDays <= 30.1);
 
   assert.equal(forgot.streak, 0);
-  assert.equal(hard.streak, 0);
+  assert.equal(hard.streak, 1);
   assert.equal(known.streak, 1);
   assert.equal(easy.streak, 1);
-
-  assert.ok(forgot.ease < hard.ease);
-  assert.ok(hard.ease < known.ease);
-  assert.ok(known.ease < easy.ease);
+  assert.equal(forgot.lastStatus, "incorrect");
+  assert.equal(hard.lastStatus, "acceptable");
 });
 
 test("ordinary non-kanji failures keep the existing immediate schedule", () => {

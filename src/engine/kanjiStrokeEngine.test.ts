@@ -131,6 +131,28 @@ test("rejects the correct shape drawn backwards", () => {
   assert.equal(result.issue, "wrong-direction");
 });
 
+test("rejects a centered shortcut that misses both canonical endpoints", () => {
+  const result = assessKanjiStroke(
+    padLine(185, 230, 320, 230),
+    horizontal,
+    500,
+    500,
+  );
+  assert.equal(result.accepted, false);
+  assert.ok(["wrong-start", "wrong-end", "wrong-shape"].includes(result.issue ?? ""));
+});
+
+test("rejects a parallel stroke whose sampled shape is displaced", () => {
+  const result = assessKanjiStroke(
+    padLine(92, 305, 413, 305),
+    horizontal,
+    500,
+    500,
+  );
+  assert.equal(result.accepted, false);
+  assert.ok(["wrong-start", "wrong-end", "wrong-position", "wrong-shape"].includes(result.issue ?? ""));
+});
+
 test("rejects a stroke whose center is too far from the target", () => {
   const result = assessKanjiStroke(
     padLine(40, 40, 250, 40),
@@ -139,7 +161,7 @@ test("rejects a stroke whose center is too far from the target", () => {
     500,
   );
   assert.equal(result.accepted, false);
-  assert.equal(result.issue, "wrong-position");
+  assert.ok(["wrong-start", "wrong-position", "wrong-shape"].includes(result.issue ?? ""));
 });
 
 test("rejects a missing corner in a simple hooked stroke", () => {
@@ -150,7 +172,7 @@ test("rejects a missing corner in a simple hooked stroke", () => {
     500,
   );
   assert.equal(result.accepted, false);
-  assert.ok(["wrong-direction", "wrong-corners"].includes(result.issue ?? ""));
+  assert.ok(["wrong-direction", "wrong-corners", "wrong-shape"].includes(result.issue ?? ""));
 });
 
 test("accepts a naturally drawn hooked stroke", () => {

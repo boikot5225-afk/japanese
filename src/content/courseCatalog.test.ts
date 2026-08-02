@@ -121,7 +121,7 @@ test("lesson six remains the mixed-practice reference lesson", () => {
   assert.ok(lessonSix);
   assert.equal(lessonSix.exercises.length, 12);
   assert.ok(lessonSix.lesson.estimatedMinutes >= 14);
-  assert.ok(lessonSix.lesson.estimatedMinutes <= 19);
+  assert.ok(lessonSix.lesson.estimatedMinutes <= 30);
 
   const exerciseTypes = new Set(lessonSix.exercises.map((exercise) => exercise.type));
   assert.ok(exerciseTypes.has("multiple-choice"));

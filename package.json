@@ -8,7 +8,7 @@
     "android": "expo run:android",
     "web": "expo start --web",
     "generate:kanji-strokes": "node scripts/generate-kanji-strokes.mjs",
-    "test:review": "tsx --test src/engine/reviewEngine.test.ts src/engine/kanjiClassicSchedule.test.ts src/engine/kanjiReviewNormalization.test.ts",
+    "test:review": "tsx --test src/engine/reviewEngine.test.ts src/engine/kanjiClassicSchedule.test.ts src/engine/kanjiSelfGradeReview.test.ts src/engine/kanjiReviewNormalization.test.ts",
     "test:kanji-progress": "tsx --test src/engine/kanjiProgress.test.ts",
     "test:kanji-strokes": "tsx --test src/engine/kanjiStrokeEngine.test.ts src/engine/skritterWritingGestures.test.ts",
     "test:writing-session": "tsx --test src/engine/writingSession.test.ts",

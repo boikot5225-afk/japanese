@@ -36,6 +36,10 @@ const LINE_THRESHOLD = 0.8;
 
 const MAX_ANGLE_DIFFERENCE = 60;
 const MAX_CENTER_DISTANCE = 0.3;
+const MAX_START_DISTANCE = 18;
+const MAX_END_DISTANCE = 20;
+const MAX_AVERAGE_DISTANCE = 16;
+const MIN_DIRECTION_SIMILARITY = 0.3;
 const MIN_CORNER_LENGTH_RATIO = 0.5;
 const MAX_CORNER_LENGTH_RATIO = 2;
 const LINE_MIN_CORNER_LENGTH_RATIO = MIN_CORNER_LENGTH_RATIO / 2;
@@ -523,10 +527,19 @@ export const assessKanjiStroke = (
   let issue: KanjiStrokeIssue | null = null;
   if (padPoints.length < 2 || actualCornerLength <= 0.01) {
     issue = "too-short";
-  } else if (angleDifference > MAX_ANGLE_DIFFERENCE) {
+  } else if (
+    angleDifference > MAX_ANGLE_DIFFERENCE ||
+    similarity < MIN_DIRECTION_SIMILARITY
+  ) {
     issue = "wrong-direction";
+  } else if (startDistance > MAX_START_DISTANCE) {
+    issue = "wrong-start";
+  } else if (endDistance > MAX_END_DISTANCE) {
+    issue = "wrong-end";
   } else if (centerDistance > MAX_CENTER_DISTANCE) {
     issue = "wrong-position";
+  } else if (averageDistance > MAX_AVERAGE_DISTANCE) {
+    issue = "wrong-shape";
   } else if (
     actualCorners.length < expectedCorners.length &&
     !oneSmoothedComplexCorner

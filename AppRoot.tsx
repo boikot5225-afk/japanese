@@ -151,6 +151,7 @@ export default function App() {
   const [reviewIndex, setReviewIndex] = useState(0);
   const [reviewAttempts, setReviewAttempts] = useState<ExerciseAttempt[]>([]);
   const [scheduledRemediationKeys, setScheduledRemediationKeys] = useState<string[]>([]);
+  const [reviewClockMs, setReviewClockMs] = useState(() => Date.now());
 
   const lessonExercise = lessonQueue[exerciseIndex];
   const activeCheckpointQuestion = checkpointQueue[exerciseIndex];
@@ -201,12 +202,20 @@ export default function App() {
     : completedLessonIds.length === lessonBundles.length
       ? lessonBundles[lessonBundles.length - 1]
       : undefined;
-  const dueReviewItems = useMemo(() => getDueReviewItems(reviewItems, new Date()), [reviewItems]);
+  const dueReviewItems = useMemo(
+    () => getDueReviewItems(reviewItems, new Date(reviewClockMs)),
+    [reviewClockMs, reviewItems],
+  );
   const weakTargetCount = useMemo(() => getWeakTargetIds(reviewItems).length, [reviewItems]);
   const nextReviewLabel = useMemo(
     () => formatReviewDate(getNextReviewAt(reviewItems)),
-    [reviewItems],
+    [reviewClockMs, reviewItems],
   );
+
+  useEffect(() => {
+    const timer = setInterval(() => setReviewClockMs(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -621,7 +630,7 @@ export default function App() {
         reviewQueue.map((entry) => getExerciseContentKey(entry.exercise)),
       );
       const remediation = buildReviewSession(
-        repeatedItems,
+        getDueReviewItems(repeatedItems, now),
         reviewExercisesByLesson,
         attemptHistory,
         1,

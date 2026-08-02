@@ -78,11 +78,12 @@ test("only grades three and four pass", () => {
   assert.equal(isPassingWritingGrade(4), true);
 });
 
-test("hidden Learn grade penalizes deliberate reveals only", () => {
-  assert.equal(getHiddenLearnWritingGrade(false, false), 3);
-  assert.equal(getHiddenLearnWritingGrade(true, false), 1);
-  assert.equal(getHiddenLearnWritingGrade(false, true), 1);
-  assert.equal(getHiddenLearnWritingGrade(true, true), 1);
+test("hidden Learn grade records automatic help and repeated failures as forgotten", () => {
+  assert.equal(getHiddenLearnWritingGrade(baseMetrics), 3);
+  assert.equal(getHiddenLearnWritingGrade({ ...baseMetrics, hints: 1 }), 1);
+  assert.equal(getHiddenLearnWritingGrade({ ...baseMetrics, revealAll: true }), 1);
+  assert.equal(getHiddenLearnWritingGrade({ ...baseMetrics, mistakes: 4, attempts: 12 }), 1);
+  assert.equal(getHiddenLearnWritingGrade({ ...baseMetrics, completed: false }), 1);
 });
 
 test("learning stages fade guidance with experience", () => {
