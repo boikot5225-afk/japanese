@@ -38,12 +38,12 @@ jobs:
           node-version: 22
 
       - name: Apply kanji study cycle
-        if: github.event_name == 'push'
         run: node scripts/apply-kanji-study-cycle.mjs
 
       - name: Persist generated source changes
-        if: github.event_name == 'push'
         shell: bash
+        env:
+          TARGET_BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
           if git diff --quiet; then
             echo "Source already up to date."
@@ -61,7 +61,7 @@ jobs:
             src/screens/CourseScreen.tsx \
             src/screens/KanjiScreen.tsx
           git commit -m "Implement kanji study cycle 0.22.0 [skip build]"
-          git push origin HEAD:${GITHUB_REF_NAME}
+          git push origin HEAD:${TARGET_BRANCH}
 
       - name: Read version
         run: echo "APP_VERSION=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
