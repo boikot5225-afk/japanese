@@ -12,7 +12,7 @@ import {
 
 import { speakJapanese } from "../audio/japaneseSpeech";
 import { KanjiWritingPanel } from "../components/KanjiWritingPanel";
-import type { KanjiTracingResult } from "../components/KanjiTracingPad";
+import type { SkritterWritingResult } from "../components/SkritterWritingPad";
 import { lessonBundles } from "../content/courseCatalog";
 import { n5KanjiCatalog } from "../content/kanjiCatalog";
 import type { KanjiItem } from "../domain/course";
@@ -34,7 +34,7 @@ interface KanjiScreenProps {
   checkpointProgress: CheckpointProgress[];
   reviewItems: ReviewItem[];
   onCourse: () => void;
-  onRecordWriting: (item: KanjiItem, result: KanjiTracingResult) => void;
+  onRecordWriting: (item: KanjiItem, result: SkritterWritingResult) => void;
 }
 
 type CatalogFilter = "available" | "weak" | "all";
@@ -237,6 +237,11 @@ export function KanjiScreen({
     (entry) => entry.progress.status === "review",
   ).length;
   const weakCount = availableEntries.filter((entry) => entry.progress.weak).length;
+  const selectedWritingReviewItem = selectedEntry
+    ? reviewItems.find(
+        (item) => item.itemId === selectedEntry.item.id && item.skill === "writing",
+      )
+    : undefined;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -253,7 +258,7 @@ export function KanjiScreen({
         <Text style={styles.title}>Кандзи: значение, чтение и письмо</Text>
         <Text style={styles.description}>
           103 знака идут вместе с курсом. Чтения учатся в словах, а письмо теперь
-          проверяет порядок, направление и форму каждого штриха — без самооценки на честном слове.
+          использует обучение, прилипание штрихов, письмо по памяти и четыре оценки SRS.
         </Text>
 
         <View style={styles.summaryGrid}>
@@ -372,7 +377,7 @@ export function KanjiScreen({
             <SkillCard
               title="Письмо"
               progress={selectedEntry.progress.writing}
-              note="Пройди обведение ниже: результат попадёт в общую интервальную очередь."
+              note="Пройди полный цикл письма ниже: оценка 1–4 изменит интервал повторения."
             />
 
             {selectedEntry.available ? (
@@ -380,7 +385,8 @@ export function KanjiScreen({
                 key={selectedEntry.item.id}
                 item={selectedEntry.item}
                 progress={selectedEntry.progress.writing}
-                onComplete={(result: KanjiTracingResult) =>
+                reviewItem={selectedWritingReviewItem}
+                onComplete={(result: SkritterWritingResult) =>
                   onRecordWriting(selectedEntry.item, result)
                 }
               />

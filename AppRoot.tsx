@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { SafeAreaView, Text, TouchableOpacity, View } from "react-native";
 
-import type { KanjiTracingResult } from "./src/components/KanjiTracingPad";
+import type { SkritterWritingResult } from "./src/components/SkritterWritingPad";
 
 import {
   findCheckpoint,
@@ -29,6 +29,7 @@ import {
 } from "./src/engine/lessonReview";
 import { calculateLessonResult, type ExerciseAttempt } from "./src/engine/lessonSession";
 import { scheduleLessonRemediation } from "./src/engine/practiceQueue";
+import { scheduleWritingReview, writingGradeStatus } from "./src/engine/writingReview";
 import {
   buildReviewSession,
   createAttemptLogEntry,
@@ -588,28 +589,26 @@ export default function App() {
 
   const recordKanjiWriting = (
     item: KanjiItem,
-    tracing: KanjiTracingResult,
+    writing: SkritterWritingResult,
   ) => {
     const exercise = createKanjiWritingExercise(
       item.introducedInLessonId,
       item,
     );
     const now = new Date();
-    const status: AnswerCheckResult["status"] =
-      tracing.mistakes === 0 ? "correct" : "acceptable";
+    const status: AnswerCheckResult["status"] = writingGradeStatus(writing.grade);
 
     setReviewItems((previous) => {
       const key = reviewItemKey({ itemId: item.id, skill: "writing" });
       const existing = previous.find((entry) => reviewItemKey(entry) === key);
       return upsertReviewItem(
         previous,
-        scheduleItemReview(
+        scheduleWritingReview(
           existing,
           item.id,
-          "writing",
           exercise,
           item.introducedInLessonId,
-          status,
+          writing.grade,
           now,
         ),
       );

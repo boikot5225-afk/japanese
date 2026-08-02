@@ -17,6 +17,8 @@ import {
 } from "../engine/practicePresentation";
 import { styles } from "../theme/appStyles";
 import { HandwritingPad } from "./HandwritingPad";
+import { SkritterWritingPad } from "./SkritterWritingPad";
+import { isPassingWritingGrade } from "../engine/writingSession";
 
 interface PracticeCardProps {
   title: string;
@@ -245,43 +247,58 @@ export function PracticeCard({
 
         {interactionMode === "handwriting" && (
           <>
-            <HandwritingPad
-              key={exercise.id}
-              reference={displayedAnswer}
-              disabled={Boolean(result)}
-              onInkChange={handleInkChange}
-              onCompare={() => setHandwritingCompared(true)}
-              onAutomaticAssessment={(looksCorrect) =>
-                onChoice(getHandwritingAssessmentAnswer(exercise, looksCorrect))
-              }
-            />
-            {!hasAutomaticHandwriting &&
-              !result &&
-              handwritingCompared &&
-              handwritingHasInk && (
-                <View style={styles.choiceList}>
-                  <Text style={styles.feedbackExplanation}>
-                    Сравни с усиленным образцом. Для слов и фраз без данных штрихов
-                    оценка пока ручная; одиночные кандзи проверяются автоматически.
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.choiceButton}
-                    onPress={() =>
-                      onChoice(getHandwritingAssessmentAnswer(exercise, true))
-                    }
-                  >
-                    <Text style={styles.choiceText}>Похоже на образец</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.choiceButton}
-                    onPress={() =>
-                      onChoice(getHandwritingAssessmentAnswer(exercise, false))
-                    }
-                  >
-                    <Text style={styles.choiceText}>Нужно повторить</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+            {hasAutomaticHandwriting ? (
+              <SkritterWritingPad
+                key={exercise.id}
+                data={getKanjiStrokeData(displayedAnswer)!}
+                initialMode="recall"
+                compact
+                allowModeSelection={false}
+                disabled={Boolean(result)}
+                onComplete={(writing) =>
+                  onChoice(
+                    getHandwritingAssessmentAnswer(
+                      exercise,
+                      isPassingWritingGrade(writing.grade),
+                    ),
+                  )
+                }
+              />
+            ) : (
+              <>
+                <HandwritingPad
+                  key={exercise.id}
+                  reference={displayedAnswer}
+                  disabled={Boolean(result)}
+                  onInkChange={handleInkChange}
+                  onCompare={() => setHandwritingCompared(true)}
+                />
+                {!result && handwritingCompared && handwritingHasInk && (
+                  <View style={styles.choiceList}>
+                    <Text style={styles.feedbackExplanation}>
+                      Для слов и фраз без поштриховых данных остаётся свободное письмо
+                      с ручным сравнением; одиночные кандзи используют полный тренажёр.
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.choiceButton}
+                      onPress={() =>
+                        onChoice(getHandwritingAssessmentAnswer(exercise, true))
+                      }
+                    >
+                      <Text style={styles.choiceText}>Похоже на образец</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.choiceButton}
+                      onPress={() =>
+                        onChoice(getHandwritingAssessmentAnswer(exercise, false))
+                      }
+                    >
+                      <Text style={styles.choiceText}>Нужно повторить</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </>
+            )}
           </>
         )}
 

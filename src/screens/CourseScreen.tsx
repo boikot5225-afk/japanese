@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { SafeAreaView, ScrollView, StatusBar, Text, TouchableOpacity, View } from "react-native";
 
-import type { KanjiTracingResult } from "../components/KanjiTracingPad";
+import type { SkritterWritingResult } from "../components/SkritterWritingPad";
 import {
   findCheckpointForUnit,
   type CourseCheckpoint,
@@ -34,7 +34,7 @@ interface CourseScreenProps {
   onStartCheckpoint: (checkpoint: CourseCheckpoint) => void;
   onStartReview: () => void;
   onOpenKana: () => void;
-  onRecordKanjiWriting: (item: KanjiItem, result: KanjiTracingResult) => void;
+  onRecordKanjiWriting: (item: KanjiItem, result: SkritterWritingResult) => void;
 }
 
 const russianForm = (count: number, one: string, few: string, many: string): string => {
