@@ -1,19 +1,19 @@
-import type { Exercise, KanjiItem } from "../domain/course";
-import { checkAnswer, type AnswerStatus } from "./checkAnswer";
+import { buildKanjiReviewExercises } from "../content/kanjiCurriculum";
+import type { Exercise, KanjiItem, Skill } from "../domain/course";
+import type { KanjiProgressSummary } from "./kanjiProgress";
+import type { AnswerStatus } from "./checkAnswer";
+import type { ReviewItem } from "./reviewEngine";
+import type { WritingGrade } from "./writingSession";
 
-export type KanjiStudyQuestionKind =
-  | "meaning"
-  | "reading-guided"
-  | "reading-recall";
+export type KanjiStudyPart = "preview" | "meaning" | "reading" | "writing";
 
-export interface KanjiStudyQuestion {
+export interface KanjiStudyCard {
   id: string;
-  kind: KanjiStudyQuestionKind;
-  title: string;
-  prompt: string;
-  exercise: Exercise;
-  choices: string[];
-  recordResult: boolean;
+  itemId: string;
+  part: KanjiStudyPart;
+  isNew: boolean;
+  remediation: boolean;
+  repetition: number;
 }
 
 export interface KanjiStudyResult {
@@ -21,170 +21,233 @@ export interface KanjiStudyResult {
   exercise: Exercise;
   answer: string;
   status: AnswerStatus;
+  grade: WritingGrade;
 }
 
-const unique = (values: readonly string[]): string[] => [
-  ...new Set(values.filter((value) => value.trim().length > 0)),
-];
+export interface KanjiStudyQueueOptions {
+  newItemLimit?: number;
+  reviewCardLimit?: number;
+}
 
-const stableHash = (value: string): number => {
-  let hash = 2166136261;
-  for (const character of value) {
-    hash ^= character.codePointAt(0) ?? 0;
-    hash = Math.imul(hash, 16777619);
+const DEFAULT_NEW_ITEM_LIMIT = 5;
+const DEFAULT_REVIEW_CARD_LIMIT = 20;
+
+const partBySkill = (skill: Skill): Exclude<KanjiStudyPart, "preview"> | null => {
+  switch (skill) {
+    case "recognition":
+    case "recall":
+      return "meaning";
+    case "reading":
+      return "reading";
+    case "writing":
+      return "writing";
+    default:
+      return null;
   }
-  return hash >>> 0;
 };
 
-const rotate = <T>(values: readonly T[], offset: number): T[] => {
-  if (values.length === 0) return [];
-  const normalized = offset % values.length;
-  return [...values.slice(normalized), ...values.slice(0, normalized)];
-};
+const cardKey = (itemId: string, part: KanjiStudyPart): string =>
+  `${itemId}:${part}`;
 
-const orderedChoices = (
-  correct: string,
-  distractors: readonly string[],
-  seed: string,
-): string[] => {
-  const values = unique([correct, ...distractors]).slice(0, 4);
-  return rotate(values, stableHash(seed) % Math.max(values.length, 1));
-};
-
-const findExercise = (
-  item: KanjiItem,
-  exercises: readonly Exercise[],
-  skill: "recognition" | "reading",
-  preferredType?: Exercise["type"],
-): Exercise | undefined => {
-  const candidates = exercises.filter(
-    (exercise) =>
-      exercise.targetItemIds.includes(item.id) && exercise.skill === skill,
-  );
-  return (
-    candidates.find((exercise) => exercise.type === preferredType) ?? candidates[0]
-  );
-};
-
-const fallbackMeaningExercise = (
-  item: KanjiItem,
-  catalog: readonly KanjiItem[],
-): Exercise => ({
-  id: `${item.introducedInLessonId}-kanji-${item.literal}-recognition`,
-  type: "multiple-choice",
-  prompt: `Что означает кандзи ${item.literal}?`,
-  targetItemIds: [item.id],
-  correctAnswers: [item.meaningsRu[0] ?? item.literal],
-  distractors: unique(
-    catalog
-      .filter((candidate) => candidate.id !== item.id)
-      .map((candidate) => candidate.meaningsRu[0] ?? candidate.literal),
-  ).slice(0, 3),
-  explanationRu: `${item.literal} — ${item.meaningsRu.join(", ")}.`,
-  contentKey: `kanji:${item.literal}:recognition`,
-  skill: "recognition",
+const createCard = (
+  itemId: string,
+  part: KanjiStudyPart,
+  isNew: boolean,
+  repetition = 0,
+  remediation = false,
+): KanjiStudyCard => ({
+  id: `${cardKey(itemId, part)}:${isNew ? "new" : "review"}:${repetition}`,
+  itemId,
+  part,
+  isNew,
+  remediation,
+  repetition,
 });
 
-const fallbackReadingExercise = (
-  item: KanjiItem,
+const isDue = (item: ReviewItem, now: Date): boolean =>
+  new Date(item.dueAt).getTime() <= now.getTime();
+
+const progressById = (
+  progress: readonly KanjiProgressSummary[],
+): ReadonlyMap<string, KanjiProgressSummary> =>
+  new Map(progress.map((entry) => [entry.itemId, entry]));
+
+const orderDueCards = (
+  reviewItems: readonly ReviewItem[],
+  itemIds: ReadonlySet<string>,
+  now: Date,
+): KanjiStudyCard[] => {
+  const seen = new Set<string>();
+  return [...reviewItems]
+    .filter((reviewItem) => itemIds.has(reviewItem.itemId) && isDue(reviewItem, now))
+    .sort((left, right) => {
+      const dueDifference =
+        new Date(left.dueAt).getTime() - new Date(right.dueAt).getTime();
+      if (dueDifference !== 0) return dueDifference;
+      if (left.lastStatus !== right.lastStatus) {
+        return left.lastStatus === "incorrect" ? -1 : 1;
+      }
+      return right.lapseCount - left.lapseCount;
+    })
+    .flatMap((reviewItem) => {
+      const part = partBySkill(reviewItem.skill);
+      if (!part) return [];
+      const key = cardKey(reviewItem.itemId, part);
+      if (seen.has(key)) return [];
+      seen.add(key);
+      return [createCard(reviewItem.itemId, part, false)];
+    });
+};
+
+const newItemCards = (itemId: string): KanjiStudyCard[] => [
+  createCard(itemId, "preview", true),
+  createCard(itemId, "meaning", true),
+  createCard(itemId, "reading", true),
+  createCard(itemId, "writing", true),
+];
+
+/**
+ * Builds one Skritter-style session for the only currently available list: JLPT N5.
+ * Overdue skill cards come first. New characters are then introduced as a complete
+ * preview → meaning → contextual reading → writing sequence.
+ */
+export const buildKanjiStudyQueue = (
   catalog: readonly KanjiItem[],
+  progress: readonly KanjiProgressSummary[],
+  reviewItems: readonly ReviewItem[],
+  now = new Date(),
+  options: KanjiStudyQueueOptions = {},
+): KanjiStudyCard[] => {
+  const newItemLimit = options.newItemLimit ?? DEFAULT_NEW_ITEM_LIMIT;
+  const reviewCardLimit = options.reviewCardLimit ?? DEFAULT_REVIEW_CARD_LIMIT;
+  const catalogIds = new Set(catalog.map((item) => item.id));
+  const byId = progressById(progress);
+  const dueCards = orderDueCards(reviewItems, catalogIds, now).slice(
+    0,
+    reviewCardLimit,
+  );
+
+  const dueItemIds = new Set(dueCards.map((card) => card.itemId));
+  const newItems = catalog
+    .filter((item) => byId.get(item.id)?.status === "new")
+    .filter((item) => !dueItemIds.has(item.id))
+    .slice(0, newItemLimit);
+
+  const queue = [
+    ...dueCards,
+    ...newItems.flatMap((item) => newItemCards(item.id)),
+  ];
+
+  if (queue.length > 0) return queue;
+
+  // "Study now" must remain useful even when nothing is formally due.
+  return [...progress]
+    .filter((entry) => catalogIds.has(entry.itemId) && entry.status !== "new")
+    .sort((left, right) => {
+      if (left.weak !== right.weak) return left.weak ? -1 : 1;
+      return left.overallMastery - right.overallMastery;
+    })
+    .slice(0, Math.min(10, reviewCardLimit))
+    .flatMap((entry) => {
+      const weakest = [entry.meaning, entry.reading, entry.writing]
+        .sort((left, right) => left.mastery - right.mastery)[0];
+      if (!weakest) return [];
+      return [createCard(entry.itemId, weakest.skill, false)];
+    });
+};
+
+export const countDueKanjiCards = (
+  catalog: readonly KanjiItem[],
+  reviewItems: readonly ReviewItem[],
+  now = new Date(),
+): number =>
+  orderDueCards(
+    reviewItems,
+    new Set(catalog.map((item) => item.id)),
+    now,
+  ).length;
+
+export const countNewKanji = (
+  catalog: readonly KanjiItem[],
+  progress: readonly KanjiProgressSummary[],
+): number => {
+  const byId = progressById(progress);
+  return catalog.filter((item) => byId.get(item.id)?.status === "new").length;
+};
+
+export const findKanjiStudyExercise = (
+  item: KanjiItem,
+  part: Exclude<KanjiStudyPart, "preview">,
 ): Exercise => {
-  const example = item.examples[0];
-  const correct = example?.kanjiReading ?? example?.reading ?? item.literal;
+  const exercises = buildKanjiReviewExercises(item.introducedInLessonId, [item]);
+  const skill: Skill =
+    part === "meaning" ? "recognition" : part === "reading" ? "reading" : "writing";
+  const exercise = exercises.find((candidate) => candidate.skill === skill);
+  if (!exercise) {
+    throw new Error(`Не найдено задание ${part} для ${item.literal}`);
+  }
+  return exercise;
+};
+
+export const gradeKanjiStudyAnswer = (grade: WritingGrade): AnswerStatus => {
+  if (grade <= 2) return "incorrect";
+  if (grade === 3) return "acceptable";
+  return "correct";
+};
+
+export const buildKanjiStudyResult = (
+  card: KanjiStudyCard,
+  item: KanjiItem,
+  grade: WritingGrade,
+): KanjiStudyResult => {
+  if (card.part === "preview") {
+    throw new Error("Карточка знакомства не записывается в SRS");
+  }
+  const exercise = findKanjiStudyExercise(item, card.part);
   return {
-    id: `${item.introducedInLessonId}-kanji-${item.literal}-reading`,
-    type: "text-input",
-    prompt: example
-      ? `Как читается ${item.literal} в слове ${example.written}（${example.reading}）?`
-      : `Введи чтение кандзи ${item.literal}.`,
-    targetItemIds: [item.id],
-    correctAnswers: [correct],
-    distractors: unique(
-      catalog
-        .filter((candidate) => candidate.id !== item.id)
-        .map((candidate) => candidate.examples[0]?.kanjiReading ?? ""),
-    ).slice(0, 3),
-    explanationRu: example
-      ? `В слове ${example.written} знак ${item.literal} читается ${correct}.`
-      : `${item.literal} читается ${correct}.`,
-    contentKey: `kanji:${item.literal}:reading`,
-    skill: "reading",
+    questionId: card.id,
+    exercise,
+    answer: exercise.correctAnswers[0] ?? item.literal,
+    status: gradeKanjiStudyAnswer(grade),
+    grade,
   };
 };
 
-export const buildKanjiStudyQuestions = (
-  item: KanjiItem,
-  exercises: readonly Exercise[],
-  catalog: readonly KanjiItem[],
-): KanjiStudyQuestion[] => {
-  const meaningExercise =
-    findExercise(item, exercises, "recognition", "multiple-choice") ??
-    fallbackMeaningExercise(item, catalog);
-  const readingExercise =
-    findExercise(item, exercises, "reading", "text-input") ??
-    fallbackReadingExercise(item, catalog);
-  const meaningAnswer = meaningExercise.correctAnswers[0] ?? item.meaningsRu[0] ?? item.literal;
-  const readingAnswer =
-    readingExercise.correctAnswers[0] ??
-    item.examples[0]?.kanjiReading ??
-    item.literal;
-  const readingDistractors = unique([
-    ...(readingExercise.distractors ?? []),
-    ...catalog
-      .filter((candidate) => candidate.id !== item.id)
-      .map((candidate) => candidate.examples[0]?.kanjiReading ?? ""),
-  ]).filter((value) => value !== readingAnswer);
-
+/**
+ * Forgotten and hard cards return later in the same session instead of being
+ * repeated immediately. The gap prevents short-term visual echo from posing as memory.
+ */
+export const requeueKanjiStudyCard = (
+  remaining: readonly KanjiStudyCard[],
+  card: KanjiStudyCard,
+  grade: WritingGrade,
+): KanjiStudyCard[] => {
+  if (grade >= 3 || card.part === "preview") return [...remaining];
+  const distance = grade === 1 ? 3 : 6;
+  const insertionIndex = Math.min(distance, remaining.length);
+  const repeated = createCard(
+    card.itemId,
+    card.part,
+    false,
+    card.repetition + 1,
+    true,
+  );
   return [
-    {
-      id: `${item.id}:meaning`,
-      kind: "meaning",
-      title: "1. Узнай значение",
-      prompt: meaningExercise.prompt,
-      exercise: meaningExercise,
-      choices: orderedChoices(
-        meaningAnswer,
-        meaningExercise.distractors ?? [],
-        `${item.id}:meaning`,
-      ),
-      recordResult: true,
-    },
-    {
-      id: `${item.id}:reading-guided`,
-      kind: "reading-guided",
-      title: "2. Найди чтение в слове",
-      prompt: readingExercise.prompt,
-      exercise: {
-        ...readingExercise,
-        id: `${readingExercise.id}-guided`,
-        type: "multiple-choice",
-        distractors: readingDistractors.slice(0, 3),
-      },
-      choices: orderedChoices(
-        readingAnswer,
-        readingDistractors,
-        `${item.id}:reading-guided`,
-      ),
-      recordResult: false,
-    },
-    {
-      id: `${item.id}:reading-recall`,
-      kind: "reading-recall",
-      title: "3. Вспомни чтение сам",
-      prompt: readingExercise.prompt,
-      exercise: readingExercise,
-      choices: [],
-      recordResult: true,
-    },
+    ...remaining.slice(0, insertionIndex),
+    repeated,
+    ...remaining.slice(insertionIndex),
   ];
 };
 
-export const checkKanjiStudyAnswer = (
-  question: KanjiStudyQuestion,
-  answer: string,
-): AnswerStatus =>
-  checkAnswer(
-    answer,
-    question.exercise.correctAnswers,
-    question.exercise.acceptableAnswers,
-  ).status;
+export const kanjiStudyPartLabel = (part: KanjiStudyPart): string => {
+  switch (part) {
+    case "preview":
+      return "Новое слово";
+    case "meaning":
+      return "Значение";
+    case "reading":
+      return "Чтение";
+    case "writing":
+      return "Письмо";
+  }
+};
