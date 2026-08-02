@@ -44,50 +44,8 @@ jobs:
         with:
           node-version: 22
 
-      - name: Apply Skritter-style writing implementation
-        if: startsWith(github.ref, 'refs/heads/agent/skritter-writing-0.21.0')
-        shell: bash
-        run: |
-          awk '
-            /^[[:space:]]*H4s/ { capture=1 }
-            capture {
-              line=$0
-              sub(/^[[:space:]]+/, "", line)
-              if (line == "PAYLOAD") exit
-              print line
-            }
-          ' .github/workflows/bootstrap-skritter-writing.yml > /tmp/apply.mjs.gz.b64
-          test -s /tmp/apply.mjs.gz.b64
-          base64 -d /tmp/apply.mjs.gz.b64 | gzip -d > scripts/apply-skritter-overhaul.mjs
-          node scripts/apply-skritter-overhaul.mjs
-          rm scripts/apply-skritter-overhaul.mjs
-
-      - name: Persist generated implementation
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/agent/skritter-writing-0.21.0')
-        shell: bash
-        run: |
-          if git diff --quiet -- \
-            AppRoot.tsx app.json package.json \
-            src/components/KanjiWritingPanel.tsx \
-            src/components/SkritterWritingPad.tsx \
-            src/components/PracticeCard.tsx \
-            src/screens/CourseScreen.tsx \
-            src/screens/KanjiScreen.tsx; then
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- \
-            AppRoot.tsx app.json package.json \
-            src/components/KanjiWritingPanel.tsx \
-            src/components/SkritterWritingPad.tsx \
-            src/components/PracticeCard.tsx \
-            src/screens/CourseScreen.tsx \
-            src/screens/KanjiScreen.tsx
-          git commit -m "Implement Skritter-style writing workflow [skip bootstrap]"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
-
       - name: Read application version
+        shell: bash
         run: |
           APP_VERSION="$(node -p "require('./package.json').version")"
           echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
@@ -104,6 +62,7 @@ jobs:
       - name: Install dependencies
         id: install
         continue-on-error: true
+        shell: bash
         run: |
           mkdir -p builds
           set -o pipefail
@@ -113,6 +72,7 @@ jobs:
         id: tests
         if: steps.install.outcome == 'success'
         continue-on-error: true
+        shell: bash
         run: |
           set -o pipefail
           npm test 2>&1 | tee builds/tests.log
@@ -121,6 +81,7 @@ jobs:
         id: app_types
         if: steps.tests.outcome == 'success'
         continue-on-error: true
+        shell: bash
         run: |
           set -o pipefail
           npm run typecheck 2>&1 | tee builds/typecheck-app.log
@@ -129,6 +90,7 @@ jobs:
         id: test_types
         if: steps.app_types.outcome == 'success'
         continue-on-error: true
+        shell: bash
         run: |
           set -o pipefail
           npm run typecheck:tests 2>&1 | tee builds/typecheck-tests.log
@@ -137,6 +99,7 @@ jobs:
         id: prebuild
         if: steps.test_types.outcome == 'success'
         continue-on-error: true
+        shell: bash
         run: |
           set -o pipefail
           npx expo prebuild --platform android --no-install 2>&1 | tee builds/prebuild.log
@@ -145,6 +108,7 @@ jobs:
         id: gradle
         if: steps.prebuild.outcome == 'success'
         continue-on-error: true
+        shell: bash
         run: |
           set -o pipefail
           cd android
@@ -154,6 +118,7 @@ jobs:
         id: bundle
         if: steps.gradle.outcome == 'success'
         continue-on-error: true
+        shell: bash
         run: |
           set -o pipefail
           APK="android/app/build/outputs/apk/release/app-release.apk"
@@ -161,6 +126,7 @@ jobs:
           unzip -l "$APK" | tee builds/apk-contents.log
           unzip -l "$APK" | grep -q "assets/index.android.bundle"
           cp "$APK" "builds/Japanese-${APP_VERSION}-standalone.apk"
+          echo "Verified assets/index.android.bundle in standalone APK" | tee builds/bundle-verification.log
 
       - name: Upload standalone APK artifact
         if: steps.bundle.outcome == 'success'
@@ -171,12 +137,22 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Japanese-${{ env.APP_VERSION }}-diagnostics
+          path: builds/*.log
+          if-no-files-found: warn
+          retention-days: 3
+
       - name: Publish preview release
         id: release
         if: steps.bundle.outcome == 'success' && github.event_name == 'push' && startsWith(github.ref, 'refs/heads/agent/')
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
           TAG="build-${APP_VERSION}-preview"
           APK="builds/Japanese-${APP_VERSION}-standalone.apk"
@@ -199,6 +175,7 @@ jobs:
           GRADLE_OUTCOME: ${{ steps.gradle.outcome }}
           BUNDLE_OUTCOME: ${{ steps.bundle.outcome }}
           RELEASE_OUTCOME: ${{ steps.release.outcome }}
+        shell: bash
         run: |
           STATE=failure
           DESCRIPTION="Standalone APK build failed"
@@ -211,7 +188,7 @@ jobs:
                 "$BUNDLE_OUTCOME" == success ]]; then
             if [[ "$GITHUB_REF" != refs/heads/agent/* || "$RELEASE_OUTCOME" == success ]]; then
               STATE=success
-              DESCRIPTION="Standalone APK includes the validated writing workflow"
+              DESCRIPTION="Standalone APK includes the validated Skritter-style writing workflow"
             fi
           fi
           gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
@@ -231,6 +208,7 @@ jobs:
           GRADLE_OUTCOME: ${{ steps.gradle.outcome }}
           BUNDLE_OUTCOME: ${{ steps.bundle.outcome }}
           RELEASE_OUTCOME: ${{ steps.release.outcome }}
+        shell: bash
         run: |
           test "$INSTALL_OUTCOME" = success
           test "$TESTS_OUTCOME" = success
