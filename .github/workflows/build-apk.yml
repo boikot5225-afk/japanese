@@ -46,6 +46,7 @@ jobs:
             node scripts/apply-writing-audit.mjs
             node scripts/apply-writing-audit-hotfix.mjs
           fi
+          node scripts/apply-writing-grade-cap-ui.mjs
 
       - name: Persist audited fixes
         env:
@@ -67,7 +68,7 @@ jobs:
           if git diff --cached --quiet; then
             exit 0
           fi
-          git commit -m "Fix audited writing workflow defects [skip build]"
+          git commit -m "Enforce audited writing grade limits [skip build]"
           git push origin "HEAD:${TARGET_BRANCH}"
 
       - name: Read version
