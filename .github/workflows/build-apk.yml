@@ -27,8 +27,11 @@ jobs:
       CI: "1"
 
     steps:
-      - name: Checkout
+      - name: Checkout branch head
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref }}
+          fetch-depth: 1
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -45,7 +48,6 @@ jobs:
           fi
 
       - name: Persist audited fixes
-        if: github.event_name == 'push' || github.event_name == 'pull_request'
         env:
           TARGET_BRANCH: ${{ github.head_ref || github.ref_name }}
         shell: bash
