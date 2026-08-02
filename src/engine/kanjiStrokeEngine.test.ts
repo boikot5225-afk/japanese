@@ -150,7 +150,7 @@ test("accepts every canonical N5 stroke with small hand jitter", () => {
       assert.equal(
         result.accepted,
         true,
-        `${character.literal} stroke ${index + 1}: ${result.issue ?? "unknown"}`,
+        `${character.literal} stroke ${index + 1}: ${JSON.stringify(result)}`,
       );
     });
   });
@@ -162,6 +162,6 @@ test("all five strokes of 古 are writable without triggering a false rejection"
   assert.equal(old.strokes.length, 5);
   old.strokes.forEach((stroke, index) => {
     const result = assessKanjiStroke(toPad(stroke.samples, 568, 1.8), stroke, 568, 568);
-    assert.equal(result.accepted, true, `古 stroke ${index + 1}: ${result.issue}`);
+    assert.equal(result.accepted, true, `古 stroke ${index + 1}: ${JSON.stringify(result)}`);
   });
 });
