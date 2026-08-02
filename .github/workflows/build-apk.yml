@@ -11,59 +11,24 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: build-apk-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  apply-audit-fixes:
-    if: github.event_name == 'pull_request' && github.head_ref == 'agent/kanji-study-cycle-0.22.0'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout exact branch
-        uses: actions/checkout@v4
-        with:
-          ref: agent/kanji-study-cycle-0.22.0
-          fetch-depth: 1
-
-      - name: Rebuild and verify audited patch
-        shell: bash
-        run: |
-          { cat .github/audit-patch.part00; sed 's/BG2AShoogP/BG2ASgoogP/' .github/audit-patch.part01; } | base64 --decode > /tmp/audit-fix.patch.gz
-          echo 'd3b87e6ec33ee6ee30ac1bb455be5ee090983a16f3ed88f9c7a6929c5c2cbfcc  /tmp/audit-fix.patch.gz' | sha256sum --check --strict
-          gzip --decompress --stdout /tmp/audit-fix.patch.gz > /tmp/audit-fix.patch
-          git apply --check \
-            --exclude=.github/workflows/build-apk.yml \
-            --exclude=.github/workflows/export-source-audit.yml \
-            /tmp/audit-fix.patch
-          git apply --index \
-            --exclude=.github/workflows/build-apk.yml \
-            --exclude=.github/workflows/export-source-audit.yml \
-            /tmp/audit-fix.patch
-
-      - name: Remove non-workflow transport
-        shell: bash
-        run: |
-          git rm -- .github/audit-patch.part00 .github/audit-patch.part01 .github/audit-trigger .github/final-build-workflow.b64
-
-      - name: Commit audited code fixes
-        shell: bash
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git diff --cached --check
-          git commit -m 'fix: harden kanji lessons and review timing'
-          git push origin HEAD:agent/kanji-study-cycle-0.22.0
-
   build-apk:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip build]')) || (github.event_name == 'pull_request' && github.head_ref != 'agent/kanji-study-cycle-0.22.0')
+    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip build]')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
       CI: "1"
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      ANDROID_KEYSTORE_FILE: release.keystore
 
     steps:
       - name: Checkout
@@ -71,20 +36,6 @@ jobs:
         with:
           ref: ${{ github.head_ref || github.ref }}
           fetch-depth: 1
-
-      - name: Pack exact source snapshot
-        shell: bash
-        run: |
-          mkdir -p builds
-          git ls-files -z | tar --null -T - -czf builds/japanese-source-audit.tar.gz
-
-      - name: Upload source snapshot
-        uses: actions/upload-artifact@v4
-        with:
-          name: japanese-source-audit
-          path: builds/japanese-source-audit.tar.gz
-          if-no-files-found: error
-          retention-days: 1
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -118,16 +69,62 @@ jobs:
       - name: Generate Android project
         run: npx expo prebuild --platform android --no-install
 
-      - name: Build release APK
-        run: cd android && ./gradlew app:assembleRelease --no-daemon --stacktrace
-
-      - name: Verify standalone bundle
+      - name: Validate signing secrets
         shell: bash
         run: |
+          values=(
+            "$ANDROID_KEYSTORE_BASE64"
+            "$ANDROID_KEYSTORE_PASSWORD"
+            "$ANDROID_KEY_ALIAS"
+            "$ANDROID_KEY_PASSWORD"
+          )
+          present=0
+          for value in "${values[@]}"; do
+            if [[ -n "$value" ]]; then present=$((present + 1)); fi
+          done
+          if [[ "$present" -ne 0 && "$present" -ne 4 ]]; then
+            echo "Android signing secrets are only partially configured." >&2
+            exit 1
+          fi
+          if [[ "$present" -eq 4 ]]; then
+            echo "HAS_RELEASE_SIGNING=1" >> "$GITHUB_ENV"
+          else
+            echo "HAS_RELEASE_SIGNING=0" >> "$GITHUB_ENV"
+          fi
+
+      - name: Configure protected release signing
+        if: env.HAS_RELEASE_SIGNING == '1'
+        shell: bash
+        run: |
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "android/app/$ANDROID_KEYSTORE_FILE"
+          node scripts/configure-android-release-signing.mjs
+
+      - name: Build standalone APK
+        run: cd android && ./gradlew app:assembleRelease --no-daemon --stacktrace
+
+      - name: Verify standalone bundle, permissions and signature
+        shell: bash
+        run: |
+          mkdir -p builds
           APK="android/app/build/outputs/apk/release/app-release.apk"
           test -s "$APK"
           unzip -l "$APK" | tee builds/apk-contents.log
           unzip -l "$APK" | grep -q "assets/index.android.bundle"
+
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          "$AAPT" dump permissions "$APK" | tee builds/apk-permissions.log
+          ! grep -Eq 'READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|SYSTEM_ALERT_WINDOW' builds/apk-permissions.log
+
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          "$APKSIGNER" verify --verbose --print-certs "$APK" | tee builds/apk-signature.log
+          if [[ "$HAS_RELEASE_SIGNING" == "1" ]]; then
+            ! grep -qi 'Android Debug' builds/apk-signature.log
+            echo "Protected release keystore" > builds/signing-status.txt
+          else
+            grep -qi 'Android Debug' builds/apk-signature.log
+            echo "Personal standalone fallback: Android Debug certificate" > builds/signing-status.txt
+          fi
+
           cp "$APK" "builds/Japanese-${APP_VERSION}-standalone.apk"
           sha256sum "builds/Japanese-${APP_VERSION}-standalone.apk" | tee builds/apk.sha256
 
@@ -139,5 +136,8 @@ jobs:
             builds/*.apk
             builds/apk.sha256
             builds/apk-contents.log
+            builds/apk-permissions.log
+            builds/apk-signature.log
+            builds/signing-status.txt
           if-no-files-found: error
           retention-days: 14
