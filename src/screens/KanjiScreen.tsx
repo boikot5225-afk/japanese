@@ -15,6 +15,7 @@ import { speakJapanese } from "../audio/japaneseSpeech";
 import { lessonBundles } from "../content/courseCatalog";
 import { n5KanjiCatalog } from "../content/kanjiCatalog";
 import type { KanjiItem } from "../domain/course";
+import { isLessonUnlocked } from "../engine/checkpointEngine";
 import {
   buildKanjiProgressCatalog,
   type KanjiProgressSummary,
@@ -176,12 +177,23 @@ export function KanjiScreen({ onCourse }: KanjiScreenProps) {
   }, []);
 
   const entries = useMemo<CatalogEntry[]>(() => {
-    const completedLessonIds = new Set(snapshot?.completedLessonIds ?? []);
-    const n5Bundles = lessonBundles.filter((bundle) => bundle.lesson.order <= 36);
-    const currentBundle = n5Bundles.find(
-      (bundle) => !completedLessonIds.has(bundle.lesson.id),
+    const completedLessonIds = snapshot?.completedLessonIds ?? [];
+    const completedLessonIdSet = new Set(completedLessonIds);
+    const checkpointProgress = snapshot?.checkpointProgress ?? [];
+    const availableLessonIds = new Set(
+      lessonBundles
+        .filter((bundle) => bundle.lesson.order <= 36)
+        .filter(
+          (bundle) =>
+            completedLessonIdSet.has(bundle.lesson.id) ||
+            isLessonUnlocked(
+              bundle.lesson.id,
+              completedLessonIds,
+              checkpointProgress,
+            ),
+        )
+        .map((bundle) => bundle.lesson.id),
     );
-    const availableThroughOrder = currentBundle?.lesson.order ?? 36;
     const progressById = new Map(
       buildKanjiProgressCatalog(
         n5KanjiCatalog,
@@ -197,8 +209,8 @@ export function KanjiScreen({ onCourse }: KanjiScreenProps) {
         item,
         progress,
         lessonOrder,
-        available: lessonOrder <= availableThroughOrder,
-        completedLesson: completedLessonIds.has(item.introducedInLessonId),
+        available: availableLessonIds.has(item.introducedInLessonId),
+        completedLesson: completedLessonIdSet.has(item.introducedInLessonId),
       };
     });
   }, [snapshot]);
@@ -223,9 +235,7 @@ export function KanjiScreen({ onCourse }: KanjiScreenProps) {
 
   const selectedEntry =
     filteredEntries.find((entry) => entry.item.id === selectedId) ??
-    filteredEntries[0] ??
-    entries.find((entry) => entry.available) ??
-    entries[0];
+    filteredEntries[0];
 
   const availableEntries = entries.filter((entry) => entry.available);
   const startedCount = availableEntries.filter(
