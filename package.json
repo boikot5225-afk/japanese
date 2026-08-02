@@ -1,14 +1,17 @@
 {
   "name": "japanese-tutor",
-  "version": "0.19.0",
+  "version": "0.20.0",
   "private": true,
   "main": "expo/AppEntry.js",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
     "web": "expo start --web",
+    "generate:kanji-strokes": "node scripts/generate-kanji-strokes.mjs",
+    "migrate:kanji-writing": "node scripts/apply-kanji-writing-integration.mjs",
     "test:review": "tsx --test src/engine/reviewEngine.test.ts",
     "test:kanji-progress": "tsx --test src/engine/kanjiProgress.test.ts",
+    "test:kanji-strokes": "tsx --test src/engine/kanjiStrokeEngine.test.ts",
     "test:lesson-review": "tsx --test src/engine/lessonReview.test.ts",
     "test:practice-queue": "node --experimental-strip-types --test src/engine/practiceQueue.test.ts",
     "test:checkpoint": "tsx --test src/engine/checkpointEngine.test.ts",
@@ -20,7 +23,7 @@
     "test:speech": "node --experimental-strip-types --test src/audio/japaneseSpeechText.test.ts",
     "test:exercise-speech": "node --experimental-strip-types --test src/audio/exerciseSpeechText.test.ts",
     "test:content": "tsx --test src/content/*.test.ts",
-    "test": "npm run test:review && npm run test:kanji-progress && npm run test:lesson-review && npm run test:practice-queue && npm run test:checkpoint && npm run test:answer && npm run test:kana && npm run test:kana-words && npm run test:katakana && npm run test:numbers && npm run test:speech && npm run test:exercise-speech && npm run test:content",
+    "test": "npm run test:review && npm run test:kanji-progress && npm run test:kanji-strokes && npm run test:lesson-review && npm run test:practice-queue && npm run test:checkpoint && npm run test:answer && npm run test:kana && npm run test:kana-words && npm run test:katakana && npm run test:numbers && npm run test:speech && npm run test:exercise-speech && npm run test:content",
     "typecheck": "tsc --noEmit",
     "typecheck:tests": "tsc --noEmit -p tsconfig.tests.json"
   },
@@ -30,7 +33,8 @@
     "expo-speech": "~14.0.8",
     "expo-status-bar": "~3.0.0",
     "react": "19.1.0",
-    "react-native": "0.81.4"
+    "react-native": "0.81.4",
+    "react-native-svg": "15.12.1"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
