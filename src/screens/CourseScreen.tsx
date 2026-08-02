@@ -1,18 +1,21 @@
 import { useState } from "react";
 import { SafeAreaView, ScrollView, StatusBar, Text, TouchableOpacity, View } from "react-native";
 
+import type { KanjiTracingResult } from "../components/KanjiTracingPad";
 import {
   findCheckpointForUnit,
   type CourseCheckpoint,
 } from "../content/courseCheckpoints";
 import { courseUnits, findLessonBundle } from "../content/courseCatalog";
 import type { LessonBundle } from "../content/lessonBundle";
+import type { KanjiItem } from "../domain/course";
 import {
   isCheckpointAvailable,
   isCheckpointPassed,
   isLessonUnlocked,
   type CheckpointProgress,
 } from "../engine/checkpointEngine";
+import type { ReviewItem } from "../engine/reviewEngine";
 import { styles } from "../theme/appStyles";
 import { kanaStyles } from "../theme/kanaStyles";
 import { KanjiScreen } from "./KanjiScreen";
@@ -21,6 +24,7 @@ import { NumberTrainerScreen } from "./NumberTrainerScreen";
 interface CourseScreenProps {
   completedLessonIds: string[];
   checkpointProgress: CheckpointProgress[];
+  reviewItems: ReviewItem[];
   todayBundle: LessonBundle | undefined;
   dueReviewCount: number;
   weakTargetCount: number;
@@ -30,6 +34,7 @@ interface CourseScreenProps {
   onStartCheckpoint: (checkpoint: CourseCheckpoint) => void;
   onStartReview: () => void;
   onOpenKana: () => void;
+  onRecordKanjiWriting: (item: KanjiItem, result: KanjiTracingResult) => void;
 }
 
 const russianForm = (count: number, one: string, few: string, many: string): string => {
@@ -43,6 +48,7 @@ const lessonWord = (count: number): string => russianForm(count, "урок", "у
 export function CourseScreen({
   completedLessonIds,
   checkpointProgress,
+  reviewItems,
   todayBundle,
   dueReviewCount,
   weakTargetCount,
@@ -52,6 +58,7 @@ export function CourseScreen({
   onStartCheckpoint,
   onStartReview,
   onOpenKana,
+  onRecordKanjiWriting,
 }: CourseScreenProps) {
   const [kanjiOpen, setKanjiOpen] = useState(false);
   const [numbersOpen, setNumbersOpen] = useState(false);
@@ -60,7 +67,15 @@ export function CourseScreen({
     : false;
 
   if (kanjiOpen) {
-    return <KanjiScreen onCourse={() => setKanjiOpen(false)} />;
+    return (
+      <KanjiScreen
+        completedLessonIds={completedLessonIds}
+        checkpointProgress={checkpointProgress}
+        reviewItems={reviewItems}
+        onRecordWriting={onRecordKanjiWriting}
+        onCourse={() => setKanjiOpen(false)}
+      />
+    );
   }
 
   if (numbersOpen) {
@@ -126,8 +141,8 @@ export function CourseScreen({
             <Text style={kanaStyles.courseKanaGlyph}>日 語</Text>
           </View>
           <Text style={kanaStyles.courseKanaBody}>
-            103 знака из текущего курса: значение, чтение в слове, отдельный
-            прогресс навыков и экран слабых кандзи.
+            103 знака: значение, чтение в слове, порядок черт, автоматическая
+            проверка письма и отдельная SRS-очередь навыка.
           </Text>
           <TouchableOpacity
             style={kanaStyles.primaryButton}
