@@ -35,34 +35,21 @@ jobs:
           { cat .github/audit-patch.part00; sed 's/BG2AShoogP/BG2ASgoogP/' .github/audit-patch.part01; } | base64 --decode > /tmp/audit-fix.patch.gz
           echo 'd3b87e6ec33ee6ee30ac1bb455be5ee090983a16f3ed88f9c7a6929c5c2cbfcc  /tmp/audit-fix.patch.gz' | sha256sum --check --strict
           gzip --decompress --stdout /tmp/audit-fix.patch.gz > /tmp/audit-fix.patch
-          git apply --check --exclude=.github/workflows/build-apk.yml /tmp/audit-fix.patch
-          git apply --index --exclude=.github/workflows/build-apk.yml /tmp/audit-fix.patch
+          git apply --check \
+            --exclude=.github/workflows/build-apk.yml \
+            --exclude=.github/workflows/export-source-audit.yml \
+            /tmp/audit-fix.patch
+          git apply --index \
+            --exclude=.github/workflows/build-apk.yml \
+            --exclude=.github/workflows/export-source-audit.yml \
+            /tmp/audit-fix.patch
 
-      - name: Reconstruct final workflow from Git baseline
+      - name: Remove non-workflow transport
         shell: bash
         run: |
-          BASELINE=85e3b9bd993e278c48f941e8a96d4afe8801f5a3
-          git fetch --no-tags --depth=1 origin "$BASELINE"
-          rm -rf /tmp/final-build
-          mkdir -p /tmp/final-build/.github/workflows
-          git show "$BASELINE:.github/workflows/build-apk.yml" > /tmp/final-build/.github/workflows/build-apk.yml
-          (
-            cd /tmp/final-build
-            git init -q
-            git add -- .github/workflows/build-apk.yml
-            git -c user.name=audit -c user.email=audit@example.invalid commit -qm baseline
-            git apply --include=.github/workflows/build-apk.yml /tmp/audit-fix.patch
-          )
-          cp /tmp/final-build/.github/workflows/build-apk.yml .github/workflows/build-apk.yml
-          echo '0f6266d354f9add70749ddccb83d53a0f03d853edd47d1028843b80254ec53a7  .github/workflows/build-apk.yml' | sha256sum --check --strict
-          git add -- .github/workflows/build-apk.yml
+          git rm -- .github/audit-patch.part00 .github/audit-patch.part01 .github/audit-trigger .github/final-build-workflow.b64
 
-      - name: Remove one-time transport
-        shell: bash
-        run: |
-          git rm -- .github/audit-patch.part00 .github/audit-patch.part01 .github/audit-trigger .github/final-build-workflow.b64 .github/workflows/apply-audit-fix.yml
-
-      - name: Commit audited fixes
+      - name: Commit audited code fixes
         shell: bash
         run: |
           git config user.name 'github-actions[bot]'
