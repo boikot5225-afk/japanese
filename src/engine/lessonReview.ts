@@ -39,7 +39,11 @@ const statusPriority: Record<AnswerStatus, number> = {
   incorrect: 3,
 };
 
-const KANJI_CORE_SKILLS: readonly Skill[] = ["recognition", "reading"];
+const KANJI_CORE_SKILLS: readonly Skill[] = [
+  "recognition",
+  "reading",
+  "writing",
+];
 
 const worseStatus = (left: AnswerStatus, right: AnswerStatus): AnswerStatus =>
   statusPriority[right] > statusPriority[left] ? right : left;
