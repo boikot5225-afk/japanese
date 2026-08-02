@@ -58,7 +58,8 @@ test("visible lessons stay compact and introduce recognition, reading, and writi
     const kanjiExercises = bundle.exercises.filter((exercise) =>
       exercise.contentKey?.startsWith("kanji:"),
     );
-    const expectedKanjiExerciseCount = 1 + (bundle.kanji?.length ?? 0);
+    const kanjiCount = bundle.kanji?.length ?? 0;
+    const expectedKanjiExerciseCount = kanjiCount === 1 ? 3 : 1 + kanjiCount;
     assert.equal(
       kanjiExercises.length,
       expectedKanjiExerciseCount,
