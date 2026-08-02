@@ -32,6 +32,20 @@ jobs:
           ref: ${{ github.head_ref || github.ref }}
           fetch-depth: 1
 
+      - name: Pack exact source snapshot
+        shell: bash
+        run: |
+          mkdir -p builds
+          git ls-files -z | tar --null -T - -czf builds/japanese-source-audit.tar.gz
+
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: japanese-source-audit
+          path: builds/japanese-source-audit.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -70,18 +84,12 @@ jobs:
       - name: Verify standalone bundle
         shell: bash
         run: |
-          mkdir -p builds
           APK="android/app/build/outputs/apk/release/app-release.apk"
           test -s "$APK"
           unzip -l "$APK" | tee builds/apk-contents.log
           unzip -l "$APK" | grep -q "assets/index.android.bundle"
           cp "$APK" "builds/Japanese-${APP_VERSION}-standalone.apk"
           sha256sum "builds/Japanese-${APP_VERSION}-standalone.apk" | tee builds/apk.sha256
-
-      - name: Pack exact source snapshot
-        shell: bash
-        run: |
-          git ls-files -z | tar --null -T - -czf builds/japanese-source-audit.tar.gz
 
       - name: Upload standalone APK
         uses: actions/upload-artifact@v4
@@ -93,11 +101,3 @@ jobs:
             builds/apk-contents.log
           if-no-files-found: error
           retention-days: 14
-
-      - name: Upload source snapshot
-        uses: actions/upload-artifact@v4
-        with:
-          name: japanese-source-audit
-          path: builds/japanese-source-audit.tar.gz
-          if-no-files-found: error
-          retention-days: 1
