@@ -34,7 +34,6 @@ const STRAW_WINDOW = 3;
 const MEDIAN_THRESHOLD = 0.95;
 const LINE_THRESHOLD = 0.8;
 
-// Thresholds observed in Skritter's writing recognizer.
 const MAX_ANGLE_DIFFERENCE = 60;
 const MAX_CENTER_DISTANCE = 0.3;
 const MIN_CORNER_LENGTH_RATIO = 0.5;
@@ -42,9 +41,6 @@ const MAX_CORNER_LENGTH_RATIO = 2;
 const LINE_MIN_CORNER_LENGTH_RATIO = MIN_CORNER_LENGTH_RATIO / 2;
 const LINE_MAX_CORNER_LENGTH_RATIO = MAX_CORNER_LENGTH_RATIO * 2;
 
-// KanjiVG paths occasionally contain tiny control-point bends which are not
-// meaningful brush corners. Skritter uses curated stroke parameters, so raw SVG
-// micro-bends must not become mandatory user gestures.
 const SHALLOW_CORNER_DEGREES = 18;
 const TECHNICAL_SEGMENT_RATIO = 0.06;
 const TECHNICAL_CORNER_MAX_DEGREES = 105;
@@ -408,7 +404,6 @@ const removeTechnicalCorners = (
   return simplified;
 };
 
-/** ShortStraw extraction followed by Skritter-style meaningful-corner filtering. */
 export const findStrokeCorners = (
   source: readonly KanjiStrokePoint[],
 ): KanjiStrokePoint[] => {
@@ -514,6 +509,17 @@ export const assessKanjiStroke = (
     ? LINE_MAX_CORNER_LENGTH_RATIO
     : MAX_CORNER_LENGTH_RATIO;
 
+  // Curved complex strokes can legitimately lose one ShortStraw corner under
+  // natural finger smoothing. Skritter's curated minPoints permits this, but a
+  // simple three-point hook must still keep its only turn.
+  const oneSmoothedComplexCorner =
+    expectedCorners.length >= 4 &&
+    actualCorners.length === expectedCorners.length - 1 &&
+    angleDifference <= 15 &&
+    centerDistance <= 0.08 &&
+    lengthRatio >= 0.75 &&
+    lengthRatio <= 1.25;
+
   let issue: KanjiStrokeIssue | null = null;
   if (padPoints.length < 2 || actualCornerLength <= 0.01) {
     issue = "too-short";
@@ -521,7 +527,10 @@ export const assessKanjiStroke = (
     issue = "wrong-direction";
   } else if (centerDistance > MAX_CENTER_DISTANCE) {
     issue = "wrong-position";
-  } else if (actualCorners.length < expectedCorners.length) {
+  } else if (
+    actualCorners.length < expectedCorners.length &&
+    !oneSmoothedComplexCorner
+  ) {
     issue = "wrong-corners";
   } else if (lengthRatio < minimumLength) {
     issue = "too-short";
