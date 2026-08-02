@@ -77,6 +77,41 @@ test("несколько заданий одного урока не накру�
   assert.equal(items[0]?.intervalDays, 0);
 });
 
+test("кандзи получает отдельные очереди значения и чтения даже после одного вида задания", () => {
+  const kanjiExercise: Exercise = {
+    id: "lesson-test-kanji-日-recognition",
+    type: "multiple-choice",
+    prompt: "Что означает 日?",
+    targetItemIds: ["kanji-日"],
+    correctAnswers: ["день"],
+    distractors: ["луна", "огонь", "вода"],
+    contentKey: "kanji:日:recognition",
+    skill: "recognition",
+  };
+
+  const items = commitLessonReviewItems({
+    items: [],
+    exercises: [kanjiExercise],
+    attempts: [{ exerciseId: kanjiExercise.id, status: "correct" }],
+    lessonId: "lesson-test",
+    mode: "learning",
+    passed: true,
+    now,
+  });
+
+  assert.equal(items.length, 2);
+  const meaning = items.find((item) => item.skill === "recognition");
+  const reading = items.find((item) => item.skill === "reading");
+  assert.ok(meaning);
+  assert.ok(reading);
+  assert.equal(meaning.correctCount, 1);
+  assert.equal(meaning.intervalDays, 1);
+  assert.equal(reading.correctCount, 0);
+  assert.equal(reading.incorrectCount, 0);
+  assert.equal(reading.intervalDays, 0);
+  assert.equal(reading.dueAt, now.toISOString());
+});
+
 test("незавершённый урок не засоряет долгосрочную очередь", () => {
   const items = commitLessonReviewItems({
     items: [],
