@@ -99,7 +99,10 @@ export const findNextNewKanjiId = (
     ...catalog.slice(startIndex),
     ...catalog.slice(0, startIndex),
   ];
-  return ordered.find((item) => byId.get(item.id)?.status === "new")?.id ?? null;
+  return ordered.find(
+    (item) =>
+      item.id !== afterItemId && byId.get(item.id)?.status === "new",
+  )?.id ?? null;
 };
 
 /**
@@ -229,8 +232,8 @@ export const findKanjiStudyExercise = (
 };
 
 export const gradeKanjiStudyAnswer = (grade: WritingGrade): AnswerStatus => {
-  if (grade <= 2) return "incorrect";
-  if (grade === 3) return "acceptable";
+  if (grade === 1) return "incorrect";
+  if (grade === 2) return "acceptable";
   return "correct";
 };
 
