@@ -47,17 +47,22 @@ test("all 103 N5 kanji are distributed through lessons 1-36", () => {
   assert.equal(new Set(introduced.map((item) => item.id)).size, 103);
 });
 
-test("kanji practice preserves all twelve original checks and separates reading from recognition", () => {
+test("visible lessons stay compact while the review pool preserves displaced practice", () => {
   const n5Bundles = lessonBundles.filter((bundle) => bundle.lesson.order <= 36);
   const targetedKanji = new Set<string>();
 
   n5Bundles.forEach((bundle) => {
-    const expectedCount = 13 + (bundle.kanji?.length ?? 0);
-    assert.equal(bundle.exercises.length, expectedCount);
+    assert.equal(bundle.exercises.length, 12, `${bundle.lesson.id} no longer has a compact session`);
+
     const kanjiExercises = bundle.exercises.filter((exercise) =>
       exercise.contentKey?.startsWith("kanji:"),
     );
-    assert.ok(kanjiExercises.length >= 2, `${bundle.lesson.id} lacks guided kanji checks`);
+    const expectedKanjiExerciseCount = 1 + (bundle.kanji?.length ?? 0);
+    assert.equal(
+      kanjiExercises.length,
+      expectedKanjiExerciseCount,
+      `${bundle.lesson.id} has the wrong number of guided kanji checks`,
+    );
 
     const skills = new Set(kanjiExercises.map(inferExerciseSkill));
     assert.ok(skills.has("recognition"), `${bundle.lesson.id} lacks kanji recognition`);
@@ -66,6 +71,24 @@ test("kanji practice preserves all twelve original checks and separates reading 
     kanjiExercises.forEach((exercise) => {
       assert.ok(exercise.skill === "recognition" || exercise.skill === "reading");
       exercise.targetItemIds.forEach((id) => targetedKanji.add(id));
+    });
+
+    const reviewExercises = bundle.reviewExercises ?? [];
+    assert.equal(
+      reviewExercises.length,
+      12 + expectedKanjiExerciseCount,
+      `${bundle.lesson.id} did not retain every displaced legacy exercise`,
+    );
+    assert.equal(
+      new Set(reviewExercises.map((exercise) => exercise.id)).size,
+      reviewExercises.length,
+      `${bundle.lesson.id} review pool repeats exercise ids`,
+    );
+    bundle.exercises.forEach((exercise) => {
+      assert.ok(
+        reviewExercises.some((candidate) => candidate.id === exercise.id),
+        `${bundle.lesson.id} review pool misses visible ${exercise.id}`,
+      );
     });
   });
 

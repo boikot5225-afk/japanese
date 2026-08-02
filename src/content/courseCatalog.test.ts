@@ -29,6 +29,9 @@ const sentenceIds = lessonBundles.flatMap((bundle) =>
 const exerciseIds = lessonBundles.flatMap((bundle) =>
   bundle.exercises.map((item) => item.id),
 );
+const reviewExerciseIds = lessonBundles.flatMap((bundle) =>
+  (bundle.reviewExercises ?? bundle.exercises).map((item) => item.id),
+);
 const learningItemIds = [...vocabularyIds, ...kanjiIds, ...grammarIds, ...sentenceIds];
 const addressableTargetIds = new Set(learningItemIds);
 
@@ -57,6 +60,7 @@ test("all course ids are globally unique", () => {
   assert.deepEqual(duplicates(lessonBundles.map((bundle) => bundle.lesson.id)), []);
   assert.deepEqual(duplicates(learningItemIds), []);
   assert.deepEqual(duplicates(exerciseIds), []);
+  assert.deepEqual(duplicates(reviewExerciseIds), []);
 });
 
 test("lesson manifests match their bundle contents", () => {
@@ -91,7 +95,7 @@ test("sentence and exercise references resolve to real course items", () => {
       assert.ok(sentence.translationRu.trim().length > 0, `${sentence.id} has no translation`);
     });
 
-    bundle.exercises.forEach((exercise) => {
+    (bundle.reviewExercises ?? bundle.exercises).forEach((exercise) => {
       assert.ok(exercise.correctAnswers.length > 0, `${exercise.id} has no correct answer`);
       exercise.targetItemIds.forEach((id) => {
         assert.ok(addressableTargetIds.has(id), `${exercise.id} references missing target ${id}`);
@@ -115,9 +119,9 @@ test("sentence and exercise references resolve to real course items", () => {
 test("lesson six remains the mixed-practice reference lesson", () => {
   const lessonSix = lessonBundles.find((bundle) => bundle.lesson.id === "lesson-006");
   assert.ok(lessonSix);
-  assert.equal(lessonSix.exercises.length, 16);
+  assert.equal(lessonSix.exercises.length, 12);
   assert.ok(lessonSix.lesson.estimatedMinutes >= 14);
-  assert.ok(lessonSix.lesson.estimatedMinutes <= 21);
+  assert.ok(lessonSix.lesson.estimatedMinutes <= 19);
 
   const exerciseTypes = new Set(lessonSix.exercises.map((exercise) => exercise.type));
   assert.ok(exerciseTypes.has("multiple-choice"));
@@ -128,13 +132,11 @@ test("lesson six remains the mixed-practice reference lesson", () => {
   assert.ok(lessonSix.exercises.some((exercise) => exercise.difficulty === 4));
 });
 
-test("every lesson keeps its mixed practice and adds only contextual N5 kanji checks", () => {
+test("every lesson keeps compact mixed practice with contextual N5 kanji checks", () => {
   lessonBundles.forEach((bundle) => {
-    const kanjiCount = bundle.kanji?.length ?? 0;
-    const expectedCount = kanjiCount > 0 ? 13 + kanjiCount : 12;
     assert.equal(
       bundle.exercises.length,
-      expectedCount,
+      12,
       `${bundle.lesson.id} has an unexpected exercise count`,
     );
 

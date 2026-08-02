@@ -14,5 +14,6 @@ export interface LessonBundle {
   grammar: GrammarPoint[];
   sentences: ExampleSentence[];
   exercises: Exercise[];
+  reviewExercises?: Exercise[];
   outcomes: string[];
 }

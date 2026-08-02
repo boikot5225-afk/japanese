@@ -1,6 +1,15 @@
-import type { Exercise, KanjiItem } from "../domain/course";
+import type { Exercise, ExerciseType, KanjiItem } from "../domain/course";
 import type { LessonBundle } from "./lessonBundle";
 import { n5KanjiCatalog } from "./kanjiCatalog";
+
+const REQUIRED_PRACTICE_TYPES: readonly ExerciseType[] = [
+  "listening",
+  "text-input",
+  "sentence-builder",
+  "particle-gap",
+  "conjugation",
+  "handwriting",
+];
 
 const unique = (values: string[]): string[] => [...new Set(values)];
 
@@ -103,10 +112,79 @@ export const buildLessonKanjiExercises = (
   return exercises;
 };
 
+const chooseReplacementIndexes = (
+  exercises: readonly Exercise[],
+  replacementCount: number,
+): number[] => {
+  const protectedIndexes = new Set<number>();
+
+  REQUIRED_PRACTICE_TYPES.forEach((type) => {
+    const index = exercises.findIndex((exercise) => exercise.type === type);
+    if (index >= 0) protectedIndexes.add(index);
+  });
+
+  const hardExerciseIndex = exercises.findIndex((exercise) => exercise.difficulty === 4);
+  if (hardExerciseIndex >= 0) protectedIndexes.add(hardExerciseIndex);
+
+  const replaceable = exercises
+    .map((exercise, index) => ({ exercise, index }))
+    .filter(({ index }) => !protectedIndexes.has(index));
+  const generated = replaceable
+    .filter(({ exercise }) => exercise.id.includes("-auto-"))
+    .reverse();
+  const authored = replaceable
+    .filter(({ exercise }) => !exercise.id.includes("-auto-"))
+    .reverse();
+  const candidates = [...generated, ...authored];
+
+  if (candidates.length < replacementCount) {
+    throw new Error(
+      `${exercises[0]?.id ?? "lesson"}: недостаточно места для кандзи без потери обязательной практики`,
+    );
+  }
+
+  return candidates
+    .slice(0, replacementCount)
+    .map(({ index }) => index)
+    .sort((left, right) => left - right);
+};
+
+const replacePracticeWithKanji = (
+  exercises: readonly Exercise[],
+  kanjiExercises: readonly Exercise[],
+): Exercise[] => {
+  if (kanjiExercises.length === 0) return [...exercises];
+
+  const replacementIndexes = chooseReplacementIndexes(exercises, kanjiExercises.length);
+  const integrated = exercises.map((exercise) => ({ ...exercise }));
+  kanjiExercises.forEach((exercise, index) => {
+    const targetIndex = replacementIndexes[index];
+    if (targetIndex !== undefined) integrated[targetIndex] = exercise;
+  });
+  return integrated;
+};
+
+const mergeExercisePools = (
+  visibleExercises: readonly Exercise[],
+  originalExercises: readonly Exercise[],
+): Exercise[] => {
+  const byId = new Map<string, Exercise>();
+  [...visibleExercises, ...originalExercises].forEach((exercise) => {
+    if (!byId.has(exercise.id)) byId.set(exercise.id, exercise);
+  });
+  return [...byId.values()];
+};
+
 export const integrateKanjiCurriculum = (bundle: LessonBundle): LessonBundle => {
   const lessonKanji = getLessonKanji(bundle.lesson.id);
+  if (lessonKanji.length === 0) {
+    return { ...bundle, kanji: [] };
+  }
+
+  const originalExercises = bundle.reviewExercises ?? bundle.exercises;
   const kanjiExercises = buildLessonKanjiExercises(bundle.lesson.id, lessonKanji);
-  const exercises = [...bundle.exercises, ...kanjiExercises];
+  const exercises = replacePracticeWithKanji(bundle.exercises, kanjiExercises);
+  const reviewExercises = mergeExercisePools(exercises, originalExercises);
   const itemIds = unique([
     ...bundle.vocabulary.map((item) => item.id),
     ...lessonKanji.map((item) => item.id),
@@ -123,5 +201,6 @@ export const integrateKanjiCurriculum = (bundle: LessonBundle): LessonBundle => 
       exerciseIds: exercises.map((exercise) => exercise.id),
     },
     exercises,
+    reviewExercises,
   };
 };
