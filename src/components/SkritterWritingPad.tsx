@@ -237,11 +237,15 @@ export function SkritterWritingPad({
       setCompleted(nextCompleted);
       setAwaitingGrade(true);
       setSuggestedGrade(grade);
-      setMaximumGrade(grade <= 2 ? grade : 4);
+      setMaximumGrade(
+        grade <= 2
+          ? grade
+          : getMaximumWritingGrade(metricsFor(nextCompleted)),
+      );
       setFeedback(message);
       setAutoRemaining(autoAdvance ? AUTO_ADVANCE_MS : null);
     },
-    [autoAdvance],
+    [autoAdvance, metricsFor],
   );
 
   const submitGrade = useCallback(
