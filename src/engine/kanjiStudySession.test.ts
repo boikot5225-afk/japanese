@@ -53,6 +53,15 @@ test("learn introduces one new N5 kanji through the exact six Skritter stages", 
   assert.ok(queue.every((card) => card.mode === "learn" && card.isNew));
 });
 
+test("learn stages use the implicit got-it score instead of showing grading", () => {
+  const queue = buildKanjiLearnQueue(n5KanjiCatalog, emptyProgress);
+  const definition = queue.find((card) => card.part === "definition");
+  const reading = queue.find((card) => card.part === "reading");
+  assert.ok(definition && reading);
+  assert.equal(buildKanjiStudyResult(definition, person, 3).status, "correct");
+  assert.equal(buildKanjiStudyResult(reading, person, 3).status, "correct");
+});
+
 test("auto-learn never selects the just-finished item from stale progress", () => {
   assert.notEqual(
     findNextNewKanjiId(n5KanjiCatalog, emptyProgress, person.id),
