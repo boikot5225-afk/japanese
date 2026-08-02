@@ -23,6 +23,11 @@ import {
   kanjiStrokeIssueMessage,
   normalizePadStroke,
 } from "../engine/kanjiStrokeEngine";
+import {
+  getSkritterPressGesture,
+  isSkritterSwipeUp,
+  SKRITTER_PRESS_HOLD_MS,
+} from "../engine/skritterWritingGestures";
 import type { WritingGrade, WritingMode } from "../engine/writingSession";
 
 export type SkritterExactWritingMode = "teach" | "snap" | "recall";
@@ -48,17 +53,10 @@ interface SkritterExactWritingPadProps {
 
 type PadPhase = "input" | "revealed" | "grading" | "done";
 
-const TAP_DELAY_MS = 270;
-
-const pointDistance = (left: KanjiStrokePoint, right: KanjiStrokePoint): number =>
-  Math.hypot(right.x - left.x, right.y - left.y);
-
-const polylineLength = (points: readonly KanjiStrokePoint[]): number =>
-  points.slice(1).reduce(
-    (sum, current, index) =>
-      sum + pointDistance(points[index] as KanjiStrokePoint, current),
-    0,
-  );
+const pointDistance = (
+  left: KanjiStrokePoint,
+  right: KanjiStrokePoint,
+): number => Math.hypot(right.x - left.x, right.y - left.y);
 
 const polylineValue = (points: readonly KanjiStrokePoint[]): string =>
   points.map((point) => `${point.x},${point.y}`).join(" ");
@@ -112,11 +110,11 @@ const modeTitle = (mode: SkritterExactWritingMode): string => {
 const modeInstruction = (mode: SkritterExactWritingMode): string => {
   switch (mode) {
     case "teach":
-      return "Следуй за синей анимацией. Принятый штрих выравнивается по эталону.";
+      return "Следуй за синей анимацией. Принятый штрих притянется к эталону.";
     case "snap":
       return "Весь знак виден бледным контуром. Пиши в правильном порядке.";
     case "recall":
-      return "Знак скрыт. Касание показывает следующую черту, двойное — весь ответ.";
+      return "Знак скрыт. Удерживай один палец для следующей черты, два — для всего ответа.";
   }
 };
 
@@ -149,8 +147,9 @@ export function SkritterExactWritingPad({
 
   const currentStrokeRef = useRef<KanjiStrokePoint[]>([]);
   const gestureStartedAtRef = useRef(0);
-  const lastTapAtRef = useRef(0);
-  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gesturePointerCountRef = useRef(1);
+  const holdTriggeredRef = useRef(false);
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rejectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const completionSentRef = useRef(false);
@@ -166,15 +165,20 @@ export function SkritterExactWritingPad({
   const inputLocked = phase !== "input";
   const showFullGuide = mode === "teach" || mode === "snap" || revealedAll;
   const showActiveHint = mode === "teach" || hintStrokeIndex === activeIndex;
+  const canvasSize = Math.min(padSize.width, padSize.height);
+
+  const clearHoldTimer = useCallback(() => {
+    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+    holdTimerRef.current = null;
+  }, []);
 
   const clearTimers = useCallback(() => {
-    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
+    clearHoldTimer();
     if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
     if (rejectTimerRef.current) clearTimeout(rejectTimerRef.current);
-    tapTimerRef.current = null;
     hintTimerRef.current = null;
     rejectTimerRef.current = null;
-  }, []);
+  }, [clearHoldTimer]);
 
   const setForgotten = useCallback(() => {
     forcedForgottenRef.current = true;
@@ -199,7 +203,8 @@ export function SkritterExactWritingPad({
     clearTimers();
     currentStrokeRef.current = [];
     gestureStartedAtRef.current = 0;
-    lastTapAtRef.current = 0;
+    gesturePointerCountRef.current = 1;
+    holdTriggeredRef.current = false;
     completionSentRef.current = false;
     forcedForgottenRef.current = false;
     manualRevealRef.current = false;
@@ -261,11 +266,10 @@ export function SkritterExactWritingPad({
   );
 
   const getHiddenGrade = useCallback(
-    (): WritingGrade =>
-      hiddenLearnWritingGrade(
-        manualRevealRef.current,
-        revealedAllRef.current,
-      ),
+    (): WritingGrade => hiddenLearnWritingGrade(
+      manualRevealRef.current,
+      revealedAllRef.current,
+    ),
     [],
   );
 
@@ -273,7 +277,9 @@ export function SkritterExactWritingPad({
     if (grading === "none") {
       const hiddenGrade = getHiddenGrade();
       setPhase("done");
-      setFeedback(hiddenGrade === 1 ? "Готово. Письмо вернётся скоро." : "Готово.");
+      setFeedback(
+        hiddenGrade === 1 ? "Готово. Письмо вернётся скоро." : "Готово.",
+      );
       emitResult(hiddenGrade);
       return;
     }
@@ -309,7 +315,7 @@ export function SkritterExactWritingPad({
     }, [activeIndex, activeStroke, addHint, data.strokes.length, inputLocked]);
 
   const revealWholeCharacter = useCallback(() => {
-    if (inputLocked) return;
+    if (inputLocked || mode !== "recall") return;
     addHint(true);
     revealedAllRef.current = true;
     setRevealedAll(true);
@@ -321,24 +327,7 @@ export function SkritterExactWritingPad({
     );
     if (grading === "none") setPhase("revealed");
     else setPhase("grading");
-  }, [addHint, grading, inputLocked]);
-
-  const handleTap = useCallback(() => {
-    if (mode !== "recall" || inputLocked) return;
-    const now = Date.now();
-    if (now - lastTapAtRef.current <= TAP_DELAY_MS) {
-      if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
-      tapTimerRef.current = null;
-      lastTapAtRef.current = 0;
-      revealWholeCharacter();
-      return;
-    }
-    lastTapAtRef.current = now;
-    tapTimerRef.current = setTimeout(() => {
-      showNextStroke(false);
-      tapTimerRef.current = null;
-    }, TAP_DELAY_MS);
-  }, [inputLocked, mode, revealWholeCharacter, showNextStroke]);
+  }, [addHint, grading, inputLocked, mode]);
 
   const rejectStroke = useCallback(
     (drawn: readonly KanjiStrokePoint[], message: string) => {
@@ -350,9 +339,7 @@ export function SkritterExactWritingPad({
       setMistakes(nextMistakes);
       setAttempts(nextAttempts);
       setConsecutiveFailures(nextFailures);
-      setRejectedStroke(
-        normalizePadStroke(drawn, padSize.width, padSize.height),
-      );
+      setRejectedStroke(normalizePadStroke(drawn, padSize.width, padSize.height));
       setFeedback(message);
       if (rejectTimerRef.current) clearTimeout(rejectTimerRef.current);
       rejectTimerRef.current = setTimeout(() => {
@@ -390,12 +377,7 @@ export function SkritterExactWritingPad({
         padSize.width,
         padSize.height,
       );
-      const guidedAcceptance =
-        (mode === "teach" || mode === "snap") &&
-        assessment.score >= 47 &&
-        assessment.directionSimilarity > 0.02 &&
-        assessment.startDistance < 31;
-      if (!assessment.accepted && !guidedAcceptance) {
+      if (!assessment.accepted) {
         rejectStroke(drawn, kanjiStrokeIssueMessage(assessment.issue));
         return;
       }
@@ -412,91 +394,125 @@ export function SkritterExactWritingPad({
       if (nextAccepted >= data.strokes.length) {
         finishCharacter();
       } else {
-        setFeedback(`Штрих ${nextAccepted} принят. Следующий: ${nextAccepted + 1}.`);
+        setFeedback(`Штрих ${nextAccepted} принят.`);
       }
     }, [
       acceptedCount,
       activeStroke,
       data.strokes.length,
       finishCharacter,
-      mode,
       padSize.height,
       padSize.width,
       rejectStroke,
     ],
   );
 
+  const triggerHoldGesture = useCallback(() => {
+    const gesture = getSkritterPressGesture(
+      currentStrokeRef.current,
+      canvasSize,
+      gesturePointerCountRef.current,
+      Date.now() - gestureStartedAtRef.current,
+    );
+    holdTimerRef.current = null;
+    if (!gesture || inputLocked) return;
+
+    holdTriggeredRef.current = true;
+    currentStrokeRef.current = [];
+    setCurrentStroke([]);
+    if (gesture === "single-hold") {
+      showNextStroke(false);
+    } else if (mode === "recall") {
+      revealWholeCharacter();
+    }
+  }, [canvasSize, inputLocked, mode, revealWholeCharacter, showNextStroke]);
+
+  const beginHoldTimer = useCallback(() => {
+    clearHoldTimer();
+    holdTimerRef.current = setTimeout(
+      triggerHoldGesture,
+      SKRITTER_PRESS_HOLD_MS,
+    );
+  }, [clearHoldTimer, triggerHoldGesture]);
+
   const finishInput = useCallback(() => {
+    clearHoldTimer();
     const drawn = currentStrokeRef.current;
     currentStrokeRef.current = [];
     setCurrentStroke([]);
+
+    if (holdTriggeredRef.current) {
+      holdTriggeredRef.current = false;
+      return;
+    }
     if (inputLocked || drawn.length === 0) return;
 
-    const duration = Date.now() - gestureStartedAtRef.current;
-    const length = polylineLength(drawn);
+    if (isSkritterSwipeUp(drawn, canvasSize, true)) {
+      reset();
+      return;
+    }
+
     const first = drawn[0];
     const last = drawn.at(-1);
-    if (!first || !last) return;
-    const deltaX = last.x - first.x;
-    const deltaY = last.y - first.y;
-
-    if (
-      mode === "recall" &&
-      duration < 260 &&
-      length < 9 &&
-      Math.abs(deltaX) < 8 &&
-      Math.abs(deltaY) < 8
-    ) {
-      handleTap();
-      return;
-    }
-
-    if (
-      duration < 900 &&
-      deltaY < -72 &&
-      Math.abs(deltaY) > Math.abs(deltaX) * 1.35
-    ) {
-      reset();
-      setFeedback("Поле очищено жестом вверх.");
-      return;
-    }
-
+    if (!first || !last || pointDistance(first, last) <= 2) return;
     acceptStroke(drawn);
-  }, [acceptStroke, handleTap, inputLocked, mode, reset]);
+  }, [acceptStroke, canvasSize, clearHoldTimer, inputLocked, reset]);
+
+  const cancelInput = useCallback(() => {
+    clearHoldTimer();
+    holdTriggeredRef.current = false;
+    currentStrokeRef.current = [];
+    setCurrentStroke([]);
+  }, [clearHoldTimer]);
 
   const responder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => !inputLocked,
-        onMoveShouldSetPanResponder: () => !inputLocked,
-        onPanResponderGrant: (event) => {
-          gestureStartedAtRef.current = Date.now();
-          const point = {
-            x: event.nativeEvent.locationX,
-            y: event.nativeEvent.locationY,
-          };
-          currentStrokeRef.current = [point];
-          setCurrentStroke([point]);
-        },
-        onPanResponderMove: (event) => {
-          const point = {
-            x: event.nativeEvent.locationX,
-            y: event.nativeEvent.locationY,
-          };
-          const previous = currentStrokeRef.current.at(-1);
-          if (previous && pointDistance(previous, point) < 1.8) return;
-          currentStrokeRef.current = [...currentStrokeRef.current, point];
-          setCurrentStroke(currentStrokeRef.current);
-        },
-        onPanResponderRelease: finishInput,
-        onPanResponderTerminate: () => {
-          currentStrokeRef.current = [];
-          setCurrentStroke([]);
-        },
-        onPanResponderTerminationRequest: () => false,
-        onShouldBlockNativeResponder: () => true,
-      }),
-    [finishInput, inputLocked],
+    () => PanResponder.create({
+      onStartShouldSetPanResponder: () => !inputLocked,
+      onMoveShouldSetPanResponder: () => !inputLocked,
+      onPanResponderGrant: (event, gestureState) => {
+        gestureStartedAtRef.current = Date.now();
+        gesturePointerCountRef.current = Math.max(
+          1,
+          gestureState.numberActiveTouches,
+          event.nativeEvent.touches.length,
+        );
+        holdTriggeredRef.current = false;
+        const point = {
+          x: event.nativeEvent.locationX,
+          y: event.nativeEvent.locationY,
+        };
+        currentStrokeRef.current = [point];
+        setCurrentStroke([point]);
+        beginHoldTimer();
+      },
+      onPanResponderStart: (event, gestureState) => {
+        gesturePointerCountRef.current = Math.max(
+          gesturePointerCountRef.current,
+          gestureState.numberActiveTouches,
+          event.nativeEvent.touches.length,
+        );
+      },
+      onPanResponderMove: (event, gestureState) => {
+        gesturePointerCountRef.current = Math.max(
+          gesturePointerCountRef.current,
+          gestureState.numberActiveTouches,
+          event.nativeEvent.touches.length,
+        );
+        const point = {
+          x: event.nativeEvent.locationX,
+          y: event.nativeEvent.locationY,
+        };
+        const previous = currentStrokeRef.current.at(-1);
+        if (previous && pointDistance(previous, point) < 1.8) return;
+        currentStrokeRef.current = [...currentStrokeRef.current, point];
+        setCurrentStroke(currentStrokeRef.current);
+      },
+      onPanResponderRelease: finishInput,
+      onPanResponderTerminate: cancelInput,
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
+    }),
+    [beginHoldTimer, cancelInput, finishInput, inputLocked],
   );
 
   const normalizedCurrent = normalizePadStroke(
@@ -532,7 +548,12 @@ export function SkritterExactWritingPad({
         onLayout={(event) => setPadSize(event.nativeEvent.layout)}
         {...responder.panHandlers}
       >
-        <Svg pointerEvents="none" width="100%" height="100%" viewBox={data.viewBox.join(" ")}>
+        <Svg
+          pointerEvents="none"
+          width="100%"
+          height="100%"
+          viewBox={data.viewBox.join(" ")}
+        >
           <Line x1="54.5" y1="0" x2="54.5" y2="109" stroke="#d8e0e7" strokeWidth="0.65" />
           <Line x1="0" y1="54.5" x2="109" y2="54.5" stroke="#d8e0e7" strokeWidth="0.65" />
           <Line x1="0" y1="0" x2="109" y2="109" stroke="#edf1f4" strokeWidth="0.45" />
@@ -617,21 +638,28 @@ export function SkritterExactWritingPad({
             />
           )}
 
-          {activeStroke && phase === "input" && (mode !== "recall" || hintStrokeIndex === activeIndex) && (
-            <>
-              <Circle cx={activeStroke.start.x} cy={activeStroke.start.y} r="5.7" fill="#c44747" />
-              <SvgText
-                x={activeStroke.start.x}
-                y={activeStroke.start.y + 2.5}
-                fontSize="7"
-                fontWeight="800"
-                fill="#ffffff"
-                textAnchor="middle"
-              >
-                {activeIndex + 1}
-              </SvgText>
-            </>
-          )}
+          {activeStroke &&
+            phase === "input" &&
+            (mode !== "recall" || hintStrokeIndex === activeIndex) && (
+              <>
+                <Circle
+                  cx={activeStroke.start.x}
+                  cy={activeStroke.start.y}
+                  r="5.7"
+                  fill="#c44747"
+                />
+                <SvgText
+                  x={activeStroke.start.x}
+                  y={activeStroke.start.y + 2.5}
+                  fontSize="7"
+                  fontWeight="800"
+                  fill="#ffffff"
+                  textAnchor="middle"
+                >
+                  {activeIndex + 1}
+                </SvgText>
+              </>
+            )}
         </Svg>
       </View>
 
@@ -639,10 +667,16 @@ export function SkritterExactWritingPad({
 
       {phase === "input" && mode === "recall" && (
         <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.actionButton} onPress={() => showNextStroke(false)}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => showNextStroke(false)}
+          >
             <Text style={styles.actionButtonText}>Одна черта</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={revealWholeCharacter}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={revealWholeCharacter}
+          >
             <Text style={styles.actionButtonText}>Показать всё</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton} onPress={reset}>
@@ -658,7 +692,10 @@ export function SkritterExactWritingPad({
       )}
 
       {phase === "revealed" && (
-        <TouchableOpacity style={styles.continueButton} onPress={() => emitResult(1)}>
+        <TouchableOpacity
+          style={styles.continueButton}
+          onPress={() => emitResult(1)}
+        >
           <Text style={styles.continueButtonText}>Дальше</Text>
         </TouchableOpacity>
       )}
@@ -680,12 +717,16 @@ export function SkritterExactWritingPad({
                   ]}
                   onPress={() => emitResult(grade)}
                 >
-                  <Text style={[styles.gradeNumber, { color: gradeColor(grade) }]}>
+                  <Text
+                    style={[styles.gradeNumber, { color: gradeColor(grade) }]}
+                  >
                     {grade}
                   </Text>
                   <Text style={styles.gradeLabel}>{gradeLabel(grade)}</Text>
                   {gradeIntervalLabels?.[grade] && (
-                    <Text style={styles.gradeInterval}>{gradeIntervalLabels[grade]}</Text>
+                    <Text style={styles.gradeInterval}>
+                      {gradeIntervalLabels[grade]}
+                    </Text>
                   )}
                 </TouchableOpacity>
               );
@@ -703,7 +744,7 @@ export function SkritterExactWritingPad({
 
       {mode === "recall" && phase === "input" && (
         <Text style={styles.gestureHint}>
-          Касание — следующая черта · двойное — весь знак · свайп вверх — стереть.
+          Удержание одним пальцем — следующая черта · двумя — весь знак · длинный свайп вверх — стереть.
         </Text>
       )}
     </View>
@@ -712,26 +753,79 @@ export function SkritterExactWritingPad({
 
 const styles = StyleSheet.create({
   wrapper: { gap: 12 },
-  headingRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  headingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
   headingCopy: { flex: 1 },
   title: { color: "#15202b", fontSize: 19, fontWeight: "900" },
   progress: { marginTop: 2, color: "#66788a", fontSize: 13 },
   metrics: { alignItems: "flex-end", gap: 3 },
   metric: { color: "#66788a", fontSize: 11, fontWeight: "700" },
   instruction: { color: "#52606d", fontSize: 14, lineHeight: 20 },
-  pad: { width: "100%", aspectRatio: 1, overflow: "hidden", borderWidth: 2, borderColor: "#c9d5df", borderRadius: 22, backgroundColor: "#fbfcfd" },
+  pad: {
+    width: "100%",
+    aspectRatio: 1,
+    overflow: "hidden",
+    borderWidth: 2,
+    borderColor: "#c9d5df",
+    borderRadius: 22,
+    backgroundColor: "#fbfcfd",
+  },
   feedback: { minHeight: 40, color: "#52606d", fontSize: 14, lineHeight: 20 },
   actionRow: { flexDirection: "row", gap: 8 },
-  actionButton: { flex: 1, minHeight: 44, alignItems: "center", justifyContent: "center", paddingHorizontal: 8, borderWidth: 1, borderColor: "#b9c7d3", borderRadius: 13, backgroundColor: "#ffffff" },
+  actionButton: {
+    flex: 1,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: "#b9c7d3",
+    borderRadius: 13,
+    backgroundColor: "#ffffff",
+  },
   actionButtonText: { color: "#263f57", fontSize: 12, fontWeight: "800" },
-  resetButton: { minHeight: 44, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#b9c7d3", borderRadius: 13, backgroundColor: "#ffffff" },
+  resetButton: {
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#b9c7d3",
+    borderRadius: 13,
+    backgroundColor: "#ffffff",
+  },
   resetButtonText: { color: "#263f57", fontSize: 13, fontWeight: "800" },
-  continueButton: { minHeight: 48, alignItems: "center", justifyContent: "center", borderRadius: 14, backgroundColor: "#183153" },
+  continueButton: {
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    backgroundColor: "#183153",
+  },
   continueButtonText: { color: "#ffffff", fontSize: 15, fontWeight: "900" },
-  gradingCard: { gap: 10, padding: 13, borderWidth: 1, borderColor: "#d3dde5", borderRadius: 16, backgroundColor: "#f8fafc" },
+  gradingCard: {
+    gap: 10,
+    padding: 13,
+    borderWidth: 1,
+    borderColor: "#d3dde5",
+    borderRadius: 16,
+    backgroundColor: "#f8fafc",
+  },
   gradingTitle: { color: "#15202b", fontSize: 16, fontWeight: "900" },
   gradeRow: { flexDirection: "row", gap: 8 },
-  gradeButton: { flex: 1, minHeight: 78, alignItems: "center", justifyContent: "center", paddingVertical: 8, borderWidth: 2, borderRadius: 13, backgroundColor: "#ffffff" },
+  gradeButton: {
+    flex: 1,
+    minHeight: 78,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+    borderWidth: 2,
+    borderRadius: 13,
+    backgroundColor: "#ffffff",
+  },
   gradeNumber: { fontSize: 21, fontWeight: "900" },
   gradeLabel: { marginTop: 2, color: "#263746", fontSize: 12, fontWeight: "800" },
   gradeInterval: { marginTop: 3, color: "#71808d", fontSize: 10, fontWeight: "700" },
