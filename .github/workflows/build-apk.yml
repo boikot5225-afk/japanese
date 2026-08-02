@@ -29,10 +29,24 @@ jobs:
           ref: agent/kanji-study-cycle-0.22.0
           fetch-depth: 1
 
-      - name: Rebuild and verify audited patch
+      - name: Rebuild transported patch
         shell: bash
         run: |
           cat .github/audit-patch.part00 .github/audit-patch.part01 | base64 --decode > /tmp/audit-fix.patch.gz
+          sha256sum /tmp/audit-fix.patch.gz
+          wc -c /tmp/audit-fix.patch.gz
+
+      - name: Upload transported patch for byte audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-patch-debug-${{ github.run_id }}
+          path: /tmp/audit-fix.patch.gz
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Verify and apply audited patch
+        shell: bash
+        run: |
           echo 'd3b87e6ec33ee6ee30ac1bb455be5ee090983a16f3ed88f9c7a6929c5c2cbfcc  /tmp/audit-fix.patch.gz' | sha256sum --check --strict
           gzip --decompress --stdout /tmp/audit-fix.patch.gz > /tmp/audit-fix.patch
           git apply --check --exclude=.github/workflows/build-apk.yml /tmp/audit-fix.patch
