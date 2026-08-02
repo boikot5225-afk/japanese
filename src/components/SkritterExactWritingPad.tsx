@@ -120,6 +120,14 @@ const modeInstruction = (mode: SkritterExactWritingMode): string => {
   }
 };
 
+export const hiddenLearnWritingGrade = (
+  strokeCount: number,
+  mistakes: number,
+  hints: number,
+  revealAll: boolean,
+): WritingGrade =>
+  revealAll || hints > 0 || mistakes > failureLimit(strokeCount) ? 1 : 3;
+
 export function SkritterExactWritingPad({
   data,
   mode,
@@ -179,9 +187,9 @@ export function SkritterExactWritingPad({
     const next = hintsRef.current + 1;
     hintsRef.current = next;
     setHints(next);
-    if (grading !== "none") setForgotten();
+    setForgotten();
     return next;
-  }, [grading, setForgotten]);
+  }, [setForgotten]);
 
   const reset = useCallback(() => {
     clearTimers();
@@ -247,27 +255,36 @@ export function SkritterExactWritingPad({
     [mode, onComplete],
   );
 
+  const getHiddenGrade = useCallback(
+    (): WritingGrade =>
+      hiddenLearnWritingGrade(
+        data.strokes.length,
+        mistakesRef.current,
+        hintsRef.current,
+        revealedAllRef.current,
+      ),
+    [data.strokes.length],
+  );
+
   const finishCharacter = useCallback(() => {
+    const hiddenGrade = getHiddenGrade();
+    const forgotten = hiddenGrade === 1 || forcedForgottenRef.current;
+    if (forgotten) setForgotten();
+
     if (grading === "none") {
       setPhase("done");
-      setFeedback("Готово.");
-      emitResult(3);
+      setFeedback(forgotten ? "Готово. Письмо вернётся скоро." : "Готово.");
+      emitResult(forgotten ? 1 : 3);
       return;
     }
 
-    const forgotten =
-      forcedForgottenRef.current ||
-      revealedAllRef.current ||
-      hintsRef.current > 0 ||
-      mistakesRef.current > failureLimit(data.strokes.length);
-    if (forgotten) setForgotten();
     setPhase("grading");
     setFeedback(
       forgotten
         ? "Подсказка или ошибки зафиксировали оценку «Забыл»."
         : "Знак завершён. Оцени ответ.",
     );
-  }, [data.strokes.length, emitResult, grading, setForgotten]);
+  }, [emitResult, getHiddenGrade, grading, setForgotten]);
 
   const showNextStroke = useCallback(
     (automatic = false) => {
@@ -294,15 +311,12 @@ export function SkritterExactWritingPad({
     setHintStrokeIndex(null);
     setFeedback(
       grading === "none"
-        ? "Ответ открыт. Посмотри на знак и продолжай."
+        ? "Ответ открыт. Письмо будет отмечено как забытое."
         : "Ответ открыт полностью. Оценка — «Забыл».",
     );
     if (grading === "none") setPhase("revealed");
-    else {
-      setForgotten();
-      setPhase("grading");
-    }
-  }, [addHint, grading, inputLocked, setForgotten]);
+    else setPhase("grading");
+  }, [addHint, grading, inputLocked]);
 
   const handleTap = useCallback(() => {
     if (mode !== "recall" || inputLocked) return;
@@ -341,10 +355,7 @@ export function SkritterExactWritingPad({
         rejectTimerRef.current = null;
       }, 420);
 
-      if (
-        grading !== "none" &&
-        nextMistakes > failureLimit(data.strokes.length)
-      ) {
+      if (nextMistakes > failureLimit(data.strokes.length)) {
         setForgotten();
       }
       if (nextFailures >= 3) {
@@ -354,7 +365,6 @@ export function SkritterExactWritingPad({
     }, [
       consecutiveFailures,
       data.strokes.length,
-      grading,
       padSize.height,
       padSize.width,
       setForgotten,
@@ -639,7 +649,7 @@ export function SkritterExactWritingPad({
       )}
 
       {phase === "revealed" && (
-        <TouchableOpacity style={styles.continueButton} onPress={() => emitResult(3)}>
+        <TouchableOpacity style={styles.continueButton} onPress={() => emitResult(1)}>
           <Text style={styles.continueButtonText}>Дальше</Text>
         </TouchableOpacity>
       )}
