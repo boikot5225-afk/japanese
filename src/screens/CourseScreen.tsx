@@ -16,6 +16,7 @@ import {
   isLessonUnlocked,
   type CheckpointProgress,
 } from "../engine/checkpointEngine";
+import { registerKanjiLessonRuntime } from "../engine/kanjiLessonBridge";
 import type { ReviewItem } from "../engine/reviewEngine";
 import { styles } from "../theme/appStyles";
 import { kanaStyles } from "../theme/kanaStyles";
@@ -68,6 +69,12 @@ export function CourseScreen({
   const todayCompleted = todayBundle
     ? completedLessonIds.includes(todayBundle.lesson.id)
     : false;
+
+  registerKanjiLessonRuntime({
+    reviewItems,
+    onRecordStudy: onRecordKanjiStudy,
+    onRecordWriting: onRecordKanjiWriting,
+  });
 
   if (kanjiOpen) {
     return (
