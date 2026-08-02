@@ -83,7 +83,7 @@ jobs:
         with:
           name: Japanese-${{ env.APP_VERSION }}-standalone
           path: |
-            builds/Japanese-${APP_VERSION}-standalone.apk
+            builds/*.apk
             builds/apk.sha256
             builds/apk-contents.log
           if-no-files-found: error
