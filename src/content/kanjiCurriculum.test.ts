@@ -47,7 +47,7 @@ test("all 103 N5 kanji are distributed through lessons 1-36", () => {
   assert.equal(new Set(introduced.map((item) => item.id)).size, 103);
 });
 
-test("visible lessons stay compact while the review pool preserves displaced practice", () => {
+test("visible lessons stay compact while review keeps both kanji skills and displaced practice", () => {
   const n5Bundles = lessonBundles.filter((bundle) => bundle.lesson.order <= 36);
   const targetedKanji = new Set<string>();
 
@@ -57,7 +57,8 @@ test("visible lessons stay compact while the review pool preserves displaced pra
     const kanjiExercises = bundle.exercises.filter((exercise) =>
       exercise.contentKey?.startsWith("kanji:"),
     );
-    const expectedKanjiExerciseCount = 1 + (bundle.kanji?.length ?? 0);
+    const kanjiCount = bundle.kanji?.length ?? 0;
+    const expectedKanjiExerciseCount = 1 + kanjiCount;
     assert.equal(
       kanjiExercises.length,
       expectedKanjiExerciseCount,
@@ -76,8 +77,8 @@ test("visible lessons stay compact while the review pool preserves displaced pra
     const reviewExercises = bundle.reviewExercises ?? [];
     assert.equal(
       reviewExercises.length,
-      12 + expectedKanjiExerciseCount,
-      `${bundle.lesson.id} did not retain every displaced legacy exercise`,
+      12 + 2 * kanjiCount,
+      `${bundle.lesson.id} did not retain legacy practice and complete kanji pairs`,
     );
     assert.equal(
       new Set(reviewExercises.map((exercise) => exercise.id)).size,
@@ -88,6 +89,22 @@ test("visible lessons stay compact while the review pool preserves displaced pra
       assert.ok(
         reviewExercises.some((candidate) => candidate.id === exercise.id),
         `${bundle.lesson.id} review pool misses visible ${exercise.id}`,
+      );
+    });
+    (bundle.kanji ?? []).forEach((item) => {
+      const itemSkills = new Set(
+        reviewExercises
+          .filter(
+            (exercise) =>
+              exercise.contentKey?.startsWith(`kanji:${item.literal}:`) &&
+              exercise.targetItemIds.includes(item.id),
+          )
+          .map(inferExerciseSkill),
+      );
+      assert.deepEqual(
+        itemSkills,
+        new Set(["recognition", "reading"]),
+        `${bundle.lesson.id} leaves ${item.literal} without a complete review pair`,
       );
     });
   });
