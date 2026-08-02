@@ -121,12 +121,9 @@ const modeInstruction = (mode: SkritterExactWritingMode): string => {
 };
 
 export const hiddenLearnWritingGrade = (
-  strokeCount: number,
-  mistakes: number,
-  hints: number,
+  manualReveal: boolean,
   revealAll: boolean,
-): WritingGrade =>
-  revealAll || hints > 0 || mistakes > failureLimit(strokeCount) ? 1 : 3;
+): WritingGrade => (manualReveal || revealAll ? 1 : 3);
 
 export function SkritterExactWritingPad({
   data,
@@ -158,6 +155,7 @@ export function SkritterExactWritingPad({
   const rejectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const completionSentRef = useRef(false);
   const forcedForgottenRef = useRef(false);
+  const manualRevealRef = useRef(false);
   const hintsRef = useRef(0);
   const mistakesRef = useRef(0);
   const attemptsRef = useRef(0);
@@ -183,13 +181,19 @@ export function SkritterExactWritingPad({
     setForcedForgotten(true);
   }, []);
 
-  const addHint = useCallback(() => {
-    const next = hintsRef.current + 1;
-    hintsRef.current = next;
-    setHints(next);
-    setForgotten();
-    return next;
-  }, [setForgotten]);
+  const addHint = useCallback(
+    (manual: boolean) => {
+      const next = hintsRef.current + 1;
+      hintsRef.current = next;
+      setHints(next);
+      if (manual) {
+        manualRevealRef.current = true;
+        setForgotten();
+      }
+      return next;
+    },
+    [setForgotten],
+  );
 
   const reset = useCallback(() => {
     clearTimers();
@@ -198,6 +202,7 @@ export function SkritterExactWritingPad({
     lastTapAtRef.current = 0;
     completionSentRef.current = false;
     forcedForgottenRef.current = false;
+    manualRevealRef.current = false;
     hintsRef.current = 0;
     mistakesRef.current = 0;
     attemptsRef.current = 0;
@@ -258,39 +263,39 @@ export function SkritterExactWritingPad({
   const getHiddenGrade = useCallback(
     (): WritingGrade =>
       hiddenLearnWritingGrade(
-        data.strokes.length,
-        mistakesRef.current,
-        hintsRef.current,
+        manualRevealRef.current,
         revealedAllRef.current,
       ),
-    [data.strokes.length],
+    [],
   );
 
   const finishCharacter = useCallback(() => {
-    const hiddenGrade = getHiddenGrade();
-    const forgotten = hiddenGrade === 1 || forcedForgottenRef.current;
-    if (forgotten) setForgotten();
-
     if (grading === "none") {
+      const hiddenGrade = getHiddenGrade();
       setPhase("done");
-      setFeedback(forgotten ? "Готово. Письмо вернётся скоро." : "Готово.");
-      emitResult(forgotten ? 1 : 3);
+      setFeedback(hiddenGrade === 1 ? "Готово. Письмо вернётся скоро." : "Готово.");
+      emitResult(hiddenGrade);
       return;
     }
 
+    const forgotten =
+      forcedForgottenRef.current ||
+      revealedAllRef.current ||
+      mistakesRef.current > failureLimit(data.strokes.length);
+    if (forgotten) setForgotten();
     setPhase("grading");
     setFeedback(
       forgotten
         ? "Подсказка или ошибки зафиксировали оценку «Забыл»."
         : "Знак завершён. Оцени ответ.",
     );
-  }, [emitResult, getHiddenGrade, grading, setForgotten]);
+  }, [data.strokes.length, emitResult, getHiddenGrade, grading, setForgotten]);
 
   const showNextStroke = useCallback(
     (automatic = false) => {
       if (!activeStroke || inputLocked) return;
       if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
-      addHint();
+      addHint(!automatic);
       setHintStrokeIndex(activeIndex);
       setFeedback(
         automatic
@@ -305,7 +310,7 @@ export function SkritterExactWritingPad({
 
   const revealWholeCharacter = useCallback(() => {
     if (inputLocked) return;
-    addHint();
+    addHint(true);
     revealedAllRef.current = true;
     setRevealedAll(true);
     setHintStrokeIndex(null);
@@ -355,7 +360,10 @@ export function SkritterExactWritingPad({
         rejectTimerRef.current = null;
       }, 420);
 
-      if (nextMistakes > failureLimit(data.strokes.length)) {
+      if (
+        grading !== "none" &&
+        nextMistakes > failureLimit(data.strokes.length)
+      ) {
         setForgotten();
       }
       if (nextFailures >= 3) {
@@ -365,6 +373,7 @@ export function SkritterExactWritingPad({
     }, [
       consecutiveFailures,
       data.strokes.length,
+      grading,
       padSize.height,
       padSize.width,
       setForgotten,
