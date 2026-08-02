@@ -39,9 +39,10 @@ export const resampleStroke = (
   points: readonly KanjiStrokePoint[],
   count = SAMPLE_COUNT,
 ): KanjiStrokePoint[] => {
-  if (points.length === 0 || count <= 0) return [];
+  const first = points[0];
+  if (!first || count <= 0) return [];
   if (points.length === 1) {
-    return Array.from({ length: count }, () => ({ ...points[0] }));
+    return Array.from({ length: count }, () => ({ x: first.x, y: first.y }));
   }
 
   const cumulative = [0];
@@ -53,7 +54,7 @@ export const resampleStroke = (
   }
   const total = cumulative[cumulative.length - 1] ?? 0;
   if (total <= 0.001) {
-    return Array.from({ length: count }, () => ({ ...points[0] }));
+    return Array.from({ length: count }, () => ({ x: first.x, y: first.y }));
   }
 
   const sampled: KanjiStrokePoint[] = [];
