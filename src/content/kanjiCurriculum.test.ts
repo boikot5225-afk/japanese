@@ -47,7 +47,7 @@ test("all 103 N5 kanji are distributed through lessons 1-36", () => {
   assert.equal(new Set(introduced.map((item) => item.id)).size, 103);
 });
 
-test("visible lessons stay compact while review keeps both kanji skills and displaced practice", () => {
+test("visible lessons stay compact while review keeps all kanji skills and displaced practice", () => {
   const n5Bundles = lessonBundles.filter((bundle) => bundle.lesson.order <= 36);
   const targetedKanji = new Set<string>();
 
@@ -77,8 +77,8 @@ test("visible lessons stay compact while review keeps both kanji skills and disp
     const reviewExercises = bundle.reviewExercises ?? [];
     assert.equal(
       reviewExercises.length,
-      12 + 2 * kanjiCount,
-      `${bundle.lesson.id} did not retain legacy practice and complete kanji pairs`,
+      12 + 3 * kanjiCount,
+      `${bundle.lesson.id} did not retain legacy practice and complete kanji skill triples`,
     );
     assert.equal(
       new Set(reviewExercises.map((exercise) => exercise.id)).size,
@@ -103,9 +103,16 @@ test("visible lessons stay compact while review keeps both kanji skills and disp
       );
       assert.deepEqual(
         itemSkills,
-        new Set(["recognition", "reading"]),
-        `${bundle.lesson.id} leaves ${item.literal} without a complete review pair`,
+        new Set(["recognition", "reading", "writing"]),
+        `${bundle.lesson.id} leaves ${item.literal} without complete review skills`,
       );
+      const writing = reviewExercises.find(
+        (exercise) =>
+          exercise.contentKey === `kanji:${item.literal}:writing` &&
+          exercise.targetItemIds.includes(item.id),
+      );
+      assert.equal(writing?.type, "handwriting");
+      assert.deepEqual(writing?.correctAnswers, [item.literal]);
     });
   });
 
