@@ -203,7 +203,12 @@ export const buildKanjiStudyResult = (
   if (card.part === "preview") {
     throw new Error("Карточка знакомства не записывается в SRS");
   }
-  const exercise = findKanjiStudyExercise(item, card.part);
+  const baseExercise = findKanjiStudyExercise(item, card.part);
+  const exercise: Exercise = {
+    ...baseExercise,
+    difficulty: grade,
+    variantGroup: `kanji-self-grade:${grade}`,
+  };
   return {
     questionId: card.id,
     exercise,
