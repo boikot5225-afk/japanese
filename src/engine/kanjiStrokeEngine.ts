@@ -34,13 +34,20 @@ const STRAW_WINDOW = 3;
 const MEDIAN_THRESHOLD = 0.95;
 const LINE_THRESHOLD = 0.8;
 
-// Observable thresholds used by Skritter's writing recognizer.
+// Thresholds observed in Skritter's writing recognizer.
 const MAX_ANGLE_DIFFERENCE = 60;
 const MAX_CENTER_DISTANCE = 0.3;
 const MIN_CORNER_LENGTH_RATIO = 0.5;
 const MAX_CORNER_LENGTH_RATIO = 2;
 const LINE_MIN_CORNER_LENGTH_RATIO = MIN_CORNER_LENGTH_RATIO / 2;
 const LINE_MAX_CORNER_LENGTH_RATIO = MAX_CORNER_LENGTH_RATIO * 2;
+
+// KanjiVG paths occasionally contain tiny control-point bends which are not
+// meaningful brush corners. Skritter uses curated stroke parameters, so raw SVG
+// micro-bends must not become mandatory user gestures.
+const SHALLOW_CORNER_DEGREES = 18;
+const TECHNICAL_SEGMENT_RATIO = 0.06;
+const TECHNICAL_CORNER_MAX_DEGREES = 105;
 
 const distance = (left: KanjiStrokePoint, right: KanjiStrokePoint): number =>
   Math.hypot(right.x - left.x, right.y - left.y);
@@ -54,6 +61,32 @@ const polylineLength = (points: readonly KanjiStrokePoint[]): number =>
       sum + distance(points[index] as KanjiStrokePoint, current),
     0,
   );
+
+const normalizedAngleDifference = (left: number, right: number): number => {
+  const raw = Math.abs(left - right) % 360;
+  return Math.min(raw, 360 - raw);
+};
+
+const turnAngle = (
+  before: KanjiStrokePoint,
+  corner: KanjiStrokePoint,
+  after: KanjiStrokePoint,
+): number => {
+  const firstX = corner.x - before.x;
+  const firstY = corner.y - before.y;
+  const secondX = after.x - corner.x;
+  const secondY = after.y - corner.y;
+  const firstLength = Math.hypot(firstX, firstY);
+  const secondLength = Math.hypot(secondX, secondY);
+  if (firstLength <= 0.000001 || secondLength <= 0.000001) return 0;
+  const cosine = clamp(
+    (firstX * secondX + firstY * secondY) /
+      (firstLength * secondLength),
+    -1,
+    1,
+  );
+  return Math.acos(cosine) * (180 / Math.PI);
+};
 
 export const resampleStroke = (
   points: readonly KanjiStrokePoint[],
@@ -260,7 +293,7 @@ const resampleForCorners = (
   let previous = first;
 
   for (let index = 1; index < points.length; index += 1) {
-    let current = points[index] as KanjiStrokePoint;
+    const current = points[index] as KanjiStrokePoint;
     let segmentLength = distance(previous, current);
     if (segmentLength <= 0.000001) continue;
 
@@ -310,7 +343,7 @@ const halfwayCorner = (
   return minimumIndex;
 };
 
-const postProcessCorners = (
+const postProcessCornerIndexes = (
   points: readonly KanjiStrokePoint[],
   initialCorners: readonly number[],
   straws: readonly number[],
@@ -343,7 +376,39 @@ const postProcessCorners = (
   return corners;
 };
 
-/** ShortStraw corner extraction used by Skritter's recognizer. */
+const removeTechnicalCorners = (
+  corners: readonly KanjiStrokePoint[],
+): KanjiStrokePoint[] => {
+  const simplified = corners.map((point) => ({ ...point }));
+  let changed = true;
+
+  while (changed && simplified.length > 2) {
+    changed = false;
+    const totalLength = Math.max(polylineLength(simplified), 0.000001);
+    for (let index = 1; index < simplified.length - 1; index += 1) {
+      const before = simplified[index - 1] as KanjiStrokePoint;
+      const corner = simplified[index] as KanjiStrokePoint;
+      const after = simplified[index + 1] as KanjiStrokePoint;
+      const leftLength = distance(before, corner);
+      const rightLength = distance(corner, after);
+      const shortRatio = Math.min(leftLength, rightLength) / totalLength;
+      const degrees = turnAngle(before, corner, after);
+      const shallow = degrees < SHALLOW_CORNER_DEGREES;
+      const technical =
+        shortRatio < TECHNICAL_SEGMENT_RATIO &&
+        degrees < TECHNICAL_CORNER_MAX_DEGREES;
+      if (shallow || technical) {
+        simplified.splice(index, 1);
+        changed = true;
+        break;
+      }
+    }
+  }
+
+  return simplified;
+};
+
+/** ShortStraw extraction followed by Skritter-style meaningful-corner filtering. */
 export const findStrokeCorners = (
   source: readonly KanjiStrokePoint[],
 ): KanjiStrokePoint[] => {
@@ -367,7 +432,7 @@ export const findStrokeCorners = (
     );
   }
   const threshold = median(straws) * MEDIAN_THRESHOLD;
-  const corners = [0];
+  const cornerIndexes = [0];
 
   for (
     let index = STRAW_WINDOW;
@@ -387,13 +452,14 @@ export const findStrokeCorners = (
       }
       index += 1;
     }
-    corners.push(localMinimumIndex);
+    cornerIndexes.push(localMinimumIndex);
   }
-  corners.push(points.length - 1);
+  cornerIndexes.push(points.length - 1);
 
-  return postProcessCorners(points, corners, straws).map(
+  const extracted = postProcessCornerIndexes(points, cornerIndexes, straws).map(
     (index) => points[index] as KanjiStrokePoint,
   );
+  return removeTechnicalCorners(extracted);
 };
 
 export const assessKanjiStroke = (
@@ -432,7 +498,10 @@ export const assessKanjiStroke = (
   const lengthRatio = expectedCornerLength <= 0.000001
     ? 0
     : actualCornerLength / expectedCornerLength;
-  const angleDifference = Math.abs(angle(actualCorners) - angle(expectedCorners));
+  const angleDifference = normalizedAngleDifference(
+    angle(actualCorners),
+    angle(expectedCorners),
+  );
   const centerDistance = distance(
     pointBounds(actualUnit, 0.01).center,
     pointBounds(expectedUnit).center,
