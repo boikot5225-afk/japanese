@@ -38,20 +38,28 @@ jobs:
           git apply --check --exclude=.github/workflows/build-apk.yml /tmp/audit-fix.patch
           git apply --index --exclude=.github/workflows/build-apk.yml /tmp/audit-fix.patch
 
-      - name: Upload final workflow transport for byte audit
-        uses: actions/upload-artifact@v4
-        with:
-          name: final-build-transport-${{ github.run_id }}
-          path: .github/final-build-workflow.b64
-          if-no-files-found: error
-          retention-days: 1
-
-      - name: Restore final workflow and remove transport
+      - name: Reconstruct final workflow from Git baseline
         shell: bash
         run: |
-          base64 --decode --ignore-garbage .github/final-build-workflow.b64 > .github/workflows/build-apk.yml
+          BASELINE=85e3b9bd993e278c48f941e8a96d4afe8801f5a3
+          git fetch --no-tags --depth=1 origin "$BASELINE"
+          rm -rf /tmp/final-build
+          mkdir -p /tmp/final-build/.github/workflows
+          git show "$BASELINE:.github/workflows/build-apk.yml" > /tmp/final-build/.github/workflows/build-apk.yml
+          (
+            cd /tmp/final-build
+            git init -q
+            git add -- .github/workflows/build-apk.yml
+            git -c user.name=audit -c user.email=audit@example.invalid commit -qm baseline
+            git apply --include=.github/workflows/build-apk.yml /tmp/audit-fix.patch
+          )
+          cp /tmp/final-build/.github/workflows/build-apk.yml .github/workflows/build-apk.yml
           echo '0f6266d354f9add70749ddccb83d53a0f03d853edd47d1028843b80254ec53a7  .github/workflows/build-apk.yml' | sha256sum --check --strict
           git add -- .github/workflows/build-apk.yml
+
+      - name: Remove one-time transport
+        shell: bash
+        run: |
           git rm -- .github/audit-patch.part00 .github/audit-patch.part01 .github/audit-trigger .github/final-build-workflow.b64 .github/workflows/apply-audit-fix.yml
 
       - name: Commit audited fixes
