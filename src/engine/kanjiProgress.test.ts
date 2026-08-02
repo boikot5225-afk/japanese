@@ -62,17 +62,31 @@ test("meaning and reading progress do not fabricate writing mastery", () => {
     reviewItem("reading"),
   ]);
 
-  assert.equal(progress.status, "review");
+  assert.equal(progress.status, "learning");
   assert.ok(progress.meaning.mastery >= 70);
   assert.ok(progress.reading.mastery >= 70);
   assert.equal(progress.writing.mastery, 0);
   assert.equal(progress.writing.attempts, 0);
   assert.equal(progress.writing.state, "new");
+  assert.ok(progress.overallMastery < progress.meaning.mastery);
 });
 
-test("a reading failure weakens reading without erasing meaning progress", () => {
+test("all three skills are required for a fully reviewed kanji", () => {
   const progress = buildKanjiProgress(item, [
     reviewItem("recognition"),
+    reviewItem("reading"),
+    reviewItem("writing"),
+  ]);
+
+  assert.equal(progress.status, "review");
+  assert.equal(progress.writing.state, "review");
+  assert.ok(progress.overallMastery >= 70);
+});
+
+test("a reading failure weakens reading without erasing other skill progress", () => {
+  const progress = buildKanjiProgress(item, [
+    reviewItem("recognition"),
+    reviewItem("writing"),
     reviewItem("reading", {
       streak: 0,
       intervalDays: 0,
@@ -87,6 +101,7 @@ test("a reading failure weakens reading without erasing meaning progress", () =>
   assert.equal(progress.status, "weak");
   assert.equal(progress.weak, true);
   assert.equal(progress.meaning.state, "review");
+  assert.equal(progress.writing.state, "review");
   assert.equal(progress.reading.state, "weak");
   assert.ok(progress.meaning.mastery > progress.reading.mastery);
 });
