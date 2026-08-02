@@ -28,6 +28,23 @@ export interface VocabularyItem {
   tags?: string[];
 }
 
+export interface KanjiExample {
+  written: string;
+  reading: string;
+  kanjiReading: string;
+  meaningRu: string;
+}
+
+export interface KanjiItem {
+  id: string;
+  type: "kanji";
+  literal: string;
+  meaningsRu: string[];
+  jlptLevel: JlptLevel;
+  introducedInLessonId: string;
+  examples: KanjiExample[];
+}
+
 export interface GrammarPoint {
   id: string;
   type: "grammar";
@@ -50,7 +67,7 @@ export interface ExampleSentence {
   vocabularyIds: string[];
 }
 
-export type LearningItem = VocabularyItem | GrammarPoint | ExampleSentence;
+export type LearningItem = VocabularyItem | KanjiItem | GrammarPoint | ExampleSentence;
 
 export type ExerciseType =
   | "multiple-choice"
@@ -75,6 +92,7 @@ export interface Exercise {
   difficulty?: 1 | 2 | 3 | 4;
   confusionItemIds?: string[];
   audioText?: string;
+  skill?: Skill;
   sessionRole?: "core" | "remediation";
 }
 

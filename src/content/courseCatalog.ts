@@ -46,6 +46,7 @@ import { lesson039Bundle } from "./lesson039";
 import { lesson040Bundle } from "./lesson040";
 import type { Lesson } from "../domain/course";
 import type { LessonBundle } from "./lessonBundle";
+import { integrateKanjiCurriculum } from "./kanjiCurriculum";
 import { diversifyLessonPractice } from "./practiceDiversity";
 import { expandLessonPractice } from "./practiceExpansion";
 
@@ -138,17 +139,16 @@ const exerciseMinutes = (bundle: LessonBundle): number =>
   }, 0);
 
 const withReviewedDuration = (bundle: LessonBundle): LessonBundle => {
-  if (bundle.lesson.order <= 10) return bundle;
-
   const studyMinutes =
     bundle.grammar.length * 1.1 +
     bundle.vocabulary.length * 0.2 +
+    (bundle.kanji?.length ?? 0) * 0.55 +
     bundle.sentences.length * 0.35;
   const guidedReviewMinutes = 1.5;
   const calculatedMinutes = Math.ceil(
     studyMinutes + exerciseMinutes(bundle) + guidedReviewMinutes,
   );
-  const estimatedMinutes = Math.min(19, Math.max(14, calculatedMinutes));
+  const estimatedMinutes = Math.min(21, Math.max(14, calculatedMinutes));
 
   return {
     ...bundle,
@@ -161,6 +161,7 @@ const withReviewedDuration = (bundle: LessonBundle): LessonBundle => {
 
 export const lessonBundles: readonly LessonBundle[] = expandedLessonBundles
   .map((bundle) => diversifyLessonPractice(bundle, expandedLessonBundles))
+  .map(integrateKanjiCurriculum)
   .map(withReviewedDuration);
 
 export const lesson001Bundle = lessonBundles[0] ?? lesson001BaseBundle;

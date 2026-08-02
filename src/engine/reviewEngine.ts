@@ -68,6 +68,8 @@ export const isSuccessfulStatus = (status: AnswerStatus): boolean =>
   successfulStatuses.includes(status);
 
 export const inferExerciseSkill = (exercise: Exercise): Skill => {
+  if (exercise.skill) return exercise.skill;
+
   switch (exercise.type) {
     case "listening":
       return "listening";

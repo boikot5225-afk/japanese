@@ -1,6 +1,7 @@
 import { SafeAreaView, ScrollView, StatusBar, Text, TouchableOpacity, View } from "react-native";
 
 import { speakJapanese } from "../audio/japaneseSpeech";
+import { KanjiLessonStage } from "../components/KanjiLessonStage";
 import { PracticeCard } from "../components/PracticeCard";
 import { SwipeNavigationView } from "../components/SwipeNavigationView";
 import type { LessonBundle } from "../content/lessonBundle";
@@ -11,6 +12,7 @@ import { styles } from "../theme/appStyles";
 export type LessonStage = "theory" | "words" | "examples" | "practice";
 
 const lessonStages: LessonStage[] = ["theory", "words", "examples", "practice"];
+
 const stageLabels: Record<LessonStage, string> = {
   theory: "Грамматика",
   words: "Слова",
@@ -169,6 +171,9 @@ export function LessonScreen({
                   </View>
                 </View>
               ))}
+              {(activeBundle.kanji?.length ?? 0) > 0 && (
+                <KanjiLessonStage kanji={activeBundle.kanji ?? []} />
+              )}
             </View>
           )}
 
@@ -276,7 +281,9 @@ export function ReviewScreen({
           </TouchableOpacity>
           <Text style={styles.eyebrow}>Повторение</Text>
           <Text style={styles.title}>{lessonTitle}</Text>
-          <Text style={styles.meaning}>Сейчас проверяем: {focusLabel}</Text>
+          <Text style={styles.meaning}>
+            Сейчас проверяем: {focusLabel === "Материал урока" ? currentExercise.prompt : focusLabel}
+          </Text>
           <Text style={styles.description}>
             {coveredCount > 1
               ? `Одна уникальная задача проверяет сразу ${coveredCount} связанных знания. Повторять тот же текст для каждого из них не придётся.`
