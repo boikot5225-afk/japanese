@@ -105,6 +105,16 @@ export const deriveAutomaticWritingGrade = (
   return maximum <= 2 ? maximum : 3;
 };
 
+/**
+ * Skritter Learn hides the grading UI, but a deliberate reveal is still stored
+ * as forgotten. Ordinary teaching corrections and automatic help after several
+ * failed strokes do not lower the hidden grade.
+ */
+export const getHiddenLearnWritingGrade = (
+  manualReveal: boolean,
+  revealAll: boolean,
+): WritingGrade => (manualReveal || revealAll ? 1 : 3);
+
 export const getInitialWritingMode = (
   attempts: number,
   mastery: number,
