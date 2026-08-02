@@ -4,10 +4,11 @@ import test from "node:test";
 import { n5KanjiCatalog } from "../content/kanjiCatalog";
 import { buildKanjiProgressCatalog } from "./kanjiProgress";
 import {
-  buildKanjiStudyQueue,
+  buildKanjiLearnQueue,
+  buildKanjiReviewQueue,
   buildKanjiStudyResult,
   gradeKanjiStudyAnswer,
-  requeueKanjiStudyCard,
+  requeueForgottenKanjiCard,
 } from "./kanjiStudySession";
 import type { ReviewItem } from "./reviewEngine";
 
@@ -34,105 +35,133 @@ const dueReviewItem = (overrides: Partial<ReviewItem> = {}): ReviewItem => ({
   ...overrides,
 });
 
-test("introduces each new N5 kanji as preview, meaning, reading, then writing", () => {
-  const queue = buildKanjiStudyQueue(
-    n5KanjiCatalog,
-    emptyProgress,
-    [],
-    new Date("2026-08-02T00:00:00.000Z"),
-    { newItemLimit: 1 },
-  );
+test("learn introduces one new N5 kanji through the exact six Skritter stages", () => {
+  const queue = buildKanjiLearnQueue(n5KanjiCatalog, emptyProgress);
   assert.deepEqual(
-    queue.slice(0, 4).map((card) => card.part),
-    ["preview", "meaning", "reading", "writing"],
+    queue.map((card) => card.part),
+    [
+      "preview",
+      "definition",
+      "reading",
+      "writing-teach",
+      "writing-snap",
+      "writing-recall",
+    ],
   );
-  assert.equal(new Set(queue.slice(0, 4).map((card) => card.itemId)).size, 1);
-  assert.ok(queue.slice(0, 4).every((card) => card.isNew));
+  assert.equal(new Set(queue.map((card) => card.itemId)).size, 1);
+  assert.ok(queue.every((card) => card.mode === "learn" && card.isNew));
 });
 
-test("puts due skill cards before new N5 material", () => {
+test("review contains due skill cards only and never mixes new material", () => {
   const reviewItems = [dueReviewItem()];
-  const progress = buildKanjiProgressCatalog(n5KanjiCatalog, reviewItems);
-  const queue = buildKanjiStudyQueue(
+  const queue = buildKanjiReviewQueue(
     n5KanjiCatalog,
-    progress,
     reviewItems,
     new Date("2026-08-02T00:00:00.000Z"),
-    { newItemLimit: 1 },
   );
+  assert.equal(queue.length, 1);
   assert.equal(queue[0]?.itemId, person.id);
   assert.equal(queue[0]?.part, "reading");
+  assert.equal(queue[0]?.mode, "review");
   assert.equal(queue[0]?.isNew, false);
-  assert.equal(queue[1]?.part, "preview");
+  assert.ok(queue.every((card) => card.part !== "preview"));
 });
 
-test("deduplicates recognition and recall into one meaning card", () => {
+test("review excludes future cards", () => {
+  const queue = buildKanjiReviewQueue(
+    n5KanjiCatalog,
+    [dueReviewItem({ dueAt: "2026-08-03T00:00:00.000Z" })],
+    new Date("2026-08-02T00:00:00.000Z"),
+  );
+  assert.deepEqual(queue, []);
+});
+
+test("deduplicates recognition and recall into one definition card", () => {
   const reviewItems = [
     dueReviewItem({ skill: "recognition" }),
     dueReviewItem({ skill: "recall", exerciseId: "recall-copy" }),
   ];
-  const progress = buildKanjiProgressCatalog(n5KanjiCatalog, reviewItems);
-  const queue = buildKanjiStudyQueue(
+  const queue = buildKanjiReviewQueue(
     n5KanjiCatalog,
-    progress,
     reviewItems,
     new Date("2026-08-02T00:00:00.000Z"),
-    { newItemLimit: 0 },
   );
   assert.equal(
-    queue.filter((card) => card.itemId === person.id && card.part === "meaning").length,
+    queue.filter(
+      (card) => card.itemId === person.id && card.part === "definition",
+    ).length,
     1,
   );
 });
 
-test("returns forgotten and hard cards later instead of repeating immediately", () => {
+test("review avoids adjacent parts of the same kanji when another item is ready", () => {
+  const queue = buildKanjiReviewQueue(
+    n5KanjiCatalog,
+    [
+      dueReviewItem({ skill: "reading" }),
+      dueReviewItem({ skill: "writing", exerciseId: "person-writing" }),
+      dueReviewItem({
+        itemId: day.id,
+        skill: "reading",
+        exerciseId: "day-reading",
+        lessonId: day.introducedInLessonId,
+      }),
+    ],
+    new Date("2026-08-02T00:00:00.000Z"),
+  );
+  assert.notEqual(queue[0]?.itemId, queue[1]?.itemId);
+});
+
+test("only forgotten review cards return at the end of the queue", () => {
   const current = {
-    id: `${person.id}:meaning:new:0`,
+    id: `${person.id}:definition:review:0`,
     itemId: person.id,
-    part: "meaning" as const,
-    isNew: true,
+    mode: "review" as const,
+    part: "definition" as const,
+    isNew: false,
     remediation: false,
     repetition: 0,
   };
-  const remaining = ["preview", "meaning", "reading", "writing", "preview", "meaning", "reading"].map(
-    (part, index) => ({
-      id: `${day.id}:${part}:${index}`,
+  const remaining = [
+    {
+      id: `${day.id}:reading:review:0`,
       itemId: day.id,
-      part: part as "preview" | "meaning" | "reading" | "writing",
-      isNew: true,
+      mode: "review" as const,
+      part: "reading" as const,
+      isNew: false,
       remediation: false,
       repetition: 0,
-    }),
-  );
+    },
+  ];
 
-  const forgotQueue = requeueKanjiStudyCard(remaining, current, 1);
-  assert.equal(forgotQueue[3]?.itemId, person.id);
-  assert.equal(forgotQueue[3]?.remediation, true);
+  const forgotQueue = requeueForgottenKanjiCard(remaining, current, 1);
+  assert.equal(forgotQueue.at(-1)?.itemId, person.id);
+  assert.equal(forgotQueue.at(-1)?.remediation, true);
 
-  const hardQueue = requeueKanjiStudyCard(remaining, current, 2);
-  assert.equal(hardQueue[6]?.itemId, person.id);
-
-  assert.deepEqual(requeueKanjiStudyCard(remaining, current, 3), remaining);
-  assert.deepEqual(requeueKanjiStudyCard(remaining, current, 4), remaining);
+  assert.deepEqual(requeueForgottenKanjiCard(remaining, current, 2), remaining);
+  assert.deepEqual(requeueForgottenKanjiCard(remaining, current, 3), remaining);
+  assert.deepEqual(requeueForgottenKanjiCard(remaining, current, 4), remaining);
 });
 
-test("maps four self-grades to review statuses and canonical exercises", () => {
+test("maps basic Skritter grades to canonical SRS exercises", () => {
   assert.equal(gradeKanjiStudyAnswer(1), "incorrect");
-  assert.equal(gradeKanjiStudyAnswer(2), "incorrect");
   assert.equal(gradeKanjiStudyAnswer(3), "acceptable");
-  assert.equal(gradeKanjiStudyAnswer(4), "correct");
 
   const card = {
     id: `${person.id}:reading:review:0`,
     itemId: person.id,
+    mode: "review" as const,
     part: "reading" as const,
     isNew: false,
     remediation: false,
     repetition: 0,
   };
-  const result = buildKanjiStudyResult(card, person, 4);
-  assert.equal(result.grade, 4);
+  const result = buildKanjiStudyResult(card, person, 3);
+  assert.equal(result.grade, 3);
   assert.equal(result.exercise.skill, "reading");
-  assert.equal(result.exercise.id, `${person.introducedInLessonId}-kanji-${person.literal}-reading`);
-  assert.equal(result.status, "correct");
+  assert.equal(
+    result.exercise.id,
+    `${person.introducedInLessonId}-kanji-${person.literal}-reading`,
+  );
+  assert.equal(result.status, "acceptable");
 });
