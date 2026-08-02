@@ -8,6 +8,7 @@ import { SwipeNavigationView } from "../components/SwipeNavigationView";
 import type { LessonBundle } from "../content/lessonBundle";
 import type { Exercise } from "../domain/course";
 import type { AnswerCheckResult } from "../engine/checkAnswer";
+import { requestKanjiLessonAdvance } from "../engine/kanjiLessonBridge";
 import { styles } from "../theme/appStyles";
 
 export type LessonStage = "theory" | "words" | "examples" | "practice";
@@ -82,10 +83,18 @@ export function LessonScreen({
 }: LessonScreenProps) {
   const stageIndex = lessonStages.indexOf(stage);
   const navigateBack = stageIndex > 0 ? onPreviousStage : onCourse;
+  const advanceStage = () => {
+    if (stage === "words" && (activeBundle.kanji?.length ?? 0) > 0) {
+      requestKanjiLessonAdvance(activeBundle.lesson.id, onNextStage);
+      return;
+    }
+    onNextStage();
+  };
+
   return (
     <SwipeNavigationView
       onBack={navigateBack}
-      onForward={stage !== "practice" ? onNextStage : undefined}
+      onForward={stage !== "practice" ? advanceStage : undefined}
       backEdgeOnly={stage === "practice"}
     >
       <SafeAreaView style={styles.safeArea}>
@@ -175,7 +184,11 @@ export function LessonScreen({
                 </View>
               ))}
               {(activeBundle.kanji?.length ?? 0) > 0 && (
-                <KanjiLessonStage kanji={activeBundle.kanji ?? []} />
+                <KanjiLessonStage
+                  key={activeBundle.lesson.id}
+                  lessonId={activeBundle.lesson.id}
+                  kanji={activeBundle.kanji ?? []}
+                />
               )}
             </View>
           )}
@@ -237,7 +250,7 @@ export function LessonScreen({
               >
                 <Text style={styles.secondaryButtonText}>Назад</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.primaryButtonSmall} onPress={onNextStage}>
+              <TouchableOpacity style={styles.primaryButtonSmall} onPress={advanceStage}>
                 <Text style={styles.primaryButtonText}>Дальше</Text>
               </TouchableOpacity>
             </View>
