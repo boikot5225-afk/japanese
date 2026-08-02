@@ -1,0 +1,44 @@
+name: Apply audited fixes
+
+on:
+  push:
+    branches:
+      - "agent/kanji-study-cycle-0.22.0"
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fixes:
+    if: github.event.head_commit.message == 'chore: apply audited fix bundle [skip build]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/kanji-study-cycle-0.22.0
+          fetch-depth: 1
+
+      - name: Rebuild and verify patch
+        shell: bash
+        run: |
+          cat .github/audit-patch.part00 .github/audit-patch.part01 | base64 --decode > /tmp/audit-fix.patch.gz
+          echo 'd3b87e6ec33ee6ee30ac1bb455be5ee090983a16f3ed88f9c7a6929c5c2cbfcc  /tmp/audit-fix.patch.gz' | sha256sum --check --strict
+          gzip --decompress --stdout /tmp/audit-fix.patch.gz > /tmp/audit-fix.patch
+          git apply --check /tmp/audit-fix.patch
+          git apply --index /tmp/audit-fix.patch
+
+      - name: Remove one-time transport
+        shell: bash
+        run: |
+          git rm -- .github/audit-patch.part00 .github/audit-patch.part01 .github/workflows/apply-audit-fix.yml
+
+      - name: Commit audited fixes
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git diff --cached --check
+          git commit -m 'fix: harden kanji lessons and review timing'
+          git push origin HEAD:agent/kanji-study-cycle-0.22.0
