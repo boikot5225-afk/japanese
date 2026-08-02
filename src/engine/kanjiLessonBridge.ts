@@ -1,5 +1,6 @@
 import type { SkritterWritingResult } from "../components/SkritterWritingPad";
 import type { KanjiItem } from "../domain/course";
+import type { KanjiStudySkill } from "./kanjiProgress";
 import type { KanjiStudyResult } from "./kanjiStudySession";
 import type { ReviewItem } from "./reviewEngine";
 
@@ -16,6 +17,7 @@ interface KanjiLessonGate {
 
 let runtime: KanjiLessonRuntime | null = null;
 const gates = new Map<string, KanjiLessonGate>();
+const completedSkills = new Map<string, Set<KanjiStudySkill>>();
 
 export const registerKanjiLessonRuntime = (
   value: KanjiLessonRuntime,
@@ -24,6 +26,19 @@ export const registerKanjiLessonRuntime = (
 };
 
 export const getKanjiLessonRuntime = (): KanjiLessonRuntime | null => runtime;
+
+export const markKanjiLessonSkillComplete = (
+  itemId: string,
+  skill: KanjiStudySkill,
+): void => {
+  const skills = completedSkills.get(itemId) ?? new Set<KanjiStudySkill>();
+  skills.add(skill);
+  completedSkills.set(itemId, skills);
+};
+
+export const getKanjiLessonCompletedSkills = (
+  itemId: string,
+): readonly KanjiStudySkill[] => [...(completedSkills.get(itemId) ?? [])];
 
 export const registerKanjiLessonGate = (
   lessonId: string,
@@ -51,4 +66,5 @@ export const requestKanjiLessonAdvance = (
 export const resetKanjiLessonBridgeForTests = (): void => {
   runtime = null;
   gates.clear();
+  completedSkills.clear();
 };
