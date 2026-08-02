@@ -8,7 +8,6 @@
     "android": "expo run:android",
     "web": "expo start --web",
     "generate:kanji-strokes": "node scripts/generate-kanji-strokes.mjs",
-    "migrate:kanji-writing": "node scripts/apply-kanji-writing-integration.mjs",
     "test:review": "tsx --test src/engine/reviewEngine.test.ts",
     "test:kanji-progress": "tsx --test src/engine/kanjiProgress.test.ts",
     "test:kanji-strokes": "tsx --test src/engine/kanjiStrokeEngine.test.ts",
