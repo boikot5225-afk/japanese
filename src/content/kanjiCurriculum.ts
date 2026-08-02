@@ -118,6 +118,22 @@ const createReadingExercise = (
   };
 };
 
+export const createKanjiWritingExercise = (
+  lessonId: string,
+  item: KanjiItem,
+): Exercise => ({
+  id: `${lessonId}-kanji-${item.literal}-writing`,
+  type: "handwriting",
+  prompt: `Напиши кандзи ${item.literal} в правильном порядке черт.`,
+  targetItemIds: [item.id],
+  correctAnswers: [item.literal],
+  explanationRu: `${item.literal} — ${item.meaningsRu.join(", ")}. Порядок и форма штрихов проверяются автоматически.`,
+  variantGroup: `${lessonId}:kanji-writing`,
+  contentKey: `kanji:${item.literal}:writing`,
+  difficulty: 2,
+  skill: "writing",
+});
+
 export const buildLessonKanjiExercises = (
   lessonId: string,
   lessonKanji: readonly KanjiItem[],
@@ -147,6 +163,7 @@ export const buildKanjiReviewExercises = (
   lessonKanji.flatMap((item) => [
     createRecognitionExercise(lessonId, item, lessonKanji),
     createReadingExercise(lessonId, item, true),
+    createKanjiWritingExercise(lessonId, item),
   ]);
 
 const countByType = (exercises: readonly Exercise[]): Map<ExerciseType, number> => {
