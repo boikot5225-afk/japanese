@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { kanjiStrokeDataByLiteral } from "../content/kanjiStrokeData";
 import type { KanjiStrokeVector } from "../domain/kanjiStroke";
 import {
   assessKanjiStroke,
@@ -47,11 +48,14 @@ const padLine = (
   y: startY + ((endY - startY) * index) / 19,
 }));
 
-const toPad = (points: readonly { x: number; y: number }[], size = 500) =>
-  points.map((point, index) => ({
-    x: (point.x / 109) * size + Math.sin(index) * 2,
-    y: (point.y / 109) * size + Math.cos(index) * 2,
-  }));
+const toPad = (
+  points: readonly { x: number; y: number }[],
+  size = 500,
+  jitter = 2,
+) => points.map((point, index) => ({
+  x: (point.x / 109) * size + Math.sin(index * 1.7) * jitter,
+  y: (point.y / 109) * size + Math.cos(index * 1.3) * jitter,
+}));
 
 test("normalizes pad coordinates into KanjiVG viewBox", () => {
   assert.deepEqual(normalizePadStroke([{ x: 100, y: 50 }], 200, 100), [
@@ -137,4 +141,27 @@ test("accepts a naturally drawn hooked stroke", () => {
   ];
   const result = assessKanjiStroke(points, hooked, 500, 500);
   assert.equal(result.accepted, true);
+});
+
+test("accepts every canonical N5 stroke with small hand jitter", () => {
+  Object.values(kanjiStrokeDataByLiteral).forEach((character) => {
+    character.strokes.forEach((stroke, index) => {
+      const result = assessKanjiStroke(toPad(stroke.samples, 560, 1.4), stroke, 560, 560);
+      assert.equal(
+        result.accepted,
+        true,
+        `${character.literal} stroke ${index + 1}: ${result.issue ?? "unknown"}`,
+      );
+    });
+  });
+});
+
+test("all five strokes of 古 are writable without triggering a false rejection", () => {
+  const old = kanjiStrokeDataByLiteral["古"];
+  assert.ok(old);
+  assert.equal(old.strokes.length, 5);
+  old.strokes.forEach((stroke, index) => {
+    const result = assessKanjiStroke(toPad(stroke.samples, 568, 1.8), stroke, 568, 568);
+    assert.equal(result.accepted, true, `古 stroke ${index + 1}: ${result.issue}`);
+  });
 });
