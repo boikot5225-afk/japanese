@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   apply-audit-fixes:
-    if: github.event_name == 'push' && github.event.head_commit.message == 'chore: run audited fix bundle [skip build]'
+    if: github.event_name == 'pull_request' && github.head_ref == 'agent/kanji-study-cycle-0.22.0'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -56,7 +56,7 @@ jobs:
           git push origin HEAD:agent/kanji-study-cycle-0.22.0
 
   build-apk:
-    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip build]')
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip build]')) || (github.event_name == 'pull_request' && github.head_ref != 'agent/kanji-study-cycle-0.22.0')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
