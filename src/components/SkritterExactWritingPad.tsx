@@ -46,6 +46,8 @@ interface SkritterExactWritingPadProps {
   onComplete: (result: SkritterExactWritingResult) => void;
 }
 
+type PadPhase = "input" | "revealed" | "grading" | "done";
+
 const TAP_DELAY_MS = 270;
 
 const pointDistance = (left: KanjiStrokePoint, right: KanjiStrokePoint): number =>
@@ -65,7 +67,6 @@ const resultMode = (mode: SkritterExactWritingMode): WritingMode =>
   mode === "snap" ? "guided" : mode;
 
 const failureLimit = (strokeCount: number): number => {
-  if (strokeCount > 11) return 3;
   if (strokeCount > 6) return 3;
   if (strokeCount > 2) return 2;
   return 1;
@@ -138,8 +139,7 @@ export function SkritterExactWritingPad({
   const [forcedForgotten, setForcedForgotten] = useState(false);
   const [hintStrokeIndex, setHintStrokeIndex] = useState<number | null>(null);
   const [teachingSampleCount, setTeachingSampleCount] = useState(1);
-  const [completed, setCompleted] = useState(false);
-  const [awaitingGrade, setAwaitingGrade] = useState(false);
+  const [phase, setPhase] = useState<PadPhase>("input");
   const [feedback, setFeedback] = useState(modeInstruction(mode));
 
   const currentStrokeRef = useRef<KanjiStrokePoint[]>([]);
@@ -149,10 +149,15 @@ export function SkritterExactWritingPad({
   const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rejectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const completionSentRef = useRef(false);
+  const forcedForgottenRef = useRef(false);
+  const hintsRef = useRef(0);
+  const mistakesRef = useRef(0);
+  const attemptsRef = useRef(0);
+  const revealedAllRef = useRef(false);
 
   const activeIndex = acceptedCount;
   const activeStroke = data.strokes[activeIndex];
-  const inputLocked = completed || awaitingGrade;
+  const inputLocked = phase !== "input";
   const showFullGuide = mode === "teach" || mode === "snap" || revealedAll;
   const showActiveHint = mode === "teach" || hintStrokeIndex === activeIndex;
 
@@ -165,12 +170,30 @@ export function SkritterExactWritingPad({
     rejectTimerRef.current = null;
   }, []);
 
+  const setForgotten = useCallback(() => {
+    forcedForgottenRef.current = true;
+    setForcedForgotten(true);
+  }, []);
+
+  const addHint = useCallback(() => {
+    const next = hintsRef.current + 1;
+    hintsRef.current = next;
+    setHints(next);
+    if (grading !== "none") setForgotten();
+    return next;
+  }, [grading, setForgotten]);
+
   const reset = useCallback(() => {
     clearTimers();
     currentStrokeRef.current = [];
     gestureStartedAtRef.current = 0;
     lastTapAtRef.current = 0;
     completionSentRef.current = false;
+    forcedForgottenRef.current = false;
+    hintsRef.current = 0;
+    mistakesRef.current = 0;
+    attemptsRef.current = 0;
+    revealedAllRef.current = false;
     setAcceptedCount(0);
     setCurrentStroke([]);
     setRejectedStroke([]);
@@ -182,19 +205,18 @@ export function SkritterExactWritingPad({
     setForcedForgotten(false);
     setHintStrokeIndex(null);
     setTeachingSampleCount(1);
-    setCompleted(false);
-    setAwaitingGrade(false);
+    setPhase("input");
     setFeedback(modeInstruction(mode));
   }, [clearTimers, mode]);
 
   useEffect(() => {
     reset();
-  }, [data.literal, mode]);
+  }, [data.literal, mode, reset]);
 
   useEffect(() => () => clearTimers(), [clearTimers]);
 
   useEffect(() => {
-    if (mode !== "teach" || !activeStroke || completed) {
+    if (mode !== "teach" || !activeStroke || phase !== "input") {
       setTeachingSampleCount(1);
       return;
     }
@@ -205,68 +227,53 @@ export function SkritterExactWritingPad({
       );
     }, 55);
     return () => clearInterval(timer);
-  }, [activeStroke, completed, mode]);
+  }, [activeStroke, mode, phase]);
 
   const emitResult = useCallback(
-    (
-      grade: WritingGrade,
-      finalMistakes = mistakes,
-      finalAttempts = attempts,
-      finalHints = hints,
-      finalRevealAll = revealedAll,
-    ) => {
+    (grade: WritingGrade) => {
       if (completionSentRef.current) return;
       completionSentRef.current = true;
+      setPhase("done");
       onComplete({
         grade,
         mode: resultMode(mode),
-        mistakes: finalMistakes,
-        attempts: finalAttempts,
-        hints: finalHints,
-        revealAll: finalRevealAll,
+        mistakes: mistakesRef.current,
+        attempts: attemptsRef.current,
+        hints: hintsRef.current,
+        revealAll: revealedAllRef.current,
         completed: true,
       });
-    }, [attempts, hints, mistakes, mode, onComplete, revealedAll],
+    },
+    [mode, onComplete],
   );
 
-  const finishCharacter = useCallback(
-    (finalMistakes: number, finalAttempts: number, finalHints: number) => {
-      const forgotten =
-        grading !== "none" &&
-        (forcedForgotten ||
-          revealedAll ||
-          finalHints > 0 ||
-          finalMistakes > failureLimit(data.strokes.length));
-      setCompleted(true);
+  const finishCharacter = useCallback(() => {
+    if (grading === "none") {
+      setPhase("done");
+      setFeedback("Готово.");
+      emitResult(3);
+      return;
+    }
 
-      if (grading === "none") {
-        setFeedback("Готово.");
-        emitResult(3, finalMistakes, finalAttempts, finalHints, revealedAll);
-        return;
-      }
-
-      if (forgotten) setForcedForgotten(true);
-      setAwaitingGrade(true);
-      setFeedback(
-        forgotten
-          ? "Подсказка или ошибки зафиксировали оценку «Забыл»."
-          : "Знак завершён. Оцени ответ.",
-      );
-    }, [
-      data.strokes.length,
-      emitResult,
-      forcedForgotten,
-      grading,
-      revealedAll,
-    ],
-  );
+    const forgotten =
+      forcedForgottenRef.current ||
+      revealedAllRef.current ||
+      hintsRef.current > 0 ||
+      mistakesRef.current > failureLimit(data.strokes.length);
+    if (forgotten) setForgotten();
+    setPhase("grading");
+    setFeedback(
+      forgotten
+        ? "Подсказка или ошибки зафиксировали оценку «Забыл»."
+        : "Знак завершён. Оцени ответ.",
+    );
+  }, [data.strokes.length, emitResult, grading, setForgotten]);
 
   const showNextStroke = useCallback(
     (automatic = false) => {
       if (!activeStroke || inputLocked) return;
       if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
-      setHints((previous) => previous + 1);
-      if (grading !== "none") setForcedForgotten(true);
+      addHint();
       setHintStrokeIndex(activeIndex);
       setFeedback(
         automatic
@@ -277,15 +284,25 @@ export function SkritterExactWritingPad({
         setHintStrokeIndex(null);
         hintTimerRef.current = null;
       }, data.strokes.length < 10 ? 1200 : 1800);
-    }, [activeIndex, activeStroke, data.strokes.length, grading, inputLocked]);
+    }, [activeIndex, activeStroke, addHint, data.strokes.length, inputLocked]);
 
   const revealWholeCharacter = useCallback(() => {
     if (inputLocked) return;
-    setHints((previous) => previous + 1);
+    addHint();
+    revealedAllRef.current = true;
     setRevealedAll(true);
-    if (grading !== "none") setForcedForgotten(true);
-    setFeedback("Ответ открыт полностью.");
-  }, [grading, inputLocked]);
+    setHintStrokeIndex(null);
+    setFeedback(
+      grading === "none"
+        ? "Ответ открыт. Посмотри на знак и продолжай."
+        : "Ответ открыт полностью. Оценка — «Забыл».",
+    );
+    if (grading === "none") setPhase("revealed");
+    else {
+      setForgotten();
+      setPhase("grading");
+    }
+  }, [addHint, grading, inputLocked, setForgotten]);
 
   const handleTap = useCallback(() => {
     if (mode !== "recall" || inputLocked) return;
@@ -306,9 +323,11 @@ export function SkritterExactWritingPad({
 
   const rejectStroke = useCallback(
     (drawn: readonly KanjiStrokePoint[], message: string) => {
-      const nextMistakes = mistakes + 1;
-      const nextAttempts = attempts + 1;
+      const nextMistakes = mistakesRef.current + 1;
+      const nextAttempts = attemptsRef.current + 1;
       const nextFailures = consecutiveFailures + 1;
+      mistakesRef.current = nextMistakes;
+      attemptsRef.current = nextAttempts;
       setMistakes(nextMistakes);
       setAttempts(nextAttempts);
       setConsecutiveFailures(nextFailures);
@@ -326,20 +345,19 @@ export function SkritterExactWritingPad({
         grading !== "none" &&
         nextMistakes > failureLimit(data.strokes.length)
       ) {
-        setForcedForgotten(true);
+        setForgotten();
       }
       if (nextFailures >= 3) {
         setConsecutiveFailures(0);
         showNextStroke(true);
       }
     }, [
-      attempts,
       consecutiveFailures,
       data.strokes.length,
       grading,
-      mistakes,
       padSize.height,
       padSize.width,
+      setForgotten,
       showNextStroke,
     ],
   );
@@ -363,8 +381,9 @@ export function SkritterExactWritingPad({
         return;
       }
 
-      const nextAttempts = attempts + 1;
+      const nextAttempts = attemptsRef.current + 1;
       const nextAccepted = acceptedCount + 1;
+      attemptsRef.current = nextAttempts;
       setAttempts(nextAttempts);
       setAcceptedCount(nextAccepted);
       setConsecutiveFailures(0);
@@ -372,18 +391,15 @@ export function SkritterExactWritingPad({
       setTeachingSampleCount(1);
 
       if (nextAccepted >= data.strokes.length) {
-        finishCharacter(mistakes, nextAttempts, hints);
+        finishCharacter();
       } else {
         setFeedback(`Штрих ${nextAccepted} принят. Следующий: ${nextAccepted + 1}.`);
       }
     }, [
       acceptedCount,
       activeStroke,
-      attempts,
       data.strokes.length,
       finishCharacter,
-      hints,
-      mistakes,
       mode,
       padSize.height,
       padSize.width,
@@ -497,38 +513,32 @@ export function SkritterExactWritingPad({
         onLayout={(event) => setPadSize(event.nativeEvent.layout)}
         {...responder.panHandlers}
       >
-        <Svg
-          pointerEvents="none"
-          width="100%"
-          height="100%"
-          viewBox={data.viewBox.join(" ")}
-        >
+        <Svg pointerEvents="none" width="100%" height="100%" viewBox={data.viewBox.join(" ")}>
           <Line x1="54.5" y1="0" x2="54.5" y2="109" stroke="#d8e0e7" strokeWidth="0.65" />
           <Line x1="0" y1="54.5" x2="109" y2="54.5" stroke="#d8e0e7" strokeWidth="0.65" />
           <Line x1="0" y1="0" x2="109" y2="109" stroke="#edf1f4" strokeWidth="0.45" />
           <Line x1="109" y1="0" x2="0" y2="109" stroke="#edf1f4" strokeWidth="0.45" />
 
-          {showFullGuide &&
-            data.strokes.map((stroke, index) => (
-              <Path
-                key={`guide-${index}`}
-                d={stroke.path}
-                fill="none"
-                stroke={revealedAll ? "#4f9c70" : "#c3ced8"}
-                strokeWidth={mode === "teach" && index === activeIndex ? 4.1 : 2.8}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                opacity={
-                  revealedAll
-                    ? 0.65
-                    : mode === "snap"
-                      ? 0.5
-                      : index === activeIndex
-                        ? 0.75
-                        : 0.28
-                }
-              />
-            ))}
+          {showFullGuide && data.strokes.map((stroke, index) => (
+            <Path
+              key={`guide-${index}`}
+              d={stroke.path}
+              fill="none"
+              stroke={revealedAll ? "#4f9c70" : "#c3ced8"}
+              strokeWidth={mode === "teach" && index === activeIndex ? 4.1 : 2.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity={
+                revealedAll
+                  ? 0.65
+                  : mode === "snap"
+                    ? 0.5
+                    : index === activeIndex
+                      ? 0.75
+                      : 0.28
+              }
+            />
+          ))}
 
           {data.strokes.slice(0, acceptedCount).map((stroke, index) => (
             <Path
@@ -542,7 +552,7 @@ export function SkritterExactWritingPad({
             />
           ))}
 
-          {activeStroke && showActiveHint && !completed && (
+          {activeStroke && showActiveHint && phase === "input" && (
             <Path
               d={activeStroke.path}
               fill="none"
@@ -554,7 +564,7 @@ export function SkritterExactWritingPad({
             />
           )}
 
-          {teachingSamples.length > 1 && !completed && (
+          {teachingSamples.length > 1 && phase === "input" && (
             <Polyline
               points={polylineValue(teachingSamples)}
               fill="none"
@@ -588,34 +598,27 @@ export function SkritterExactWritingPad({
             />
           )}
 
-          {activeStroke &&
-            !completed &&
-            (mode !== "recall" || hintStrokeIndex === activeIndex) && (
-              <>
-                <Circle
-                  cx={activeStroke.start.x}
-                  cy={activeStroke.start.y}
-                  r="5.7"
-                  fill="#c44747"
-                />
-                <SvgText
-                  x={activeStroke.start.x}
-                  y={activeStroke.start.y + 2.5}
-                  fontSize="7"
-                  fontWeight="800"
-                  fill="#ffffff"
-                  textAnchor="middle"
-                >
-                  {activeIndex + 1}
-                </SvgText>
-              </>
-            )}
+          {activeStroke && phase === "input" && (mode !== "recall" || hintStrokeIndex === activeIndex) && (
+            <>
+              <Circle cx={activeStroke.start.x} cy={activeStroke.start.y} r="5.7" fill="#c44747" />
+              <SvgText
+                x={activeStroke.start.x}
+                y={activeStroke.start.y + 2.5}
+                fontSize="7"
+                fontWeight="800"
+                fill="#ffffff"
+                textAnchor="middle"
+              >
+                {activeIndex + 1}
+              </SvgText>
+            </>
+          )}
         </Svg>
       </View>
 
       <Text style={styles.feedback}>{feedback}</Text>
 
-      {!completed && mode === "recall" && (
+      {phase === "input" && mode === "recall" && (
         <View style={styles.actionRow}>
           <TouchableOpacity style={styles.actionButton} onPress={() => showNextStroke(false)}>
             <Text style={styles.actionButtonText}>Одна черта</Text>
@@ -629,13 +632,19 @@ export function SkritterExactWritingPad({
         </View>
       )}
 
-      {!completed && mode !== "recall" && (
+      {phase === "input" && mode !== "recall" && (
         <TouchableOpacity style={styles.resetButton} onPress={reset}>
           <Text style={styles.resetButtonText}>Начать заново</Text>
         </TouchableOpacity>
       )}
 
-      {awaitingGrade && (
+      {phase === "revealed" && (
+        <TouchableOpacity style={styles.continueButton} onPress={() => emitResult(3)}>
+          <Text style={styles.continueButtonText}>Дальше</Text>
+        </TouchableOpacity>
+      )}
+
+      {phase === "grading" && (
         <View style={styles.gradingCard}>
           <Text style={styles.gradingTitle}>Оцени ответ</Text>
           <View style={styles.gradeRow}>
@@ -665,7 +674,7 @@ export function SkritterExactWritingPad({
           </View>
           <Text style={styles.gradingHint}>
             {forcedForgotten
-              ? "После подсказки Skritter разрешает только «Забыл»."
+              ? "После подсказки или показа ответа доступно только «Забыл»."
               : grading === "basic"
                 ? "Обычный режим: «Забыл» или «Знаю»."
                 : "Advanced Grading: четыре оценки."}
@@ -673,7 +682,7 @@ export function SkritterExactWritingPad({
         </View>
       )}
 
-      {mode === "recall" && !completed && (
+      {mode === "recall" && phase === "input" && (
         <Text style={styles.gestureHint}>
           Касание — следующая черта · двойное — весь знак · свайп вверх — стереть.
         </Text>
@@ -684,71 +693,26 @@ export function SkritterExactWritingPad({
 
 const styles = StyleSheet.create({
   wrapper: { gap: 12 },
-  headingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
+  headingRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
   headingCopy: { flex: 1 },
   title: { color: "#15202b", fontSize: 19, fontWeight: "900" },
   progress: { marginTop: 2, color: "#66788a", fontSize: 13 },
   metrics: { alignItems: "flex-end", gap: 3 },
   metric: { color: "#66788a", fontSize: 11, fontWeight: "700" },
   instruction: { color: "#52606d", fontSize: 14, lineHeight: 20 },
-  pad: {
-    width: "100%",
-    aspectRatio: 1,
-    overflow: "hidden",
-    borderWidth: 2,
-    borderColor: "#c9d5df",
-    borderRadius: 22,
-    backgroundColor: "#fbfcfd",
-  },
+  pad: { width: "100%", aspectRatio: 1, overflow: "hidden", borderWidth: 2, borderColor: "#c9d5df", borderRadius: 22, backgroundColor: "#fbfcfd" },
   feedback: { minHeight: 40, color: "#52606d", fontSize: 14, lineHeight: 20 },
   actionRow: { flexDirection: "row", gap: 8 },
-  actionButton: {
-    flex: 1,
-    minHeight: 44,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 8,
-    borderWidth: 1,
-    borderColor: "#b9c7d3",
-    borderRadius: 13,
-    backgroundColor: "#ffffff",
-  },
+  actionButton: { flex: 1, minHeight: 44, alignItems: "center", justifyContent: "center", paddingHorizontal: 8, borderWidth: 1, borderColor: "#b9c7d3", borderRadius: 13, backgroundColor: "#ffffff" },
   actionButtonText: { color: "#263f57", fontSize: 12, fontWeight: "800" },
-  resetButton: {
-    minHeight: 44,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#b9c7d3",
-    borderRadius: 13,
-    backgroundColor: "#ffffff",
-  },
+  resetButton: { minHeight: 44, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#b9c7d3", borderRadius: 13, backgroundColor: "#ffffff" },
   resetButtonText: { color: "#263f57", fontSize: 13, fontWeight: "800" },
-  gradingCard: {
-    gap: 10,
-    padding: 13,
-    borderWidth: 1,
-    borderColor: "#d3dde5",
-    borderRadius: 16,
-    backgroundColor: "#f8fafc",
-  },
+  continueButton: { minHeight: 48, alignItems: "center", justifyContent: "center", borderRadius: 14, backgroundColor: "#183153" },
+  continueButtonText: { color: "#ffffff", fontSize: 15, fontWeight: "900" },
+  gradingCard: { gap: 10, padding: 13, borderWidth: 1, borderColor: "#d3dde5", borderRadius: 16, backgroundColor: "#f8fafc" },
   gradingTitle: { color: "#15202b", fontSize: 16, fontWeight: "900" },
   gradeRow: { flexDirection: "row", gap: 8 },
-  gradeButton: {
-    flex: 1,
-    minHeight: 78,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 8,
-    borderWidth: 2,
-    borderRadius: 13,
-    backgroundColor: "#ffffff",
-  },
+  gradeButton: { flex: 1, minHeight: 78, alignItems: "center", justifyContent: "center", paddingVertical: 8, borderWidth: 2, borderRadius: 13, backgroundColor: "#ffffff" },
   gradeNumber: { fontSize: 21, fontWeight: "900" },
   gradeLabel: { marginTop: 2, color: "#263746", fontSize: 12, fontWeight: "800" },
   gradeInterval: { marginTop: 3, color: "#71808d", fontSize: 10, fontWeight: "700" },
