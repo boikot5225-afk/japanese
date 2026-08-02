@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   deriveAutomaticWritingGrade,
+  getHiddenLearnWritingGrade,
   getInitialWritingMode,
   getMaximumWritingGrade,
   isPassingWritingGrade,
@@ -75,6 +76,13 @@ test("only grades three and four pass", () => {
   assert.equal(isPassingWritingGrade(2), false);
   assert.equal(isPassingWritingGrade(3), true);
   assert.equal(isPassingWritingGrade(4), true);
+});
+
+test("hidden Learn grade penalizes deliberate reveals only", () => {
+  assert.equal(getHiddenLearnWritingGrade(false, false), 3);
+  assert.equal(getHiddenLearnWritingGrade(true, false), 1);
+  assert.equal(getHiddenLearnWritingGrade(false, true), 1);
+  assert.equal(getHiddenLearnWritingGrade(true, true), 1);
 });
 
 test("learning stages fade guidance with experience", () => {
