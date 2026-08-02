@@ -1,15 +1,24 @@
 import { buildKanjiReviewExercises } from "../content/kanjiCurriculum";
 import type { Exercise, KanjiItem, Skill } from "../domain/course";
-import type { KanjiProgressSummary } from "./kanjiProgress";
 import type { AnswerStatus } from "./checkAnswer";
+import type { KanjiProgressSummary } from "./kanjiProgress";
 import type { ReviewItem } from "./reviewEngine";
 import type { WritingGrade } from "./writingSession";
 
-export type KanjiStudyPart = "preview" | "meaning" | "reading" | "writing";
+export type KanjiStudyMode = "learn" | "review";
+
+export type KanjiStudyPart =
+  | "preview"
+  | "definition"
+  | "reading"
+  | "writing-teach"
+  | "writing-snap"
+  | "writing-recall";
 
 export interface KanjiStudyCard {
   id: string;
   itemId: string;
+  mode: KanjiStudyMode;
   part: KanjiStudyPart;
   isNew: boolean;
   remediation: boolean;
@@ -24,40 +33,29 @@ export interface KanjiStudyResult {
   grade: WritingGrade;
 }
 
-export interface KanjiStudyQueueOptions {
-  newItemLimit?: number;
-  reviewCardLimit?: number;
-}
-
-const DEFAULT_NEW_ITEM_LIMIT = 5;
-const DEFAULT_REVIEW_CARD_LIMIT = 20;
-
-const partBySkill = (skill: Skill): Exclude<KanjiStudyPart, "preview"> | null => {
-  switch (skill) {
-    case "recognition":
-    case "recall":
-      return "meaning";
-    case "reading":
-      return "reading";
-    case "writing":
-      return "writing";
-    default:
-      return null;
-  }
-};
+const LEARN_PARTS: readonly KanjiStudyPart[] = [
+  "preview",
+  "definition",
+  "reading",
+  "writing-teach",
+  "writing-snap",
+  "writing-recall",
+] as const;
 
 const cardKey = (itemId: string, part: KanjiStudyPart): string =>
   `${itemId}:${part}`;
 
 const createCard = (
   itemId: string,
+  mode: KanjiStudyMode,
   part: KanjiStudyPart,
   isNew: boolean,
   repetition = 0,
   remediation = false,
 ): KanjiStudyCard => ({
-  id: `${cardKey(itemId, part)}:${isNew ? "new" : "review"}:${repetition}`,
+  id: `${cardKey(itemId, part)}:${mode}:${repetition}`,
   itemId,
+  mode,
   part,
   isNew,
   remediation,
@@ -67,105 +65,142 @@ const createCard = (
 const isDue = (item: ReviewItem, now: Date): boolean =>
   new Date(item.dueAt).getTime() <= now.getTime();
 
+const reviewPartBySkill = (
+  skill: Skill,
+): "definition" | "reading" | "writing-recall" | null => {
+  switch (skill) {
+    case "recognition":
+    case "recall":
+      return "definition";
+    case "reading":
+      return "reading";
+    case "writing":
+      return "writing-recall";
+    default:
+      return null;
+  }
+};
+
 const progressById = (
   progress: readonly KanjiProgressSummary[],
 ): ReadonlyMap<string, KanjiProgressSummary> =>
   new Map(progress.map((entry) => [entry.itemId, entry]));
 
-const orderDueCards = (
-  reviewItems: readonly ReviewItem[],
-  itemIds: ReadonlySet<string>,
-  now: Date,
-): KanjiStudyCard[] => {
-  const seen = new Set<string>();
-  return [...reviewItems]
-    .filter((reviewItem) => itemIds.has(reviewItem.itemId) && isDue(reviewItem, now))
-    .sort((left, right) => {
-      const dueDifference =
-        new Date(left.dueAt).getTime() - new Date(right.dueAt).getTime();
-      if (dueDifference !== 0) return dueDifference;
-      if (left.lastStatus !== right.lastStatus) {
-        return left.lastStatus === "incorrect" ? -1 : 1;
-      }
-      return right.lapseCount - left.lapseCount;
-    })
-    .flatMap((reviewItem) => {
-      const part = partBySkill(reviewItem.skill);
-      if (!part) return [];
-      const key = cardKey(reviewItem.itemId, part);
-      if (seen.has(key)) return [];
-      seen.add(key);
-      return [createCard(reviewItem.itemId, part, false)];
-    });
-};
-
-const newItemCards = (itemId: string): KanjiStudyCard[] => [
-  createCard(itemId, "preview", true),
-  createCard(itemId, "meaning", true),
-  createCard(itemId, "reading", true),
-  createCard(itemId, "writing", true),
-];
-
-/**
- * Builds one Skritter-style session for the only currently available list: JLPT N5.
- * Overdue skill cards come first. New characters are then introduced as a complete
- * preview → meaning → contextual reading → writing sequence.
- */
-export const buildKanjiStudyQueue = (
+export const findNextNewKanjiId = (
   catalog: readonly KanjiItem[],
   progress: readonly KanjiProgressSummary[],
+  afterItemId?: string,
+): string | null => {
+  const byId = progressById(progress);
+  const startIndex = afterItemId
+    ? Math.max(0, catalog.findIndex((item) => item.id === afterItemId) + 1)
+    : 0;
+  const ordered = [
+    ...catalog.slice(startIndex),
+    ...catalog.slice(0, startIndex),
+  ];
+  return ordered.find((item) => byId.get(item.id)?.status === "new")?.id ?? null;
+};
+
+/**
+ * Skritter's Learn activity handles exactly one new vocabulary item at a time.
+ * A Japanese kanji follows six stages and none of the teaching stages is graded:
+ * preview → definition → reading → writing teach → writing snap → writing recall.
+ */
+export const buildKanjiLearnQueue = (
+  catalog: readonly KanjiItem[],
+  progress: readonly KanjiProgressSummary[],
+  requestedItemId?: string,
+): KanjiStudyCard[] => {
+  const byId = progressById(progress);
+  const requested = requestedItemId
+    ? catalog.find(
+        (item) =>
+          item.id === requestedItemId && byId.get(item.id)?.status === "new",
+      )
+    : undefined;
+  const itemId = requested?.id ?? findNextNewKanjiId(catalog, progress);
+  if (!itemId) return [];
+  return LEARN_PARTS.map((part) =>
+    createCard(itemId, "learn", part, true),
+  );
+};
+
+interface DueCardCandidate {
+  card: KanjiStudyCard;
+  dueAt: number;
+  lapseCount: number;
+  failed: boolean;
+}
+
+const orderReviewCandidates = (
+  candidates: readonly DueCardCandidate[],
+): KanjiStudyCard[] => {
+  const remaining = [...candidates].sort((left, right) => {
+    if (left.dueAt !== right.dueAt) return left.dueAt - right.dueAt;
+    if (left.failed !== right.failed) return left.failed ? -1 : 1;
+    return right.lapseCount - left.lapseCount;
+  });
+  const result: KanjiStudyCard[] = [];
+
+  while (remaining.length > 0) {
+    const previousItemId = result.at(-1)?.itemId;
+    const differentIndex = remaining.findIndex(
+      (candidate) => candidate.card.itemId !== previousItemId,
+    );
+    const index = differentIndex >= 0 ? differentIndex : 0;
+    const [next] = remaining.splice(index, 1);
+    if (next) result.push(next.card);
+  }
+
+  return result;
+};
+
+/**
+ * Review is a separate activity. It contains due skill cards only; new material is
+ * never mixed into the review queue. Recognition and recall collapse into one
+ * definition card, matching the single definition part used by Skritter.
+ */
+export const buildKanjiReviewQueue = (
+  catalog: readonly KanjiItem[],
   reviewItems: readonly ReviewItem[],
   now = new Date(),
-  options: KanjiStudyQueueOptions = {},
+  limit = 20,
 ): KanjiStudyCard[] => {
-  const newItemLimit = options.newItemLimit ?? DEFAULT_NEW_ITEM_LIMIT;
-  const reviewCardLimit = options.reviewCardLimit ?? DEFAULT_REVIEW_CARD_LIMIT;
+  if (limit <= 0) return [];
   const catalogIds = new Set(catalog.map((item) => item.id));
-  const byId = progressById(progress);
-  const dueCards = orderDueCards(reviewItems, catalogIds, now).slice(
-    0,
-    reviewCardLimit,
-  );
+  const seen = new Set<string>();
+  const candidates: DueCardCandidate[] = [];
 
-  const dueItemIds = new Set(dueCards.map((card) => card.itemId));
-  const newItems = catalog
-    .filter((item) => byId.get(item.id)?.status === "new")
-    .filter((item) => !dueItemIds.has(item.id))
-    .slice(0, newItemLimit);
-
-  const queue = [
-    ...dueCards,
-    ...newItems.flatMap((item) => newItemCards(item.id)),
-  ];
-
-  if (queue.length > 0) return queue;
-
-  // "Study now" must remain useful even when nothing is formally due.
-  return [...progress]
-    .filter((entry) => catalogIds.has(entry.itemId) && entry.status !== "new")
-    .sort((left, right) => {
-      if (left.weak !== right.weak) return left.weak ? -1 : 1;
-      return left.overallMastery - right.overallMastery;
-    })
-    .slice(0, Math.min(10, reviewCardLimit))
-    .flatMap((entry) => {
-      const weakest = [entry.meaning, entry.reading, entry.writing]
-        .sort((left, right) => left.mastery - right.mastery)[0];
-      if (!weakest) return [];
-      return [createCard(entry.itemId, weakest.skill, false)];
+  reviewItems
+    .filter(
+      (reviewItem) =>
+        catalogIds.has(reviewItem.itemId) && isDue(reviewItem, now),
+    )
+    .forEach((reviewItem) => {
+      const part = reviewPartBySkill(reviewItem.skill);
+      if (!part) return;
+      const key = cardKey(reviewItem.itemId, part);
+      if (seen.has(key)) return;
+      seen.add(key);
+      candidates.push({
+        card: createCard(reviewItem.itemId, "review", part, false),
+        dueAt: new Date(reviewItem.dueAt).getTime(),
+        lapseCount: reviewItem.lapseCount,
+        failed:
+          reviewItem.lastStatus !== "correct" &&
+          reviewItem.lastStatus !== "acceptable",
+      });
     });
+
+  return orderReviewCandidates(candidates).slice(0, limit);
 };
 
 export const countDueKanjiCards = (
   catalog: readonly KanjiItem[],
   reviewItems: readonly ReviewItem[],
   now = new Date(),
-): number =>
-  orderDueCards(
-    reviewItems,
-    new Set(catalog.map((item) => item.id)),
-    now,
-  ).length;
+): number => buildKanjiReviewQueue(catalog, reviewItems, now, Number.MAX_SAFE_INTEGER).length;
 
 export const countNewKanji = (
   catalog: readonly KanjiItem[],
@@ -177,11 +212,15 @@ export const countNewKanji = (
 
 export const findKanjiStudyExercise = (
   item: KanjiItem,
-  part: Exclude<KanjiStudyPart, "preview">,
+  part: "definition" | "reading" | "writing-recall",
 ): Exercise => {
   const exercises = buildKanjiReviewExercises(item.introducedInLessonId, [item]);
   const skill: Skill =
-    part === "meaning" ? "recognition" : part === "reading" ? "reading" : "writing";
+    part === "definition"
+      ? "recognition"
+      : part === "reading"
+        ? "reading"
+        : "writing";
   const exercise = exercises.find((candidate) => candidate.skill === skill);
   if (!exercise) {
     throw new Error(`Не найдено задание ${part} для ${item.literal}`);
@@ -195,13 +234,18 @@ export const gradeKanjiStudyAnswer = (grade: WritingGrade): AnswerStatus => {
   return "correct";
 };
 
+export const isRecordableKanjiStudyPart = (
+  part: KanjiStudyPart,
+): part is "definition" | "reading" | "writing-recall" =>
+  part === "definition" || part === "reading" || part === "writing-recall";
+
 export const buildKanjiStudyResult = (
   card: KanjiStudyCard,
   item: KanjiItem,
   grade: WritingGrade,
 ): KanjiStudyResult => {
-  if (card.part === "preview") {
-    throw new Error("Карточка знакомства не записывается в SRS");
+  if (!isRecordableKanjiStudyPart(card.part)) {
+    throw new Error(`Этап ${card.part} не записывается в SRS`);
   }
   const baseExercise = findKanjiStudyExercise(item, card.part);
   const exercise: Exercise = {
@@ -219,28 +263,25 @@ export const buildKanjiStudyResult = (
 };
 
 /**
- * Forgotten and hard cards return later in the same session instead of being
- * repeated immediately. The gap prevents short-term visual echo from posing as memory.
+ * Skritter's review queue repeats only forgotten cards. Grade 1 goes to the end
+ * of the queue; hard, got-it and easy continue normally.
  */
-export const requeueKanjiStudyCard = (
+export const requeueForgottenKanjiCard = (
   remaining: readonly KanjiStudyCard[],
   card: KanjiStudyCard,
   grade: WritingGrade,
 ): KanjiStudyCard[] => {
-  if (grade >= 3 || card.part === "preview") return [...remaining];
-  const distance = grade === 1 ? 3 : 6;
-  const insertionIndex = Math.min(distance, remaining.length);
-  const repeated = createCard(
-    card.itemId,
-    card.part,
-    false,
-    card.repetition + 1,
-    true,
-  );
+  if (card.mode !== "review" || grade !== 1) return [...remaining];
   return [
-    ...remaining.slice(0, insertionIndex),
-    repeated,
-    ...remaining.slice(insertionIndex),
+    ...remaining,
+    createCard(
+      card.itemId,
+      "review",
+      card.part,
+      false,
+      card.repetition + 1,
+      true,
+    ),
   ];
 };
 
@@ -248,11 +289,15 @@ export const kanjiStudyPartLabel = (part: KanjiStudyPart): string => {
   switch (part) {
     case "preview":
       return "Новое слово";
-    case "meaning":
+    case "definition":
       return "Значение";
     case "reading":
       return "Чтение";
-    case "writing":
+    case "writing-teach":
+      return "Письмо · обучение";
+    case "writing-snap":
+      return "Письмо · контур";
+    case "writing-recall":
       return "Письмо";
   }
 };
