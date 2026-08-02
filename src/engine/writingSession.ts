@@ -82,13 +82,27 @@ const failedEnoughForForgotten = (
  * lapse based on character complexity, and ordinary corrections default to hard.
  * Grade 4 remains a deliberate self-assessment rather than an automatic reward.
  */
-export const deriveAutomaticWritingGrade = (
+export const getMaximumWritingGrade = (
   metrics: WritingSessionMetrics,
 ): WritingGrade => {
   if (!metrics.completed || metrics.revealAll || metrics.hints >= 2) return 1;
   if (failedEnoughForForgotten(metrics.strokeCount, metrics.mistakes)) return 1;
-  if (metrics.hints > 0 || metrics.mistakes > 0) return 2;
-  return 3;
+  if (
+    metrics.mode === "teach" ||
+    metrics.hints > 0 ||
+    metrics.mistakes > 0
+  ) {
+    return 2;
+  }
+  if (metrics.mode === "guided") return 3;
+  return 4;
+};
+
+export const deriveAutomaticWritingGrade = (
+  metrics: WritingSessionMetrics,
+): WritingGrade => {
+  const maximum = getMaximumWritingGrade(metrics);
+  return maximum <= 2 ? maximum : 3;
 };
 
 export const getInitialWritingMode = (

@@ -25,6 +25,7 @@ import {
 } from "../engine/kanjiStrokeEngine";
 import {
   deriveAutomaticWritingGrade,
+  getMaximumWritingGrade,
   getWritingGradeDefinition,
   type WritingGrade,
   type WritingMode,
@@ -123,6 +124,7 @@ export function SkritterWritingPad({
   const [completed, setCompleted] = useState(false);
   const [awaitingGrade, setAwaitingGrade] = useState(false);
   const [suggestedGrade, setSuggestedGrade] = useState<WritingGrade>(3);
+  const [maximumGrade, setMaximumGrade] = useState<WritingGrade>(4);
   const [submittedGrade, setSubmittedGrade] = useState<WritingGrade | null>(null);
   const [feedback, setFeedback] = useState(modeInstruction(initialMode));
   const [autoRemaining, setAutoRemaining] = useState<number | null>(null);
@@ -159,6 +161,8 @@ export function SkritterWritingPad({
     (nextMode: WritingMode = mode) => {
       clearTimers();
       currentStrokeRef.current = [];
+      gestureStartedAtRef.current = 0;
+      lastTapAtRef.current = 0;
       gradeSubmittedRef.current = false;
       setAcceptedCount(0);
       setFreeformStrokes([]);
@@ -176,6 +180,7 @@ export function SkritterWritingPad({
       setCompleted(false);
       setAwaitingGrade(false);
       setSuggestedGrade(3);
+      setMaximumGrade(4);
       setSubmittedGrade(null);
       setAutoRemaining(null);
       setFeedback(modeInstruction(nextMode));
@@ -232,6 +237,7 @@ export function SkritterWritingPad({
       setCompleted(nextCompleted);
       setAwaitingGrade(true);
       setSuggestedGrade(grade);
+      setMaximumGrade(grade <= 2 ? grade : 4);
       setFeedback(message);
       setAutoRemaining(autoAdvance ? AUTO_ADVANCE_MS : null);
     },
@@ -241,13 +247,14 @@ export function SkritterWritingPad({
   const submitGrade = useCallback(
     (grade: WritingGrade) => {
       if (disabled || gradeSubmittedRef.current) return;
+      const safeGrade = Math.min(grade, maximumGrade) as WritingGrade;
       gradeSubmittedRef.current = true;
-      setSubmittedGrade(grade);
+      setSubmittedGrade(safeGrade);
       setAutoRemaining(null);
-      const definition = getWritingGradeDefinition(grade);
+      const definition = getWritingGradeDefinition(safeGrade);
       setFeedback(`${definition.label}. Результат записан в повторение.`);
       onComplete({
-        grade,
+        grade: safeGrade,
         mode,
         mistakes,
         attempts,
@@ -256,7 +263,7 @@ export function SkritterWritingPad({
         completed: true,
       });
     },
-    [attempts, disabled, hints, mistakes, mode, onComplete, revealedAll],
+    [attempts, disabled, hints, maximumGrade, mistakes, mode, onComplete, revealedAll],
   );
 
   useEffect(() => {
@@ -483,7 +490,10 @@ export function SkritterWritingPad({
           setCurrentStroke(currentStrokeRef.current);
         },
         onPanResponderRelease: finishInput,
-        onPanResponderTerminate: finishInput,
+        onPanResponderTerminate: () => {
+          currentStrokeRef.current = [];
+          setCurrentStroke([]);
+        },
         onPanResponderTerminationRequest: () => false,
         onShouldBlockNativeResponder: () => true,
       }),
@@ -775,7 +785,15 @@ export function SkritterWritingPad({
                 teachingEnabled && styles.actionButtonActive,
                 (disabled || !activeStroke) && styles.disabled,
               ]}
-              onPress={() => setTeachingEnabled((previous) => !previous)}
+              onPress={() =>
+                setTeachingEnabled((previous) => {
+                  const next = !previous;
+                  if (next && mode !== "teach") {
+                    setHints((current) => current + 1);
+                  }
+                  return next;
+                })
+              }
             >
               <Text
                 style={[
@@ -838,14 +856,21 @@ export function SkritterWritingPad({
               return (
                 <TouchableOpacity
                   key={definition.grade}
-                  disabled={disabled || submittedGrade !== null}
+                  disabled={
+                    disabled ||
+                    submittedGrade !== null ||
+                    definition.grade > maximumGrade
+                  }
                   style={[
                     styles.gradeButton,
                     selected && {
                       borderColor: gradeColor(definition.grade),
                       backgroundColor: `${gradeColor(definition.grade)}16`,
                     },
-                    (disabled || submittedGrade !== null) && styles.disabled,
+                    (disabled ||
+                      submittedGrade !== null ||
+                      definition.grade > maximumGrade) &&
+                      styles.disabled,
                   ]}
                   onPress={() => submitGrade(definition.grade)}
                 >
@@ -869,7 +894,9 @@ export function SkritterWritingPad({
           </View>
           {submittedGrade === null && (
             <Text style={styles.gradingHelp}>
-              1–2 считаются ошибкой и возвращаются быстро; 3–4 продвигают интервал.
+              {maximumGrade < 4
+                ? `Подсказки и ошибки ограничили оценку: максимум ${maximumGrade}/4.`
+                : "1–2 считаются ошибкой и возвращаются быстро; 3–4 продвигают интервал."}
             </Text>
           )}
         </View>

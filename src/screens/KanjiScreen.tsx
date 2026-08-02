@@ -237,6 +237,19 @@ export function KanjiScreen({
     (entry) => entry.progress.status === "review",
   ).length;
   const weakCount = availableEntries.filter((entry) => entry.progress.weak).length;
+  const advanceToNextAvailableEntry = () => {
+    if (!selectedEntry || filteredEntries.length < 2) return;
+    const currentIndex = filteredEntries.findIndex(
+      (entry) => entry.item.id === selectedEntry.item.id,
+    );
+    const ordered = [
+      ...filteredEntries.slice(currentIndex + 1),
+      ...filteredEntries.slice(0, currentIndex),
+    ];
+    const next = ordered.find((entry) => entry.available);
+    if (next) setSelectedId(next.item.id);
+  };
+
   const selectedWritingReviewItem = selectedEntry
     ? reviewItems.find(
         (item) => item.itemId === selectedEntry.item.id && item.skill === "writing",
@@ -389,6 +402,7 @@ export function KanjiScreen({
                 onComplete={(result: SkritterWritingResult) =>
                   onRecordWriting(selectedEntry.item, result)
                 }
+                onAutoAdvance={advanceToNextAvailableEntry}
               />
             ) : (
               <Text style={styles.lockedWriting}>

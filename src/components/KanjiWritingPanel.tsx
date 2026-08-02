@@ -22,6 +22,7 @@ interface KanjiWritingPanelProps {
   progress: KanjiSkillProgress;
   reviewItem?: ReviewItem;
   onComplete: (result: SkritterWritingResult) => void;
+  onAutoAdvance?: () => void;
 }
 
 export function KanjiWritingPanel({
@@ -29,6 +30,7 @@ export function KanjiWritingPanel({
   progress,
   reviewItem,
   onComplete,
+  onAutoAdvance,
 }: KanjiWritingPanelProps) {
   const data = getKanjiStrokeData(item.literal);
   const initialMode = getInitialWritingMode(progress.attempts, progress.mastery);
@@ -99,7 +101,10 @@ export function KanjiWritingPanel({
         initialMode={mode}
         autoAdvance={autoAdvance}
         gradeIntervalLabels={intervals}
-        onComplete={onComplete}
+        onComplete={(result) => {
+          onComplete(result);
+          if (autoAdvance) onAutoAdvance?.();
+        }}
       />
       <Text style={styles.attribution}>
         Поведение воспроизведено независимо; векторные данные: KanjiVG, CC BY-SA 3.0.

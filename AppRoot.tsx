@@ -100,6 +100,8 @@ const getLearningItemLabel = (bundle: LessonBundle, itemId: string): string => {
   if (grammar) return grammar.title;
   const sentence = bundle.sentences.find((item) => item.id === itemId);
   if (sentence) return sentence.japanese;
+  const kanji = bundle.kanji?.find((item) => item.id === itemId);
+  if (kanji) return `${kanji.literal} — ${kanji.meaningsRu[0] ?? "кандзи"}`;
   return "Материал урока";
 };
 
@@ -489,7 +491,11 @@ export default function App() {
       }
     }
 
-    const attempt = { exerciseId: currentExercise.id, status: checkResult.status };
+    const attempt: ExerciseAttempt = {
+      exerciseId: currentExercise.id,
+      status: checkResult.status,
+      writingGrade,
+    };
     if (screen === "review") {
       setReviewAttempts((previous) => [...previous, attempt]);
     } else if (screen === "checkpoint") {

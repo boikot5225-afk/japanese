@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   deriveAutomaticWritingGrade,
   getInitialWritingMode,
+  getMaximumWritingGrade,
   isPassingWritingGrade,
   nextLearningWritingMode,
 } from "./writingSession";
@@ -20,6 +21,21 @@ const baseMetrics = {
 
 test("clean recall defaults to got-it rather than easy", () => {
   assert.equal(deriveAutomaticWritingGrade(baseMetrics), 3);
+});
+
+test("guidance fades without trapping progress", () => {
+  assert.equal(deriveAutomaticWritingGrade({ ...baseMetrics, mode: "teach" }), 2);
+  assert.equal(getMaximumWritingGrade({ ...baseMetrics, mode: "teach" }), 2);
+  assert.equal(deriveAutomaticWritingGrade({ ...baseMetrics, mode: "guided" }), 3);
+  assert.equal(getMaximumWritingGrade({ ...baseMetrics, mode: "guided" }), 3);
+});
+
+test("manual grades are capped by revealed evidence", () => {
+  assert.equal(getMaximumWritingGrade(baseMetrics), 4);
+  assert.equal(getMaximumWritingGrade({ ...baseMetrics, mistakes: 1 }), 2);
+  assert.equal(getMaximumWritingGrade({ ...baseMetrics, hints: 1 }), 2);
+  assert.equal(getMaximumWritingGrade({ ...baseMetrics, revealAll: true }), 1);
+  assert.equal(getMaximumWritingGrade({ ...baseMetrics, hints: 2 }), 1);
 });
 
 test("a correction or single hint defaults to hard", () => {

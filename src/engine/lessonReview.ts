@@ -1,5 +1,7 @@
 import type { Exercise, Skill } from "../domain/course";
 import type { AnswerStatus } from "./checkAnswer";
+import { scheduleWritingReview } from "./writingReview";
+import type { WritingGrade } from "./writingSession";
 import {
   inferExerciseSkill,
   reviewItemKey,
@@ -13,6 +15,7 @@ export type LessonRunMode = "learning" | "practice";
 interface LessonReviewAttempt {
   exerciseId: string;
   status: AnswerStatus;
+  writingGrade?: WritingGrade;
 }
 
 interface CommitLessonReviewParams {
@@ -30,6 +33,7 @@ interface TargetSessionResult {
   skill: Skill;
   exercise: Exercise;
   status: AnswerStatus;
+  writingGrade?: WritingGrade;
 }
 
 const statusPriority: Record<AnswerStatus, number> = {
@@ -47,6 +51,15 @@ const KANJI_CORE_SKILLS: readonly Skill[] = [
 
 const worseStatus = (left: AnswerStatus, right: AnswerStatus): AnswerStatus =>
   statusPriority[right] > statusPriority[left] ? right : left;
+
+const worseWritingGrade = (
+  left: WritingGrade | undefined,
+  right: WritingGrade | undefined,
+): WritingGrade | undefined => {
+  if (left === undefined) return right;
+  if (right === undefined) return left;
+  return Math.min(left, right) as WritingGrade;
+};
 
 const seedUnseenKanjiSkills = (
   items: ReviewItem[],
@@ -116,15 +129,31 @@ export function commitLessonReviewItems({
       const key = reviewItemKey({ itemId, skill });
       const previous = sessionResults.get(key);
       if (!previous) {
-        sessionResults.set(key, { itemId, skill, exercise, status: attempt.status });
+        sessionResults.set(key, {
+          itemId,
+          skill,
+          exercise,
+          status: attempt.status,
+          writingGrade: attempt.writingGrade,
+        });
         return;
       }
       const status = worseStatus(previous.status, attempt.status);
+      const writingGrade = worseWritingGrade(
+        previous.writingGrade,
+        attempt.writingGrade,
+      );
+      const useCurrentExercise =
+        statusPriority[attempt.status] > statusPriority[previous.status] ||
+        (status === previous.status &&
+          attempt.writingGrade !== undefined &&
+          writingGrade === attempt.writingGrade);
       sessionResults.set(key, {
         itemId,
         skill,
-        exercise: status === attempt.status ? exercise : previous.exercise,
+        exercise: useCurrentExercise ? exercise : previous.exercise,
         status,
+        writingGrade,
       });
     });
   });
@@ -133,18 +162,26 @@ export function commitLessonReviewItems({
   const scheduledItems = results.reduce((currentItems, target) => {
     const key = reviewItemKey(target);
     const existing = currentItems.find((item) => reviewItemKey(item) === key);
-    return upsertReviewItem(
-      currentItems,
-      scheduleItemReview(
-        existing,
-        target.itemId,
-        target.skill,
-        target.exercise,
-        lessonId,
-        target.status,
-        now,
-      ),
-    );
+    const scheduled =
+      target.skill === "writing" && target.writingGrade !== undefined
+        ? scheduleWritingReview(
+            existing,
+            target.itemId,
+            target.exercise,
+            lessonId,
+            target.writingGrade,
+            now,
+          )
+        : scheduleItemReview(
+            existing,
+            target.itemId,
+            target.skill,
+            target.exercise,
+            lessonId,
+            target.status,
+            now,
+          );
+    return upsertReviewItem(currentItems, scheduled);
   }, items);
 
   return seedUnseenKanjiSkills(scheduledItems, results, lessonId, now);

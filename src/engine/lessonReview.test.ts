@@ -77,6 +77,39 @@ test("несколько заданий одного урока не накру�
   assert.equal(items[0]?.intervalDays, 0);
 });
 
+test("оценка письма из первого прохождения сохраняет собственный интервал", () => {
+  const writingExercise: Exercise = {
+    id: "lesson-test-kanji-writing",
+    type: "handwriting",
+    prompt: "Напиши 日",
+    targetItemIds: ["kanji-日"],
+    correctAnswers: ["日"],
+    skill: "writing",
+  };
+
+  const items = commitLessonReviewItems({
+    items: [],
+    exercises: [writingExercise],
+    attempts: [
+      {
+        exerciseId: writingExercise.id,
+        status: "correct",
+        writingGrade: 4,
+      },
+    ],
+    lessonId: "lesson-test",
+    mode: "learning",
+    passed: true,
+    now,
+  });
+
+  const writing = items.find((item) => item.skill === "writing");
+  assert.ok(writing);
+  assert.equal(writing.intervalDays, 4);
+  assert.equal(writing.streak, 1);
+  assert.equal(writing.correctCount, 1);
+});
+
 test("кандзи получает очереди значения, чтения и письма после одного вида задания", () => {
   const kanjiExercise: Exercise = {
     id: "lesson-test-kanji-日-recognition",
