@@ -16,7 +16,7 @@ env:
 
 concurrency:
   group: build-apk-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build-apk:
@@ -43,6 +43,33 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      # BEGIN WRITING GRADE MIGRATION
+      - name: Apply grade-aware writing integration
+        run: node scripts/apply-writing-grade-integration.mjs
+
+      - name: Persist grade-aware writing integration
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('.github/workflows/build-apk.yml')
+          text = path.read_text()
+          start = text.index('      # BEGIN WRITING GRADE MIGRATION\n')
+          end = text.index('      # END WRITING GRADE MIGRATION\n') + len('      # END WRITING GRADE MIGRATION\n')
+          path.write_text(text[:start] + text[end:])
+          PY
+          rm scripts/apply-writing-grade-integration.mjs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Wire writing grades into lessons and reviews [skip build]"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+      # END WRITING GRADE MIGRATION
 
       - name: Read application version
         shell: bash
