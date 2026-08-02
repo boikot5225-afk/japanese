@@ -43,6 +43,18 @@ const distractorKanji = (target: KanjiItem, lessonKanji: readonly KanjiItem[]): 
   return selected;
 };
 
+const readingDistractors = (target: KanjiItem): string[] => {
+  const correct = target.examples[0]?.kanjiReading;
+  const values: string[] = [];
+  for (const candidate of n5KanjiCatalog) {
+    const reading = candidate.examples[0]?.kanjiReading;
+    if (!reading || reading === correct || values.includes(reading)) continue;
+    values.push(reading);
+    if (values.length === 3) break;
+  }
+  return values;
+};
+
 const createRecognitionExercise = (
   lessonId: string,
   item: KanjiItem,
@@ -68,25 +80,41 @@ const createRecognitionExercise = (
   };
 };
 
-const createReadingExercise = (lessonId: string, item: KanjiItem): Exercise => {
+const createReadingExercise = (
+  lessonId: string,
+  item: KanjiItem,
+  activeRecall: boolean,
+): Exercise => {
   const example = item.examples[0];
   if (!example) {
     return createRecognitionExercise(lessonId, item, [item]);
   }
   const katakanaReading = hiraganaToKatakana(example.kanjiReading);
-  return {
+  const common = {
     id: `${lessonId}-kanji-${item.literal}-reading`,
-    type: "text-input",
     prompt: `Как читается выделенный знак ${item.literal} в слове ${example.written}（${example.reading}）?`,
     targetItemIds: [item.id],
     correctAnswers: [example.kanjiReading],
-    acceptableAnswers:
-      katakanaReading === example.kanjiReading ? undefined : [katakanaReading],
     explanationRu: `В слове ${example.written} знак ${item.literal} читается ${example.kanjiReading}. Всё слово: ${example.reading} — ${example.meaningRu}.`,
     variantGroup: `${lessonId}:kanji-guided`,
     contentKey: `kanji:${item.literal}:reading`,
-    difficulty: 2,
-    skill: "reading",
+    difficulty: activeRecall ? 2 as const : 1 as const,
+    skill: "reading" as const,
+  };
+
+  if (!activeRecall) {
+    return {
+      ...common,
+      type: "multiple-choice",
+      distractors: readingDistractors(item),
+    };
+  }
+
+  return {
+    ...common,
+    type: "text-input",
+    acceptableAnswers:
+      katakanaReading === example.kanjiReading ? undefined : [katakanaReading],
   };
 };
 
@@ -99,63 +127,103 @@ export const buildLessonKanjiExercises = (
 
   const exercises: Exercise[] = [
     createRecognitionExercise(lessonId, first, lessonKanji),
-    createReadingExercise(lessonId, first),
+    createReadingExercise(lessonId, first, true),
   ];
 
   lessonKanji.slice(1).forEach((item, index) => {
     exercises.push(
       index % 2 === 0
-        ? createReadingExercise(lessonId, item)
+        ? createReadingExercise(lessonId, item, false)
         : createRecognitionExercise(lessonId, item, lessonKanji),
     );
   });
   return exercises;
 };
 
+const countByType = (exercises: readonly Exercise[]): Map<ExerciseType, number> => {
+  const counts = new Map<ExerciseType, number>();
+  exercises.forEach((exercise) => {
+    counts.set(exercise.type, (counts.get(exercise.type) ?? 0) + 1);
+  });
+  return counts;
+};
+
+const countProtectedTargets = (
+  exercises: readonly Exercise[],
+  protectedTargetIds: ReadonlySet<string>,
+): Map<string, number> => {
+  const counts = new Map<string, number>();
+  protectedTargetIds.forEach((id) => counts.set(id, 0));
+  exercises.forEach((exercise) => {
+    exercise.targetItemIds.forEach((id) => {
+      if (protectedTargetIds.has(id)) counts.set(id, (counts.get(id) ?? 0) + 1);
+    });
+  });
+  return counts;
+};
+
 const chooseReplacementIndexes = (
   exercises: readonly Exercise[],
   replacementCount: number,
+  protectedTargetIds: ReadonlySet<string>,
 ): number[] => {
-  const protectedIndexes = new Set<number>();
-
-  REQUIRED_PRACTICE_TYPES.forEach((type) => {
-    const index = exercises.findIndex((exercise) => exercise.type === type);
-    if (index >= 0) protectedIndexes.add(index);
-  });
-
-  const hardExerciseIndex = exercises.findIndex((exercise) => exercise.difficulty === 4);
-  if (hardExerciseIndex >= 0) protectedIndexes.add(hardExerciseIndex);
-
-  const replaceable = exercises
+  const typeCounts = countByType(exercises);
+  const targetCounts = countProtectedTargets(exercises, protectedTargetIds);
+  let hardCount = exercises.filter((exercise) => exercise.difficulty === 4).length;
+  const generated = exercises
     .map((exercise, index) => ({ exercise, index }))
-    .filter(({ index }) => !protectedIndexes.has(index));
-  const generated = replaceable
     .filter(({ exercise }) => exercise.id.includes("-auto-"))
     .reverse();
-  const authored = replaceable
+  const authored = exercises
+    .map((exercise, index) => ({ exercise, index }))
     .filter(({ exercise }) => !exercise.id.includes("-auto-"))
     .reverse();
   const candidates = [...generated, ...authored];
+  const selected: number[] = [];
 
-  if (candidates.length < replacementCount) {
+  for (const { exercise, index } of candidates) {
+    if (selected.length >= replacementCount) break;
+
+    const typeMustRemain = REQUIRED_PRACTICE_TYPES.includes(exercise.type);
+    if (typeMustRemain && (typeCounts.get(exercise.type) ?? 0) <= 1) continue;
+    if (exercise.difficulty === 4 && hardCount <= 1) continue;
+
+    const removesOnlyProtectedTarget = exercise.targetItemIds.some(
+      (id) => protectedTargetIds.has(id) && (targetCounts.get(id) ?? 0) <= 1,
+    );
+    if (removesOnlyProtectedTarget) continue;
+
+    selected.push(index);
+    typeCounts.set(exercise.type, (typeCounts.get(exercise.type) ?? 0) - 1);
+    if (exercise.difficulty === 4) hardCount -= 1;
+    exercise.targetItemIds.forEach((id) => {
+      if (protectedTargetIds.has(id)) {
+        targetCounts.set(id, (targetCounts.get(id) ?? 0) - 1);
+      }
+    });
+  }
+
+  if (selected.length < replacementCount) {
     throw new Error(
       `${exercises[0]?.id ?? "lesson"}: недостаточно места для кандзи без потери обязательной практики`,
     );
   }
 
-  return candidates
-    .slice(0, replacementCount)
-    .map(({ index }) => index)
-    .sort((left, right) => left - right);
+  return selected.sort((left, right) => left - right);
 };
 
 const replacePracticeWithKanji = (
   exercises: readonly Exercise[],
   kanjiExercises: readonly Exercise[],
+  protectedTargetIds: ReadonlySet<string>,
 ): Exercise[] => {
   if (kanjiExercises.length === 0) return [...exercises];
 
-  const replacementIndexes = chooseReplacementIndexes(exercises, kanjiExercises.length);
+  const replacementIndexes = chooseReplacementIndexes(
+    exercises,
+    kanjiExercises.length,
+    protectedTargetIds,
+  );
   const integrated = exercises.map((exercise) => ({ ...exercise }));
   kanjiExercises.forEach((exercise, index) => {
     const targetIndex = replacementIndexes[index];
@@ -175,6 +243,17 @@ const mergeExercisePools = (
   return [...byId.values()];
 };
 
+const grammarNeedingDirectPractice = (bundle: LessonBundle): Set<string> => {
+  const grammarUsedInExamples = new Set(
+    bundle.sentences.flatMap((sentence) => sentence.grammarIds),
+  );
+  return new Set(
+    bundle.grammar
+      .map((grammar) => grammar.id)
+      .filter((id) => !grammarUsedInExamples.has(id)),
+  );
+};
+
 export const integrateKanjiCurriculum = (bundle: LessonBundle): LessonBundle => {
   const lessonKanji = getLessonKanji(bundle.lesson.id);
   if (lessonKanji.length === 0) {
@@ -183,7 +262,11 @@ export const integrateKanjiCurriculum = (bundle: LessonBundle): LessonBundle => 
 
   const originalExercises = bundle.reviewExercises ?? bundle.exercises;
   const kanjiExercises = buildLessonKanjiExercises(bundle.lesson.id, lessonKanji);
-  const exercises = replacePracticeWithKanji(bundle.exercises, kanjiExercises);
+  const exercises = replacePracticeWithKanji(
+    bundle.exercises,
+    kanjiExercises,
+    grammarNeedingDirectPractice(bundle),
+  );
   const reviewExercises = mergeExercisePools(exercises, originalExercises);
   const itemIds = unique([
     ...bundle.vocabulary.map((item) => item.id),
