@@ -78,6 +78,11 @@ jobs:
           cp "$APK" "builds/Japanese-${APP_VERSION}-standalone.apk"
           sha256sum "builds/Japanese-${APP_VERSION}-standalone.apk" | tee builds/apk.sha256
 
+      - name: Pack exact source snapshot
+        shell: bash
+        run: |
+          git ls-files -z | tar --null -T - -czf builds/japanese-source-audit.tar.gz
+
       - name: Upload standalone APK
         uses: actions/upload-artifact@v4
         with:
@@ -88,3 +93,11 @@ jobs:
             builds/apk-contents.log
           if-no-files-found: error
           retention-days: 14
+
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: japanese-source-audit
+          path: builds/japanese-source-audit.tar.gz
+          if-no-files-found: error
+          retention-days: 1
