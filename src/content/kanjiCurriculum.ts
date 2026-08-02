@@ -140,6 +140,15 @@ export const buildLessonKanjiExercises = (
   return exercises;
 };
 
+export const buildKanjiReviewExercises = (
+  lessonId: string,
+  lessonKanji: readonly KanjiItem[],
+): Exercise[] =>
+  lessonKanji.flatMap((item) => [
+    createRecognitionExercise(lessonId, item, lessonKanji),
+    createReadingExercise(lessonId, item, true),
+  ]);
+
 const countByType = (exercises: readonly Exercise[]): Map<ExerciseType, number> => {
   const counts = new Map<ExerciseType, number>();
   exercises.forEach((exercise) => {
@@ -233,11 +242,10 @@ const replacePracticeWithKanji = (
 };
 
 const mergeExercisePools = (
-  visibleExercises: readonly Exercise[],
-  originalExercises: readonly Exercise[],
+  ...exercisePools: readonly (readonly Exercise[])[]
 ): Exercise[] => {
   const byId = new Map<string, Exercise>();
-  [...visibleExercises, ...originalExercises].forEach((exercise) => {
+  exercisePools.flat().forEach((exercise) => {
     if (!byId.has(exercise.id)) byId.set(exercise.id, exercise);
   });
   return [...byId.values()];
@@ -262,12 +270,20 @@ export const integrateKanjiCurriculum = (bundle: LessonBundle): LessonBundle => 
 
   const originalExercises = bundle.reviewExercises ?? bundle.exercises;
   const kanjiExercises = buildLessonKanjiExercises(bundle.lesson.id, lessonKanji);
+  const kanjiReviewExercises = buildKanjiReviewExercises(
+    bundle.lesson.id,
+    lessonKanji,
+  );
   const exercises = replacePracticeWithKanji(
     bundle.exercises,
     kanjiExercises,
     grammarNeedingDirectPractice(bundle),
   );
-  const reviewExercises = mergeExercisePools(exercises, originalExercises);
+  const reviewExercises = mergeExercisePools(
+    exercises,
+    originalExercises,
+    kanjiReviewExercises,
+  );
   const itemIds = unique([
     ...bundle.vocabulary.map((item) => item.id),
     ...lessonKanji.map((item) => item.id),
