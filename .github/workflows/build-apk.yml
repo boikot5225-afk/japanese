@@ -45,7 +45,7 @@ jobs:
           node-version: 22
 
       - name: Apply writing audit fixes
-        run: node scripts/apply-writing-audit.mjs
+        run: node scripts/apply-writing-audit.mjs && node scripts/apply-writing-audit-hotfix.mjs
 
       - name: Persist writing audit fixes
         if: github.event_name == 'push'
