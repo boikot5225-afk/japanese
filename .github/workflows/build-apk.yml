@@ -5,6 +5,9 @@ on:
     branches:
       - main
       - "agent/**"
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -45,10 +48,17 @@ jobs:
           node-version: 22
 
       - name: Apply writing audit fixes
-        run: node scripts/apply-writing-audit.mjs && node scripts/apply-writing-audit-hotfix.mjs
+        shell: bash
+        run: |
+          if [[ "$(node -p "require('./package.json').version")" == "0.21.0" ]]; then
+            node scripts/apply-writing-audit.mjs
+            node scripts/apply-writing-audit-hotfix.mjs
+          fi
 
       - name: Persist writing audit fixes
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        env:
+          TARGET_BRANCH: ${{ github.head_ref || github.ref_name }}
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
@@ -67,7 +77,7 @@ jobs:
             exit 0
           fi
           git commit -m "Fix audited writing workflow defects [skip build]"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          git push origin "HEAD:${TARGET_BRANCH}"
 
       - name: Read application version
         shell: bash
