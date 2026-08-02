@@ -30,6 +30,7 @@ import {
 import { calculateLessonResult, type ExerciseAttempt } from "./src/engine/lessonSession";
 import { scheduleLessonRemediation } from "./src/engine/practiceQueue";
 import { scheduleWritingReview, writingGradeStatus } from "./src/engine/writingReview";
+import type { WritingGrade } from "./src/engine/writingSession";
 import {
   buildReviewSession,
   createAttemptLogEntry,
@@ -359,6 +360,7 @@ export default function App() {
     checkResult: AnswerCheckResult,
     source: AttemptSource,
     reviewQuestion?: ReviewSessionQuestion,
+    writingGrade?: WritingGrade,
   ) => {
     const now = new Date();
     if (source === "review" && reviewQuestion) {
@@ -366,18 +368,26 @@ export default function App() {
         reviewQuestion.items.reduce((items, scheduledItem) => {
           const key = reviewItemKey(scheduledItem);
           const existing = items.find((item) => reviewItemKey(item) === key);
-          return upsertReviewItem(
-            items,
-            scheduleItemReview(
-              existing,
-              scheduledItem.itemId,
-              scheduledItem.skill,
-              exercise,
-              scheduledItem.lessonId,
-              checkResult.status,
-              now,
-            ),
-          );
+          const scheduledReview =
+            scheduledItem.skill === "writing" && writingGrade
+              ? scheduleWritingReview(
+                  existing,
+                  scheduledItem.itemId,
+                  exercise,
+                  scheduledItem.lessonId,
+                  writingGrade,
+                  now,
+                )
+              : scheduleItemReview(
+                  existing,
+                  scheduledItem.itemId,
+                  scheduledItem.skill,
+                  exercise,
+                  scheduledItem.lessonId,
+                  checkResult.status,
+                  now,
+                );
+          return upsertReviewItem(items, scheduledReview);
         }, previous),
       );
     }
@@ -391,6 +401,7 @@ export default function App() {
     exercise: Exercise,
     lessonId: string,
     checkResult: AnswerCheckResult,
+    writingGrade?: WritingGrade,
   ) => {
     const skill = inferExerciseSkill(exercise);
     const now = new Date();
@@ -398,23 +409,34 @@ export default function App() {
       exercise.targetItemIds.reduce((items, itemId) => {
         const key = reviewItemKey({ itemId, skill });
         const existing = items.find((item) => reviewItemKey(item) === key);
-        return upsertReviewItem(
-          items,
-          scheduleItemReview(
-            existing,
-            itemId,
-            skill,
-            exercise,
-            lessonId,
-            checkResult.status,
-            now,
-          ),
-        );
+        const scheduledReview =
+          skill === "writing" && writingGrade
+            ? scheduleWritingReview(
+                existing,
+                itemId,
+                exercise,
+                lessonId,
+                writingGrade,
+                now,
+              )
+            : scheduleItemReview(
+                existing,
+                itemId,
+                skill,
+                exercise,
+                lessonId,
+                checkResult.status,
+                now,
+              );
+        return upsertReviewItem(items, scheduledReview);
       }, previous),
     );
   };
 
-  const finishExercise = (checkResult: AnswerCheckResult) => {
+  const finishExercise = (
+    checkResult: AnswerCheckResult,
+    writingGrade?: WritingGrade,
+  ) => {
     if (!currentExercise) return;
     const bundle = screen === "review"
       ? activeReviewBundle
@@ -434,6 +456,7 @@ export default function App() {
       checkResult,
       source,
       activeReviewQuestion,
+      writingGrade,
     );
 
     if (screen === "checkpoint" && activeCheckpointQuestion) {
@@ -441,6 +464,7 @@ export default function App() {
         currentExercise,
         activeCheckpointQuestion.lessonId,
         checkResult,
+        writingGrade,
       );
     }
 
@@ -473,6 +497,24 @@ export default function App() {
     } else {
       setAttempts((previous) => [...previous, attempt]);
     }
+  };
+
+  const finishWritingExercise = (writing: SkritterWritingResult) => {
+    if (!currentExercise || result) return;
+    const status = writingGradeStatus(writing.grade);
+    const normalizedAnswer = currentExercise.correctAnswers[0] ?? "";
+    setAnswer(normalizedAnswer);
+    finishExercise(
+      {
+        status,
+        normalizedAnswer,
+        message:
+          status === "correct"
+            ? `Письмо принято. Оценка ${writing.grade}/4.`
+            : `Письмо нужно повторить. Оценка ${writing.grade}/4.`,
+      },
+      writing.grade,
+    );
   };
 
   const submitAnswer = () => {
@@ -665,6 +707,7 @@ export default function App() {
           ),
         onClearTokens: () => setSelectedTokens([]),
         onSubmit: submitAnswer,
+        onWritingComplete: finishWritingExercise,
       }
     : null;
 

@@ -3,6 +3,7 @@ import { SafeAreaView, ScrollView, StatusBar, Text, TouchableOpacity, View } fro
 import { speakJapanese } from "../audio/japaneseSpeech";
 import { KanjiLessonStage } from "../components/KanjiLessonStage";
 import { PracticeCard } from "../components/PracticeCard";
+import type { SkritterWritingResult } from "../components/SkritterWritingPad";
 import { SwipeNavigationView } from "../components/SwipeNavigationView";
 import type { LessonBundle } from "../content/lessonBundle";
 import type { Exercise } from "../domain/course";
@@ -43,6 +44,7 @@ interface CommonPracticeProps {
   onRemoveToken: (index: number) => void;
   onClearTokens: () => void;
   onSubmit: () => void;
+  onWritingComplete: (result: SkritterWritingResult) => void;
   onContinue: () => void;
 }
 
@@ -75,6 +77,7 @@ export function LessonScreen({
   onRemoveToken,
   onClearTokens,
   onSubmit,
+  onWritingComplete,
   onContinue,
 }: LessonScreenProps) {
   const stageIndex = lessonStages.indexOf(stage);
@@ -220,6 +223,7 @@ export function LessonScreen({
               onRemoveToken={onRemoveToken}
               onClearTokens={onClearTokens}
               onSubmit={onSubmit}
+              onWritingComplete={onWritingComplete}
               onContinue={onContinue}
             />
           )}
@@ -269,6 +273,7 @@ export function ReviewScreen({
   onRemoveToken,
   onClearTokens,
   onSubmit,
+  onWritingComplete,
   onContinue,
 }: ReviewScreenProps) {
   return (

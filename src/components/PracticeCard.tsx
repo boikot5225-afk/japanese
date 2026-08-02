@@ -17,8 +17,10 @@ import {
 } from "../engine/practicePresentation";
 import { styles } from "../theme/appStyles";
 import { HandwritingPad } from "./HandwritingPad";
-import { SkritterWritingPad } from "./SkritterWritingPad";
-import { isPassingWritingGrade } from "../engine/writingSession";
+import {
+  SkritterWritingPad,
+  type SkritterWritingResult,
+} from "./SkritterWritingPad";
 
 interface PracticeCardProps {
   title: string;
@@ -36,6 +38,7 @@ interface PracticeCardProps {
   onRemoveToken: (index: number) => void;
   onClearTokens: () => void;
   onSubmit: () => void;
+  onWritingComplete: (result: SkritterWritingResult) => void;
   onContinue: () => void;
 }
 
@@ -60,6 +63,7 @@ export function PracticeCard({
   onRemoveToken,
   onClearTokens,
   onSubmit,
+  onWritingComplete,
   onContinue,
 }: PracticeCardProps) {
   const [handwritingHasInk, setHandwritingHasInk] = useState(false);
@@ -255,14 +259,9 @@ export function PracticeCard({
                 compact
                 allowModeSelection={false}
                 disabled={Boolean(result)}
-                onComplete={(writing) =>
-                  onChoice(
-                    getHandwritingAssessmentAnswer(
-                      exercise,
-                      isPassingWritingGrade(writing.grade),
-                    ),
-                  )
-                }
+                onComplete={(writing) => {
+                  onWritingComplete(writing);
+                }}
               />
             ) : (
               <>

@@ -1,6 +1,7 @@
 import { SafeAreaView, ScrollView, StatusBar, Text, TouchableOpacity, View } from "react-native";
 
 import { PracticeCard } from "../components/PracticeCard";
+import type { SkritterWritingResult } from "../components/SkritterWritingPad";
 import { SwipeNavigationView } from "../components/SwipeNavigationView";
 import type { CourseCheckpoint } from "../content/courseCheckpoints";
 import type { Exercise } from "../domain/course";
@@ -23,6 +24,7 @@ interface CheckpointScreenProps {
   onRemoveToken: (index: number) => void;
   onClearTokens: () => void;
   onSubmit: () => void;
+  onWritingComplete: (result: SkritterWritingResult) => void;
   onContinue: () => void;
   onCourse: () => void;
 }
@@ -42,6 +44,7 @@ export function CheckpointScreen({
   onRemoveToken,
   onClearTokens,
   onSubmit,
+  onWritingComplete,
   onContinue,
   onCourse,
 }: CheckpointScreenProps) {
@@ -75,6 +78,7 @@ export function CheckpointScreen({
             onRemoveToken={onRemoveToken}
             onClearTokens={onClearTokens}
             onSubmit={onSubmit}
+            onWritingComplete={onWritingComplete}
             onContinue={onContinue}
           />
         </ScrollView>
