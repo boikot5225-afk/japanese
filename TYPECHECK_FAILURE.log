@@ -1,14 +1,1 @@
-
-> japanese-tutor@0.20.0 typecheck
-> tsc --noEmit
-
-src/engine/kanjiStrokeEngine.ts(44,5): error TS2322: Type '{ x?: number | undefined; y?: number | undefined; }[]' is not assignable to type 'KanjiStrokePoint[]'.
-  Type '{ x?: number | undefined; y?: number | undefined; }' is not assignable to type 'KanjiStrokePoint'.
-    Types of property 'x' are incompatible.
-      Type 'number | undefined' is not assignable to type 'number'.
-        Type 'undefined' is not assignable to type 'number'.
-src/engine/kanjiStrokeEngine.ts(56,5): error TS2322: Type '{ x?: number | undefined; y?: number | undefined; }[]' is not assignable to type 'KanjiStrokePoint[]'.
-  Type '{ x?: number | undefined; y?: number | undefined; }' is not assignable to type 'KanjiStrokePoint'.
-    Types of property 'x' are incompatible.
-      Type 'number | undefined' is not assignable to type 'number'.
-        Type 'undefined' is not assignable to type 'number'.
+Typecheck passed.
