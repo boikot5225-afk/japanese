@@ -17,7 +17,6 @@ import {
   type KanjiStudyResult,
 } from "../engine/kanjiStudySession";
 import type { ReviewItem } from "../engine/reviewEngine";
-import { previewWritingGradeIntervals } from "../engine/writingReview";
 import type { WritingGrade } from "../engine/writingSession";
 import {
   SkritterExactWritingPad,
@@ -72,25 +71,9 @@ const writingModeForPart = (
   }
 };
 
-const reviewItemForCard = (
-  card: KanjiStudyCard,
-  reviewItems: readonly ReviewItem[],
-): ReviewItem | undefined =>
-  reviewItems.find((reviewItem) => {
-    if (reviewItem.itemId !== card.itemId) return false;
-    if (card.part === "definition") {
-      return reviewItem.skill === "recognition" || reviewItem.skill === "recall";
-    }
-    if (card.part === "reading") return reviewItem.skill === "reading";
-    if (card.part === "writing-recall") return reviewItem.skill === "writing";
-    return false;
-  });
-
 function BasicGradeButtons({
-  intervals,
   onGrade,
 }: {
-  intervals: Partial<Record<WritingGrade, string>>;
   onGrade: (grade: WritingGrade) => void;
 }) {
   return (
@@ -101,7 +84,6 @@ function BasicGradeButtons({
       >
         <Text style={styles.gradeNumberForgot}>1</Text>
         <Text style={styles.gradeLabel}>Забыл</Text>
-        {intervals[1] && <Text style={styles.gradeInterval}>{intervals[1]}</Text>}
       </TouchableOpacity>
       <TouchableOpacity
         style={[styles.gradeButton, styles.gradeGotIt]}
@@ -109,7 +91,6 @@ function BasicGradeButtons({
       >
         <Text style={styles.gradeNumberGotIt}>3</Text>
         <Text style={styles.gradeLabel}>Знаю</Text>
-        {intervals[3] && <Text style={styles.gradeInterval}>{intervals[3]}</Text>}
       </TouchableOpacity>
     </View>
   );
@@ -141,13 +122,6 @@ export function KanjiStudyPanel({
   const item = card ? itemById.get(card.itemId) : undefined;
   const example = item?.examples[0];
   const writingMode = card ? writingModeForPart(card.part) : null;
-  const currentReviewItem = card
-    ? reviewItemForCard(card, reviewItems)
-    : undefined;
-  const intervals = useMemo(
-    () => previewWritingGradeIntervals(currentReviewItem),
-    [currentReviewItem],
-  );
 
   const resetReveal = () => setRevealed(false);
 
@@ -345,7 +319,7 @@ export function KanjiStudyPanel({
                   <Text style={styles.primaryButtonText}>Дальше</Text>
                 </TouchableOpacity>
               ) : (
-                <BasicGradeButtons intervals={intervals} onGrade={finishReviewCard} />
+                <BasicGradeButtons onGrade={finishReviewCard} />
               )}
             </View>
           )}
@@ -386,7 +360,7 @@ export function KanjiStudyPanel({
                   <Text style={styles.primaryButtonText}>Дальше</Text>
                 </TouchableOpacity>
               ) : (
-                <BasicGradeButtons intervals={intervals} onGrade={finishReviewCard} />
+                <BasicGradeButtons onGrade={finishReviewCard} />
               )}
             </View>
           )}
@@ -412,7 +386,6 @@ export function KanjiStudyPanel({
               data={strokeData}
               mode={writingMode}
               grading={mode === "learn" ? "none" : "basic"}
-              gradeIntervalLabels={intervals}
               onComplete={finishWriting}
             />
           </View>
@@ -530,7 +503,6 @@ const styles = StyleSheet.create({
   gradeNumberForgot: { color: "#c44747", fontSize: 24, fontWeight: "900" },
   gradeNumberGotIt: { color: "#2e7d55", fontSize: 24, fontWeight: "900" },
   gradeLabel: { color: "#263746", fontSize: 13, fontWeight: "900" },
-  gradeInterval: { marginTop: 3, color: "#71808d", fontSize: 11, fontWeight: "700" },
   primaryButton: {
     minHeight: 50,
     alignItems: "center",
