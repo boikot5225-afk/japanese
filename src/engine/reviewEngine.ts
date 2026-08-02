@@ -59,7 +59,10 @@ export interface ReviewSessionOptions {
   recentAttemptLimit?: number;
 }
 
+type KanjiSelfGrade = 1 | 2 | 3 | 4;
+
 const DAY_MS = 24 * 60 * 60 * 1000;
+const MINUTE_MS = 60 * 1000;
 const successfulStatuses: AnswerStatus[] = ["correct", "acceptable"];
 const WEAKNESS_THRESHOLD = 5;
 const DEFAULT_RECENT_ATTEMPT_LIMIT = 40;
@@ -98,6 +101,82 @@ export const reviewQuestionCoverageKey = (
 const addDays = (date: Date, days: number): string =>
   new Date(date.getTime() + days * DAY_MS).toISOString();
 
+const clamp = (value: number, minimum: number, maximum: number): number =>
+  Math.min(maximum, Math.max(minimum, value));
+
+const getKanjiSelfGrade = (exercise: Exercise): KanjiSelfGrade | null => {
+  const match = exercise.variantGroup?.match(/^kanji-self-grade:([1-4])$/);
+  if (!match) return null;
+  const grade = Number(match[1]);
+  return grade >= 1 && grade <= 4 ? grade as KanjiSelfGrade : null;
+};
+
+const scheduleKanjiSelfGrade = (
+  existing: ReviewItem | undefined,
+  itemId: string,
+  skill: Skill,
+  exercise: Exercise,
+  lessonId: string,
+  status: AnswerStatus,
+  grade: KanjiSelfGrade,
+  now: Date,
+): ReviewItem => {
+  const previousEase = existing?.ease ?? 2.3;
+  const previousInterval = Math.max(existing?.intervalDays ?? 0, 0);
+  const previousStreak = existing?.streak ?? 0;
+
+  let dueAt: string;
+  let intervalDays: number;
+  let ease: number;
+  let streak: number;
+  let success: boolean;
+
+  if (grade === 1) {
+    intervalDays = 10 / (24 * 60);
+    dueAt = new Date(now.getTime() + 10 * MINUTE_MS).toISOString();
+    ease = clamp(previousEase - 0.25, 1.3, 2.8);
+    streak = 0;
+    success = false;
+  } else if (grade === 2) {
+    intervalDays = 1 / 3;
+    dueAt = new Date(now.getTime() + 8 * 60 * MINUTE_MS).toISOString();
+    ease = clamp(previousEase - 0.12, 1.3, 2.8);
+    streak = 0;
+    success = false;
+  } else {
+    streak = previousStreak + 1;
+    success = true;
+    if (grade === 4) {
+      ease = clamp(previousEase + 0.12, 1.3, 2.8);
+      intervalDays = previousInterval > 0
+        ? Math.max(7, Math.round(previousInterval * Math.max(3.1, ease + 0.5)))
+        : 4;
+    } else {
+      ease = clamp(previousEase + 0.03, 1.3, 2.8);
+      if (streak === 1) intervalDays = 1;
+      else if (streak === 2) intervalDays = 3;
+      else intervalDays = Math.max(7, Math.round(Math.max(previousInterval, 3) * ease));
+    }
+    dueAt = addDays(now, intervalDays);
+  }
+
+  return {
+    itemId,
+    skill,
+    exerciseId: exercise.id,
+    lessonId,
+    dueAt,
+    intervalDays,
+    ease,
+    streak,
+    correctCount: (existing?.correctCount ?? 0) + (success ? 1 : 0),
+    incorrectCount: (existing?.incorrectCount ?? 0) + (success ? 0 : 1),
+    lapseCount: (existing?.lapseCount ?? 0) + (success ? 0 : 1),
+    lastStatus: status,
+    lastAnsweredAt: now.toISOString(),
+  };
+};
+
 const weaknessScore = (item: ReviewItem): number =>
   item.incorrectCount * 4 + item.lapseCount * 3 - item.correctCount +
   (isSuccessfulStatus(item.lastStatus) ? 0 : 6);
@@ -116,6 +195,20 @@ export function scheduleItemReview(
   status: AnswerStatus,
   now: Date,
 ): ReviewItem {
+  const kanjiSelfGrade = getKanjiSelfGrade(exercise);
+  if (kanjiSelfGrade) {
+    return scheduleKanjiSelfGrade(
+      existing,
+      itemId,
+      skill,
+      exercise,
+      lessonId,
+      status,
+      kanjiSelfGrade,
+      now,
+    );
+  }
+
   const success = isSuccessfulStatus(status);
   const previousStreak = existing?.streak ?? 0;
   const streak = success ? previousStreak + 1 : 0;
