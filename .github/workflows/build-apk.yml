@@ -60,7 +60,7 @@ jobs:
           KANJI_DIR="$(dirname "$(find .cache/kanjivg-release -name 065e5.svg -print -quit)")"
           test -n "$KANJI_DIR"
           node scripts/generate-kanji-strokes.mjs "$KANJI_DIR"
-          node -e "const fs=require('fs');const s=fs.readFileSync('src/content/kanjiStrokeData.ts','utf8');const n=(s.match(/source:\"KanjiVG\"/g)||[]).length;if(n!==103)throw new Error('Expected 103 kanji, got '+n);"
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/content/kanjiStrokeData.ts','utf8');const n=(s.match(/\"source\":\"KanjiVG\"/g)||[]).length;if(n!==103)throw new Error('Expected 103 kanji, got '+n);"
 
       - name: Persist generated source
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/agent/')
