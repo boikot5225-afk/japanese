@@ -77,7 +77,7 @@ test("несколько заданий одного урока не накру�
   assert.equal(items[0]?.intervalDays, 0);
 });
 
-test("оценка письма из первого прохождения сохраняет собственный интервал", () => {
+test("оценка письма из первого прохождения сохраняет интервал Skritter Classic", () => {
   const writingExercise: Exercise = {
     id: "lesson-test-kanji-writing",
     type: "handwriting",
@@ -105,7 +105,7 @@ test("оценка письма из первого прохождения со�
 
   const writing = items.find((item) => item.skill === "writing");
   assert.ok(writing);
-  assert.equal(writing.intervalDays, 4);
+  assert.ok(writing.intervalDays >= 25 && writing.intervalDays <= 31);
   assert.equal(writing.streak, 1);
   assert.equal(writing.correctCount, 1);
 });
