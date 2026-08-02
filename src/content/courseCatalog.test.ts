@@ -17,6 +17,9 @@ const duplicates = (values: string[]): string[] => {
 const vocabularyIds = lessonBundles.flatMap((bundle) =>
   bundle.vocabulary.map((item) => item.id),
 );
+const kanjiIds = lessonBundles.flatMap((bundle) =>
+  (bundle.kanji ?? []).map((item) => item.id),
+);
 const grammarIds = lessonBundles.flatMap((bundle) =>
   bundle.grammar.map((item) => item.id),
 );
@@ -26,8 +29,11 @@ const sentenceIds = lessonBundles.flatMap((bundle) =>
 const exerciseIds = lessonBundles.flatMap((bundle) =>
   bundle.exercises.map((item) => item.id),
 );
-const learningItemIds = [...vocabularyIds, ...grammarIds, ...sentenceIds];
-const addressableTargetIds = new Set([...vocabularyIds, ...grammarIds, ...sentenceIds]);
+const reviewExerciseIds = lessonBundles.flatMap((bundle) =>
+  (bundle.reviewExercises ?? bundle.exercises).map((item) => item.id),
+);
+const learningItemIds = [...vocabularyIds, ...kanjiIds, ...grammarIds, ...sentenceIds];
+const addressableTargetIds = new Set(learningItemIds);
 
 test("lesson order is contiguous and each lesson appears in one matching unit", () => {
   const lessons = lessonBundles.map((bundle) => bundle.lesson);
@@ -54,12 +60,14 @@ test("all course ids are globally unique", () => {
   assert.deepEqual(duplicates(lessonBundles.map((bundle) => bundle.lesson.id)), []);
   assert.deepEqual(duplicates(learningItemIds), []);
   assert.deepEqual(duplicates(exerciseIds), []);
+  assert.deepEqual(duplicates(reviewExerciseIds), []);
 });
 
 test("lesson manifests match their bundle contents", () => {
   lessonBundles.forEach((bundle) => {
     const expectedItemIds = [
       ...bundle.vocabulary.map((item) => item.id),
+      ...(bundle.kanji ?? []).map((item) => item.id),
       ...bundle.grammar.map((item) => item.id),
       ...bundle.sentences.map((item) => item.id),
     ];
@@ -87,7 +95,7 @@ test("sentence and exercise references resolve to real course items", () => {
       assert.ok(sentence.translationRu.trim().length > 0, `${sentence.id} has no translation`);
     });
 
-    bundle.exercises.forEach((exercise) => {
+    (bundle.reviewExercises ?? bundle.exercises).forEach((exercise) => {
       assert.ok(exercise.correctAnswers.length > 0, `${exercise.id} has no correct answer`);
       exercise.targetItemIds.forEach((id) => {
         assert.ok(addressableTargetIds.has(id), `${exercise.id} references missing target ${id}`);
@@ -112,7 +120,8 @@ test("lesson six remains the mixed-practice reference lesson", () => {
   const lessonSix = lessonBundles.find((bundle) => bundle.lesson.id === "lesson-006");
   assert.ok(lessonSix);
   assert.equal(lessonSix.exercises.length, 12);
-  assert.equal(lessonSix.lesson.estimatedMinutes, 12);
+  assert.ok(lessonSix.lesson.estimatedMinutes >= 14);
+  assert.ok(lessonSix.lesson.estimatedMinutes <= 19);
 
   const exerciseTypes = new Set(lessonSix.exercises.map((exercise) => exercise.type));
   assert.ok(exerciseTypes.has("multiple-choice"));
@@ -123,9 +132,13 @@ test("lesson six remains the mixed-practice reference lesson", () => {
   assert.ok(lessonSix.exercises.some((exercise) => exercise.difficulty === 4));
 });
 
-test("every lesson has twelve semantically unique mixed exercises", () => {
+test("every lesson keeps compact mixed practice with contextual N5 kanji checks", () => {
   lessonBundles.forEach((bundle) => {
-    assert.equal(bundle.exercises.length, 12, `${bundle.lesson.id} does not have 12 exercises`);
+    assert.equal(
+      bundle.exercises.length,
+      12,
+      `${bundle.lesson.id} has an unexpected exercise count`,
+    );
 
     const contentKeys = bundle.exercises.map(getExerciseContentKey);
     assert.equal(

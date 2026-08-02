@@ -183,6 +183,9 @@ const createVocabularyExercises = (
   const meaningKey = `vocabulary:${word.id}:meaning`;
   const readingKey = `vocabulary:${word.id}:reading`;
   const writtenKey = `vocabulary:${word.id}:written`;
+  const writtenAlreadyShowsReading = readings.some(
+    (reading) => normalizeText(reading) === normalizeText(word.writtenForm),
+  );
 
   const exercises: Exercise[] = [
     {
@@ -275,11 +278,15 @@ const createVocabularyExercises = (
     },
   ];
 
-  return exercises.filter(
-    (exercise) =>
+  return exercises.filter((exercise) => {
+    if (writtenAlreadyShowsReading && exercise.contentKey === readingKey) {
+      return false;
+    }
+    return (
       exercise.type !== "listening" ||
-      normalizeText(exercise.audioText ?? "").length >= 2,
-  );
+      normalizeText(exercise.audioText ?? "").length >= 2
+    );
+  });
 };
 
 const createGrammarExercises = (

@@ -3,6 +3,7 @@ import { Text, TextInput, TouchableOpacity, View } from "react-native";
 
 import { getExerciseSpeechText } from "../audio/exerciseSpeechText";
 import { speakJapanese } from "../audio/japaneseSpeech";
+import { getKanjiStrokeData } from "../content/kanjiStrokeData";
 import type { Exercise } from "../domain/course";
 import type { AnswerCheckResult } from "../engine/checkAnswer";
 import {
@@ -16,6 +17,10 @@ import {
 } from "../engine/practicePresentation";
 import { styles } from "../theme/appStyles";
 import { HandwritingPad } from "./HandwritingPad";
+import {
+  SkritterWritingPad,
+  type SkritterWritingResult,
+} from "./SkritterWritingPad";
 
 interface PracticeCardProps {
   title: string;
@@ -33,6 +38,7 @@ interface PracticeCardProps {
   onRemoveToken: (index: number) => void;
   onClearTokens: () => void;
   onSubmit: () => void;
+  onWritingComplete: (result: SkritterWritingResult) => void;
   onContinue: () => void;
 }
 
@@ -57,6 +63,7 @@ export function PracticeCard({
   onRemoveToken,
   onClearTokens,
   onSubmit,
+  onWritingComplete,
   onContinue,
 }: PracticeCardProps) {
   const [handwritingHasInk, setHandwritingHasInk] = useState(false);
@@ -100,6 +107,10 @@ export function PracticeCard({
   const interactionMode = getPracticeInteractionMode(exercise);
   const isChoiceExercise = interactionMode === "choice";
   const isTextExercise = interactionMode === "text";
+  const hasAutomaticHandwriting =
+    interactionMode === "handwriting" &&
+    displayedAnswer.length === 1 &&
+    Boolean(getKanjiStrokeData(displayedAnswer));
 
   useEffect(() => {
     setHandwritingHasInk(false);
@@ -240,35 +251,52 @@ export function PracticeCard({
 
         {interactionMode === "handwriting" && (
           <>
-            <HandwritingPad
-              key={exercise.id}
-              reference={displayedAnswer}
-              disabled={Boolean(result)}
-              onInkChange={handleInkChange}
-              onCompare={() => setHandwritingCompared(true)}
-            />
-            {!result && handwritingCompared && handwritingHasInk && (
-              <View style={styles.choiceList}>
-                <Text style={styles.feedbackExplanation}>
-                  Сравни с усиленным образцом. Пока без распознавания штрихов оценка ручная — зато приложение не врёт, будто умеет видеть то, чего ещё не проверяет.
-                </Text>
-                <TouchableOpacity
-                  style={styles.choiceButton}
-                  onPress={() =>
-                    onChoice(getHandwritingAssessmentAnswer(exercise, true))
-                  }
-                >
-                  <Text style={styles.choiceText}>Похоже на образец</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.choiceButton}
-                  onPress={() =>
-                    onChoice(getHandwritingAssessmentAnswer(exercise, false))
-                  }
-                >
-                  <Text style={styles.choiceText}>Нужно повторить</Text>
-                </TouchableOpacity>
-              </View>
+            {hasAutomaticHandwriting ? (
+              <SkritterWritingPad
+                key={exercise.id}
+                data={getKanjiStrokeData(displayedAnswer)!}
+                initialMode="recall"
+                compact
+                allowModeSelection={false}
+                disabled={Boolean(result)}
+                onComplete={(writing) => {
+                  onWritingComplete(writing);
+                }}
+              />
+            ) : (
+              <>
+                <HandwritingPad
+                  key={exercise.id}
+                  reference={displayedAnswer}
+                  disabled={Boolean(result)}
+                  onInkChange={handleInkChange}
+                  onCompare={() => setHandwritingCompared(true)}
+                />
+                {!result && handwritingCompared && handwritingHasInk && (
+                  <View style={styles.choiceList}>
+                    <Text style={styles.feedbackExplanation}>
+                      Для слов и фраз без поштриховых данных остаётся свободное письмо
+                      с ручным сравнением; одиночные кандзи используют полный тренажёр.
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.choiceButton}
+                      onPress={() =>
+                        onChoice(getHandwritingAssessmentAnswer(exercise, true))
+                      }
+                    >
+                      <Text style={styles.choiceText}>Похоже на образец</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.choiceButton}
+                      onPress={() =>
+                        onChoice(getHandwritingAssessmentAnswer(exercise, false))
+                      }
+                    >
+                      <Text style={styles.choiceText}>Нужно повторить</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </>
             )}
           </>
         )}

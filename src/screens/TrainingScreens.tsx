@@ -1,7 +1,9 @@
 import { SafeAreaView, ScrollView, StatusBar, Text, TouchableOpacity, View } from "react-native";
 
 import { speakJapanese } from "../audio/japaneseSpeech";
+import { KanjiLessonStage } from "../components/KanjiLessonStage";
 import { PracticeCard } from "../components/PracticeCard";
+import type { SkritterWritingResult } from "../components/SkritterWritingPad";
 import { SwipeNavigationView } from "../components/SwipeNavigationView";
 import type { LessonBundle } from "../content/lessonBundle";
 import type { Exercise } from "../domain/course";
@@ -11,6 +13,7 @@ import { styles } from "../theme/appStyles";
 export type LessonStage = "theory" | "words" | "examples" | "practice";
 
 const lessonStages: LessonStage[] = ["theory", "words", "examples", "practice"];
+
 const stageLabels: Record<LessonStage, string> = {
   theory: "Грамматика",
   words: "Слова",
@@ -41,6 +44,7 @@ interface CommonPracticeProps {
   onRemoveToken: (index: number) => void;
   onClearTokens: () => void;
   onSubmit: () => void;
+  onWritingComplete: (result: SkritterWritingResult) => void;
   onContinue: () => void;
 }
 
@@ -73,6 +77,7 @@ export function LessonScreen({
   onRemoveToken,
   onClearTokens,
   onSubmit,
+  onWritingComplete,
   onContinue,
 }: LessonScreenProps) {
   const stageIndex = lessonStages.indexOf(stage);
@@ -169,6 +174,9 @@ export function LessonScreen({
                   </View>
                 </View>
               ))}
+              {(activeBundle.kanji?.length ?? 0) > 0 && (
+                <KanjiLessonStage kanji={activeBundle.kanji ?? []} />
+              )}
             </View>
           )}
 
@@ -215,6 +223,7 @@ export function LessonScreen({
               onRemoveToken={onRemoveToken}
               onClearTokens={onClearTokens}
               onSubmit={onSubmit}
+              onWritingComplete={onWritingComplete}
               onContinue={onContinue}
             />
           )}
@@ -264,6 +273,7 @@ export function ReviewScreen({
   onRemoveToken,
   onClearTokens,
   onSubmit,
+  onWritingComplete,
   onContinue,
 }: ReviewScreenProps) {
   return (
@@ -276,7 +286,9 @@ export function ReviewScreen({
           </TouchableOpacity>
           <Text style={styles.eyebrow}>Повторение</Text>
           <Text style={styles.title}>{lessonTitle}</Text>
-          <Text style={styles.meaning}>Сейчас проверяем: {focusLabel}</Text>
+          <Text style={styles.meaning}>
+            Сейчас проверяем: {focusLabel === "Материал урока" ? currentExercise.prompt : focusLabel}
+          </Text>
           <Text style={styles.description}>
             {coveredCount > 1
               ? `Одна уникальная задача проверяет сразу ${coveredCount} связанных знания. Повторять тот же текст для каждого из них не придётся.`
@@ -298,6 +310,7 @@ export function ReviewScreen({
             onRemoveToken={onRemoveToken}
             onClearTokens={onClearTokens}
             onSubmit={onSubmit}
+            onWritingComplete={onWritingComplete}
             onContinue={onContinue}
           />
         </ScrollView>
