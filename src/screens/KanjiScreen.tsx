@@ -389,19 +389,26 @@ export function KanjiScreen({
               </View>
             )}
 
-            <KanjiStudyPanel
-              key={"study-" + selectedEntry.item.id}
-              item={selectedEntry.item}
-              catalog={n5KanjiCatalog}
-              exercises={selectedStudyExercises}
-              progress={selectedEntry.progress}
-              strokeCount={
-                kanjiStrokeDataByLiteral[selectedEntry.item.literal]?.strokes.length ?? null
-              }
-              onRecord={(study: KanjiStudyResult) =>
-                onRecordStudy(selectedEntry.item, study)
-              }
-            />
+            {selectedEntry.available ? (
+              <KanjiStudyPanel
+                key={"study-" + selectedEntry.item.id}
+                item={selectedEntry.item}
+                catalog={n5KanjiCatalog}
+                exercises={selectedStudyExercises}
+                progress={selectedEntry.progress}
+                strokeCount={
+                  kanjiStrokeDataByLiteral[selectedEntry.item.literal]?.strokes.length ?? null
+                }
+                onRecord={(study: KanjiStudyResult) =>
+                  onRecordStudy(selectedEntry.item, study)
+                }
+              />
+            ) : (
+              <Text style={styles.lockedWriting}>
+                Изучение откроется вместе с уроком {selectedEntry.lessonOrder}. Пример можно
+                посмотреть заранее, но значение, чтение и письмо не записываются в прогресс.
+              </Text>
+            )}
             <SkillCard
               title="Значение"
               progress={selectedEntry.progress.meaning}

@@ -239,7 +239,7 @@ export default function App() {
         setReviewItems(
           snapshot.reviewItems.filter(
             (item) =>
-              completedLessonIdSet.has(item.lessonId) &&
+              knownLessonIds.has(item.lessonId) &&
               knownExerciseIds.has(item.exerciseId) &&
               knownItemIds.has(item.itemId),
           ),
