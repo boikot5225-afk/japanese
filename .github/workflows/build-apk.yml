@@ -16,7 +16,7 @@ env:
 
 concurrency:
   group: build-apk-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build-apk:
@@ -43,6 +43,37 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Integrate kanji writing state
+        run: node scripts/apply-kanji-writing-integration.mjs
+
+      - name: Generate pinned KanjiVG N5 dataset
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .cache/kanjivg-release
+          mkdir -p .cache/kanjivg-release
+          curl --fail --location \
+            "https://github.com/KanjiVG/kanjivg/releases/download/r20250816/kanjivg-20250816-main.zip" \
+            --output .cache/kanjivg-main.zip
+          unzip -q .cache/kanjivg-main.zip -d .cache/kanjivg-release
+          KANJI_DIR="$(dirname "$(find .cache/kanjivg-release -name 065e5.svg -print -quit)")"
+          test -n "$KANJI_DIR"
+          node scripts/generate-kanji-strokes.mjs "$KANJI_DIR"
+          node -e "const fs=require('fs');const s=fs.readFileSync('src/content/kanjiStrokeData.ts','utf8');const n=(s.match(/source:\"KanjiVG\"/g)||[]).length;if(n!==103)throw new Error('Expected 103 kanji, got '+n);"
+
+      - name: Persist generated source
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/agent/')
+        shell: bash
+        run: |
+          if git diff --quiet -- AppRoot.tsx src/content/kanjiStrokeData.ts; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add AppRoot.tsx src/content/kanjiStrokeData.ts
+          git commit -m "Generate N5 stroke data and wire writing [skip build]"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
 
       - name: Read application version
         shell: bash
@@ -151,7 +182,7 @@ jobs:
           gh release create "$TAG" "$APK" \
             --target "$GITHUB_SHA" \
             --title "Japanese Tutor ${APP_VERSION} standalone preview" \
-            --notes "Исправленная автономная Android-сборка с упакованным JavaScript bundle. Не требует Metro или подключения к компьютеру." \
+            --notes "Автономная Android-сборка с порядком черт KanjiVG, автоматической проверкой письма и упакованным JavaScript bundle." \
             --prerelease
 
       - name: Report final build status
@@ -179,7 +210,7 @@ jobs:
                 "$BUNDLE_OUTCOME" == success ]]; then
             if [[ "$GITHUB_REF" != refs/heads/agent/* || "$RELEASE_OUTCOME" == success ]]; then
               STATE=success
-              DESCRIPTION="Standalone APK includes JavaScript bundle"
+              DESCRIPTION="Standalone APK includes validated kanji strokes"
             fi
           fi
           gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
