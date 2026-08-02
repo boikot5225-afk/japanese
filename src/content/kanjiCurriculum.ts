@@ -118,6 +118,30 @@ const createReadingExercise = (
   };
 };
 
+const createWritingExercise = (lessonId: string, item: KanjiItem): Exercise => {
+  const example = item.examples[0];
+  const meaning = item.meaningsRu[0] ?? "этот знак";
+  return {
+    id: `${lessonId}-kanji-${item.literal}-writing`,
+    type: "handwriting",
+    prompt: `Напиши кандзи со значением «${meaning}». Сначала попробуй по памяти.`,
+    targetItemIds: [item.id],
+    correctAnswers: [item.literal],
+    explanationRu: example
+      ? `${item.literal} — ${item.meaningsRu.join(", ")}. В уроке знак встречался в ${example.written}（${example.reading}）.`
+      : `${item.literal} — ${item.meaningsRu.join(", ")}.`,
+    variantGroup: `${lessonId}:kanji-guided`,
+    contentKey: `kanji:${item.literal}:writing`,
+    difficulty: 2,
+    skill: "writing",
+    handwritingGuide: {
+      reference: item.literal,
+      initialMode: "memory",
+      instructionRu: "Напиши знак по памяти. При необходимости открой образец, затем снова попробуй без него.",
+    },
+  };
+};
+
 export const buildLessonKanjiExercises = (
   lessonId: string,
   lessonKanji: readonly KanjiItem[],
@@ -127,14 +151,21 @@ export const buildLessonKanjiExercises = (
 
   const exercises: Exercise[] = [
     createRecognitionExercise(lessonId, first, lessonKanji),
-    createReadingExercise(lessonId, first, true),
+    createWritingExercise(lessonId, first),
   ];
 
-  lessonKanji.slice(1).forEach((item, index) => {
+  const second = lessonKanji[1];
+  if (second) {
+    exercises.push(createReadingExercise(lessonId, second, false));
+  } else {
+    exercises.push(createReadingExercise(lessonId, first, true));
+  }
+
+  lessonKanji.slice(2).forEach((item, index) => {
     exercises.push(
       index % 2 === 0
-        ? createReadingExercise(lessonId, item, false)
-        : createRecognitionExercise(lessonId, item, lessonKanji),
+        ? createRecognitionExercise(lessonId, item, lessonKanji)
+        : createReadingExercise(lessonId, item, false),
     );
   });
   return exercises;

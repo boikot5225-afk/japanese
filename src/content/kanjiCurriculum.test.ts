@@ -47,9 +47,10 @@ test("all 103 N5 kanji are distributed through lessons 1-36", () => {
   assert.equal(new Set(introduced.map((item) => item.id)).size, 103);
 });
 
-test("visible lessons stay compact while the review pool preserves displaced practice", () => {
+test("visible lessons stay compact and introduce recognition, reading, and writing", () => {
   const n5Bundles = lessonBundles.filter((bundle) => bundle.lesson.order <= 36);
   const targetedKanji = new Set<string>();
+  let writingExerciseCount = 0;
 
   n5Bundles.forEach((bundle) => {
     assert.equal(bundle.exercises.length, 12, `${bundle.lesson.id} no longer has a compact session`);
@@ -67,9 +68,26 @@ test("visible lessons stay compact while the review pool preserves displaced pra
     const skills = new Set(kanjiExercises.map(inferExerciseSkill));
     assert.ok(skills.has("recognition"), `${bundle.lesson.id} lacks kanji recognition`);
     assert.ok(skills.has("reading"), `${bundle.lesson.id} lacks contextual kanji reading`);
+    assert.ok(skills.has("writing"), `${bundle.lesson.id} lacks kanji writing`);
+
+    const writingExercises = kanjiExercises.filter(
+      (exercise) => inferExerciseSkill(exercise) === "writing",
+    );
+    assert.equal(writingExercises.length, 1, `${bundle.lesson.id} should introduce one writing target`);
+    writingExerciseCount += writingExercises.length;
+    writingExercises.forEach((exercise) => {
+      assert.equal(exercise.type, "handwriting");
+      assert.equal(exercise.correctAnswers.length, 1);
+      assert.equal(exercise.handwritingGuide?.reference, exercise.correctAnswers[0]);
+      assert.equal(exercise.handwritingGuide?.initialMode, "memory");
+    });
 
     kanjiExercises.forEach((exercise) => {
-      assert.ok(exercise.skill === "recognition" || exercise.skill === "reading");
+      assert.ok(
+        exercise.skill === "recognition" ||
+          exercise.skill === "reading" ||
+          exercise.skill === "writing",
+      );
       exercise.targetItemIds.forEach((id) => targetedKanji.add(id));
     });
 
@@ -92,6 +110,7 @@ test("visible lessons stay compact while the review pool preserves displaced pra
     });
   });
 
+  assert.equal(writingExerciseCount, 36);
   assert.deepEqual(
     [...targetedKanji].sort(),
     n5KanjiCatalog.map((item) => item.id).sort(),
@@ -103,6 +122,12 @@ test("explicit exercise skill overrides the generic interaction type", () => {
     .flatMap((bundle) => bundle.exercises)
     .find((exercise) => exercise.skill === "reading");
   assert.ok(readingExercise);
-  assert.equal(readingExercise.type, "text-input");
   assert.equal(inferExerciseSkill(readingExercise), "reading");
+
+  const writingExercise = lessonBundles
+    .flatMap((bundle) => bundle.exercises)
+    .find((exercise) => exercise.skill === "writing" && exercise.contentKey?.startsWith("kanji:"));
+  assert.ok(writingExercise);
+  assert.equal(writingExercise.type, "handwriting");
+  assert.equal(inferExerciseSkill(writingExercise), "writing");
 });

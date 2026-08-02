@@ -78,6 +78,12 @@ export type ExerciseType =
   | "conjugation"
   | "handwriting";
 
+export interface HandwritingGuide {
+  reference: string;
+  initialMode: "trace" | "memory";
+  instructionRu?: string;
+}
+
 export interface Exercise {
   id: string;
   type: ExerciseType;
@@ -94,6 +100,7 @@ export interface Exercise {
   audioText?: string;
   skill?: Skill;
   sessionRole?: "core" | "remediation";
+  handwritingGuide?: HandwritingGuide;
 }
 
 export interface Lesson {
