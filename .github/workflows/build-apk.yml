@@ -38,6 +38,14 @@ jobs:
           git apply --check --exclude=.github/workflows/build-apk.yml /tmp/audit-fix.patch
           git apply --index --exclude=.github/workflows/build-apk.yml /tmp/audit-fix.patch
 
+      - name: Upload final workflow transport for byte audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: final-build-transport-${{ github.run_id }}
+          path: .github/final-build-workflow.b64
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Restore final workflow and remove transport
         shell: bash
         run: |
