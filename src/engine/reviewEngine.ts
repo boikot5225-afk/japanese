@@ -1,6 +1,6 @@
 import type { Exercise, Skill } from "../domain/course";
-import { getExerciseContentKey } from "./exerciseIdentity";
 import type { AnswerStatus } from "./checkAnswer";
+import { getExerciseContentKey } from "./exerciseIdentity";
 
 export type AttemptSource = "lesson" | "review" | "practice";
 
@@ -62,7 +62,10 @@ export interface ReviewSessionOptions {
 type KanjiSelfGrade = 1 | 2 | 3 | 4;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const MINUTE_MS = 60 * 1000;
+const SECOND_MS = 1000;
+const DAY_SECONDS = 24 * 60 * 60;
+const INITIAL_RIGHT_SECONDS = 7 * DAY_SECONDS;
+const MAX_INTERVAL_SECONDS = 31_556_952;
 const successfulStatuses: AnswerStatus[] = ["correct", "acceptable"];
 const WEAKNESS_THRESHOLD = 5;
 const DEFAULT_RECENT_ATTEMPT_LIMIT = 40;
@@ -101,9 +104,6 @@ export const reviewQuestionCoverageKey = (
 const addDays = (date: Date, days: number): string =>
   new Date(date.getTime() + days * DAY_MS).toISOString();
 
-const clamp = (value: number, minimum: number, maximum: number): number =>
-  Math.min(maximum, Math.max(minimum, value));
-
 const getKanjiSelfGrade = (exercise: Exercise): KanjiSelfGrade | null => {
   const match = exercise.variantGroup?.match(/^kanji-self-grade:([1-4])$/);
   if (!match) return null;
@@ -111,6 +111,27 @@ const getKanjiSelfGrade = (exercise: Exercise): KanjiSelfGrade | null => {
   return grade >= 1 && grade <= 4 ? grade as KanjiSelfGrade : null;
 };
 
+const randomizeInterval = (intervalSeconds: number): number =>
+  Math.round(intervalSeconds * (0.925 + Math.random() * 0.15));
+
+const initialSkritterInterval = (grade: KanjiSelfGrade): number => {
+  switch (grade) {
+    case 1:
+      return 30;
+    case 2:
+    case 3:
+      return DAY_SECONDS;
+    case 4:
+      return randomizeInterval(INITIAL_RIGHT_SECONDS * 4);
+  }
+};
+
+/**
+ * Skritter Classic scheduling for definition and reading cards. It mirrors the
+ * app's non-continuous mode: score 1 returns after 30 seconds, every score above
+ * one is successful and is spaced at least one day, and overdue answers adjust
+ * the right/easy factor by actual readiness.
+ */
 const scheduleKanjiSelfGrade = (
   existing: ReviewItem | undefined,
   itemId: string,
@@ -121,43 +142,52 @@ const scheduleKanjiSelfGrade = (
   grade: KanjiSelfGrade,
   now: Date,
 ): ReviewItem => {
-  const previousEase = existing?.ease ?? 2.3;
-  const previousInterval = Math.max(existing?.intervalDays ?? 0, 0);
-  const previousStreak = existing?.streak ?? 0;
+  const previousIntervalSeconds = Math.max(
+    0,
+    (existing?.intervalDays ?? 0) * DAY_SECONDS,
+  );
+  const reviews =
+    (existing?.correctCount ?? 0) + (existing?.incorrectCount ?? 0);
+  const successes = existing?.correctCount ?? 0;
+  const success = grade > 1;
 
-  let dueAt: string;
-  let intervalDays: number;
-  let ease: number;
-  let streak: number;
-  let success: boolean;
-
-  if (grade === 1) {
-    intervalDays = 10 / (24 * 60);
-    dueAt = new Date(now.getTime() + 10 * MINUTE_MS).toISOString();
-    ease = clamp(previousEase - 0.25, 1.3, 2.8);
-    streak = 0;
-    success = false;
-  } else if (grade === 2) {
-    intervalDays = 1 / 3;
-    dueAt = new Date(now.getTime() + 8 * 60 * MINUTE_MS).toISOString();
-    ease = clamp(previousEase - 0.12, 1.3, 2.8);
-    streak = 0;
-    success = false;
+  let intervalSeconds: number;
+  if (!existing || previousIntervalSeconds <= 0 || !existing.lastAnsweredAt) {
+    intervalSeconds = initialSkritterInterval(grade);
   } else {
-    streak = previousStreak + 1;
-    success = true;
-    if (grade === 4) {
-      ease = clamp(previousEase + 0.12, 1.3, 2.8);
-      intervalDays = previousInterval > 0
-        ? Math.max(7, Math.round(previousInterval * Math.max(3.1, ease + 0.5)))
-        : 4;
-    } else {
-      ease = clamp(previousEase + 0.03, 1.3, 2.8);
-      if (streak === 1) intervalDays = 1;
-      else if (streak === 2) intervalDays = 3;
-      else intervalDays = Math.max(7, Math.round(Math.max(previousInterval, 3) * ease));
+    const lastSeconds = new Date(existing.lastAnsweredAt).getTime() / SECOND_MS;
+    const dueSeconds = new Date(existing.dueAt).getTime() / SECOND_MS;
+    const nowSeconds = now.getTime() / SECOND_MS;
+    const actualInterval = Math.max(nowSeconds - lastSeconds, 1);
+    const scheduledInterval = Math.max(
+      dueSeconds - lastSeconds,
+      previousIntervalSeconds,
+      1,
+    );
+
+    let factor: number;
+    if (grade === 2) factor = 0.9;
+    else if (grade === 4) factor = 3.5;
+    else factor = grade === 1 ? 0.25 : 2.2;
+
+    if (grade > 2) {
+      factor = (factor - 1) * (actualInterval / scheduledInterval) + 1;
     }
-    dueAt = addDays(now, intervalDays);
+
+    if (successes === reviews && reviews < 5) {
+      factor *= 1.5;
+    }
+
+    if (reviews > 8 && reviews > 0 && successes / reviews < 0.5) {
+      factor *= (successes / reviews) ** 0.7;
+    }
+
+    intervalSeconds = randomizeInterval(previousIntervalSeconds * factor);
+    if (grade === 1) intervalSeconds = 30;
+    if (grade > 1) intervalSeconds = Math.max(DAY_SECONDS, intervalSeconds);
+    if (intervalSeconds > MAX_INTERVAL_SECONDS) {
+      intervalSeconds = randomizeInterval(MAX_INTERVAL_SECONDS);
+    }
   }
 
   return {
@@ -165,13 +195,13 @@ const scheduleKanjiSelfGrade = (
     skill,
     exerciseId: exercise.id,
     lessonId,
-    dueAt,
-    intervalDays,
-    ease,
-    streak,
+    dueAt: new Date(now.getTime() + intervalSeconds * SECOND_MS).toISOString(),
+    intervalDays: intervalSeconds / DAY_SECONDS,
+    ease: existing?.ease ?? 2.3,
+    streak: success ? (existing?.streak ?? 0) + 1 : 0,
     correctCount: (existing?.correctCount ?? 0) + (success ? 1 : 0),
     incorrectCount: (existing?.incorrectCount ?? 0) + (success ? 0 : 1),
-    lapseCount: (existing?.lapseCount ?? 0) + (success ? 0 : 1),
+    lapseCount: (existing?.lapseCount ?? 0) + (grade === 1 ? 1 : 0),
     lastStatus: status,
     lastAnsweredAt: now.toISOString(),
   };
