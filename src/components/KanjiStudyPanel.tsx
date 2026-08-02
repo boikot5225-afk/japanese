@@ -25,10 +25,16 @@ interface KanjiStudyPanelProps {
   onRecord: (result: KanjiStudyResult) => void;
 }
 
-const statusMessage = (correct: boolean): string =>
-  correct
+const statusMessage = (correct: boolean, recorded: boolean): string => {
+  if (!correct) {
+    return recorded
+      ? "Пока нет. Посмотри объяснение: это знание вернётся в ближайшее повторение."
+      : "Пока нет. Посмотри объяснение и затем попробуй вспомнить чтение без вариантов.";
+  }
+  return recorded
     ? "Верно. Связь записана в интервальное повторение."
-    : "Пока нет. Посмотри объяснение: это знание вернётся в ближайшее повторение.";
+    : "Верно. Это тренировочная подсказка; прогресс подтвердит следующий ответ без вариантов.";
+};
 
 export function KanjiStudyPanel({
   item,
@@ -198,7 +204,9 @@ export function KanjiStudyPanel({
 
       {status && (
         <View style={[styles.feedback, successful ? styles.feedbackCorrect : styles.feedbackIncorrect]}>
-          <Text style={styles.feedbackTitle}>{statusMessage(successful)}</Text>
+          <Text style={styles.feedbackTitle}>
+            {statusMessage(successful, question.recordResult)}
+          </Text>
           <Text style={styles.feedbackBody}>{question.exercise.explanationRu}</Text>
           {!question.recordResult && (
             <Text style={styles.guidedNote}>
