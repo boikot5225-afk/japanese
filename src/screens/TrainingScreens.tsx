@@ -310,6 +310,7 @@ export function ReviewScreen({
             onRemoveToken={onRemoveToken}
             onClearTokens={onClearTokens}
             onSubmit={onSubmit}
+            onWritingComplete={onWritingComplete}
             onContinue={onContinue}
           />
         </ScrollView>
