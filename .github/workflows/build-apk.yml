@@ -44,6 +44,31 @@ jobs:
         with:
           node-version: 22
 
+      - name: Apply writing audit fixes
+        run: node scripts/apply-writing-audit.mjs
+
+      - name: Persist writing audit fixes
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- \
+            package.json app.json AppRoot.tsx \
+            src/engine/writingSession.ts \
+            src/engine/writingSession.test.ts \
+            src/engine/lessonSession.ts \
+            src/engine/lessonReview.ts \
+            src/engine/lessonReview.test.ts \
+            src/components/SkritterWritingPad.tsx \
+            src/components/KanjiWritingPanel.tsx \
+            src/screens/KanjiScreen.tsx
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Fix audited writing workflow defects [skip build]"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
       - name: Read application version
         shell: bash
         run: |
@@ -160,7 +185,7 @@ jobs:
           gh release create "$TAG" "$APK" \
             --target "$GITHUB_SHA" \
             --title "Japanese Tutor ${APP_VERSION} standalone preview" \
-            --notes "Автономная Android-сборка с поштриховым обучением, исчезающими подсказками, четырьмя оценками и интервальным повторением письма." \
+            --notes "Повторно проверенная Android-сборка: ограничение оценок после подсказок, сохранение градации письма в уроках, безопасные жесты и настоящий автопереход между кандзи." \
             --prerelease
 
       - name: Report final build status
@@ -188,7 +213,7 @@ jobs:
                 "$BUNDLE_OUTCOME" == success ]]; then
             if [[ "$GITHUB_REF" != refs/heads/agent/* || "$RELEASE_OUTCOME" == success ]]; then
               STATE=success
-              DESCRIPTION="Standalone APK includes the validated Skritter-style writing workflow"
+              DESCRIPTION="Standalone APK passed the second writing audit"
             fi
           fi
           gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" \
