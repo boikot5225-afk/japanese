@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { SafeAreaView, Text, TouchableOpacity, View } from "react-native";
 
 import type { SkritterWritingResult } from "./src/components/SkritterWritingPad";
+import type { KanjiStudyResult } from "./src/engine/kanjiStudySession";
 
 import {
   findCheckpoint,
@@ -81,7 +82,10 @@ const initialBundle: LessonBundle = lessonBundles[0] ?? (() => {
   throw new Error("В курсе нет ни одного урока.");
 })();
 const reviewExercisesByLesson: ReadonlyMap<string, readonly Exercise[]> = new Map(
-  lessonBundles.map((bundle) => [bundle.lesson.id, bundle.exercises]),
+  lessonBundles.map((bundle) => [
+    bundle.lesson.id,
+    bundle.reviewExercises ?? bundle.exercises,
+  ]),
 );
 
 const skillLabels: Record<Skill, string> = {
@@ -212,7 +216,9 @@ export default function App() {
       if (snapshot) {
         const knownLessonIds = new Set(lessonBundles.map((bundle) => bundle.lesson.id));
         const knownExerciseIds = new Set(
-          lessonBundles.flatMap((bundle) => bundle.exercises.map((exercise) => exercise.id)),
+          lessonBundles.flatMap((bundle) =>
+            (bundle.reviewExercises ?? bundle.exercises).map((exercise) => exercise.id),
+          ),
         );
         const knownItemIds = new Set(
           lessonBundles.flatMap((bundle) => bundle.lesson.itemIds),
@@ -673,6 +679,37 @@ export default function App() {
     ].slice(0, 200));
   };
 
+  const recordKanjiStudy = (item: KanjiItem, study: KanjiStudyResult) => {
+    const now = new Date();
+    const skill = inferExerciseSkill(study.exercise);
+
+    setReviewItems((previous) => {
+      const key = reviewItemKey({ itemId: item.id, skill });
+      const existing = previous.find((entry) => reviewItemKey(entry) === key);
+      return upsertReviewItem(
+        previous,
+        scheduleItemReview(
+          existing,
+          item.id,
+          skill,
+          study.exercise,
+          item.introducedInLessonId,
+          study.status,
+          now,
+        ),
+      );
+    });
+    setAttemptHistory((previous) => [
+      createAttemptLogEntry(
+        study.exercise,
+        item.introducedInLessonId,
+        study.status,
+        "practice",
+        now,
+      ),
+      ...previous,
+    ].slice(0, 200));
+  };
   const sentenceBuilderTokens = useMemo(() => {
     if (!currentExercise || currentExercise.type !== "sentence-builder") return [];
     const correct = currentExercise.correctAnswers[0];
@@ -754,6 +791,7 @@ export default function App() {
         onStartReview={startReview}
         onOpenKana={() => setScreen("kana")}
         onRecordKanjiWriting={recordKanjiWriting}
+        onRecordKanjiStudy={recordKanjiStudy}
       />
     );
   }

@@ -11,10 +11,12 @@ import {
 } from "react-native";
 
 import { speakJapanese } from "../audio/japaneseSpeech";
+import { KanjiStudyPanel } from "../components/KanjiStudyPanel";
 import { KanjiWritingPanel } from "../components/KanjiWritingPanel";
 import type { SkritterWritingResult } from "../components/SkritterWritingPad";
 import { lessonBundles } from "../content/courseCatalog";
 import { n5KanjiCatalog } from "../content/kanjiCatalog";
+import { kanjiStrokeDataByLiteral } from "../content/kanjiStrokeData";
 import type { KanjiItem } from "../domain/course";
 import {
   isLessonUnlocked,
@@ -27,6 +29,7 @@ import {
   type KanjiSkillState,
   type KanjiStudyStatus,
 } from "../engine/kanjiProgress";
+import type { KanjiStudyResult } from "../engine/kanjiStudySession";
 import type { ReviewItem } from "../engine/reviewEngine";
 
 interface KanjiScreenProps {
@@ -35,6 +38,7 @@ interface KanjiScreenProps {
   reviewItems: ReviewItem[];
   onCourse: () => void;
   onRecordWriting: (item: KanjiItem, result: SkritterWritingResult) => void;
+  onRecordStudy: (item: KanjiItem, result: KanjiStudyResult) => void;
 }
 
 type CatalogFilter = "available" | "weak" | "all";
@@ -167,6 +171,7 @@ export function KanjiScreen({
   reviewItems,
   onCourse,
   onRecordWriting,
+  onRecordStudy,
 }: KanjiScreenProps) {
   const [filter, setFilter] = useState<CatalogFilter>("available");
   const [query, setQuery] = useState("");
@@ -250,6 +255,13 @@ export function KanjiScreen({
     if (next) setSelectedId(next.item.id);
   };
 
+  const selectedLessonBundle = selectedEntry
+    ? lessonBundles.find(
+        (bundle) => bundle.lesson.id === selectedEntry.item.introducedInLessonId,
+      )
+    : undefined;
+  const selectedStudyExercises =
+    selectedLessonBundle?.reviewExercises ?? selectedLessonBundle?.exercises ?? [];
   const selectedWritingReviewItem = selectedEntry
     ? reviewItems.find(
         (item) => item.itemId === selectedEntry.item.id && item.skill === "writing",
@@ -270,8 +282,8 @@ export function KanjiScreen({
         <Text style={styles.eyebrow}>漢字 · Kanji Study</Text>
         <Text style={styles.title}>Кандзи: значение, чтение и письмо</Text>
         <Text style={styles.description}>
-          103 знака идут вместе с курсом. Чтения учатся в словах, а письмо теперь
-          использует обучение, прилипание штрихов, письмо по памяти и четыре оценки SRS.
+          103 знака идут вместе с курсом: сначала знакомое слово и значение, затем
+          чтение с опорой и без вариантов, после этого письмо и раздельное повторение.
         </Text>
 
         <View style={styles.summaryGrid}>
@@ -377,6 +389,19 @@ export function KanjiScreen({
               </View>
             )}
 
+            <KanjiStudyPanel
+              key={"study-" + selectedEntry.item.id}
+              item={selectedEntry.item}
+              catalog={n5KanjiCatalog}
+              exercises={selectedStudyExercises}
+              progress={selectedEntry.progress}
+              strokeCount={
+                kanjiStrokeDataByLiteral[selectedEntry.item.literal]?.strokes.length ?? null
+              }
+              onRecord={(study: KanjiStudyResult) =>
+                onRecordStudy(selectedEntry.item, study)
+              }
+            />
             <SkillCard
               title="Значение"
               progress={selectedEntry.progress.meaning}

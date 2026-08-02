@@ -9,6 +9,7 @@ import {
 import { courseUnits, findLessonBundle } from "../content/courseCatalog";
 import type { LessonBundle } from "../content/lessonBundle";
 import type { KanjiItem } from "../domain/course";
+import type { KanjiStudyResult } from "../engine/kanjiStudySession";
 import {
   isCheckpointAvailable,
   isCheckpointPassed,
@@ -35,6 +36,7 @@ interface CourseScreenProps {
   onStartReview: () => void;
   onOpenKana: () => void;
   onRecordKanjiWriting: (item: KanjiItem, result: SkritterWritingResult) => void;
+  onRecordKanjiStudy: (item: KanjiItem, result: KanjiStudyResult) => void;
 }
 
 const russianForm = (count: number, one: string, few: string, many: string): string => {
@@ -59,6 +61,7 @@ export function CourseScreen({
   onStartReview,
   onOpenKana,
   onRecordKanjiWriting,
+  onRecordKanjiStudy,
 }: CourseScreenProps) {
   const [kanjiOpen, setKanjiOpen] = useState(false);
   const [numbersOpen, setNumbersOpen] = useState(false);
@@ -73,6 +76,7 @@ export function CourseScreen({
         checkpointProgress={checkpointProgress}
         reviewItems={reviewItems}
         onRecordWriting={onRecordKanjiWriting}
+        onRecordStudy={onRecordKanjiStudy}
         onCourse={() => setKanjiOpen(false)}
       />
     );
@@ -141,8 +145,8 @@ export function CourseScreen({
             <Text style={kanaStyles.courseKanaGlyph}>日 語</Text>
           </View>
           <Text style={kanaStyles.courseKanaBody}>
-            103 знака: значение, чтение в слове, порядок черт, автоматическая
-            проверка письма и отдельная SRS-очередь навыка.
+            103 знака: первое знакомство через знакомое слово, значение, чтение
+            без вариантов, порядок черт и раздельная SRS каждого навыка.
           </Text>
           <TouchableOpacity
             style={kanaStyles.primaryButton}
