@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -12,10 +11,15 @@ import {
 } from "react-native";
 
 import { speakJapanese } from "../audio/japaneseSpeech";
+import { KanjiWritingPanel } from "../components/KanjiWritingPanel";
+import type { KanjiTracingResult } from "../components/KanjiTracingPad";
 import { lessonBundles } from "../content/courseCatalog";
 import { n5KanjiCatalog } from "../content/kanjiCatalog";
 import type { KanjiItem } from "../domain/course";
-import { isLessonUnlocked } from "../engine/checkpointEngine";
+import {
+  isLessonUnlocked,
+  type CheckpointProgress,
+} from "../engine/checkpointEngine";
 import {
   buildKanjiProgressCatalog,
   type KanjiProgressSummary,
@@ -23,13 +27,14 @@ import {
   type KanjiSkillState,
   type KanjiStudyStatus,
 } from "../engine/kanjiProgress";
-import {
-  loadCourseProgress,
-  type CourseProgressSnapshot,
-} from "../storage/progressStorage";
+import type { ReviewItem } from "../engine/reviewEngine";
 
 interface KanjiScreenProps {
+  completedLessonIds: string[];
+  checkpointProgress: CheckpointProgress[];
+  reviewItems: ReviewItem[];
   onCourse: () => void;
+  onRecordWriting: (item: KanjiItem, result: KanjiTracingResult) => void;
 }
 
 type CatalogFilter = "available" | "weak" | "all";
@@ -60,7 +65,8 @@ const lessonOrderById = new Map(
   lessonBundles.map((bundle) => [bundle.lesson.id, bundle.lesson.order]),
 );
 
-const normalizeSearch = (value: string): string => value.trim().toLocaleLowerCase("ru-RU");
+const normalizeSearch = (value: string): string =>
+  value.trim().toLocaleLowerCase("ru-RU");
 
 const matchesSearch = (item: KanjiItem, query: string): boolean => {
   if (!query) return true;
@@ -155,31 +161,19 @@ function SkillCard({
   );
 }
 
-export function KanjiScreen({ onCourse }: KanjiScreenProps) {
-  const [snapshot, setSnapshot] = useState<CourseProgressSnapshot | null>(null);
-  const [hydrated, setHydrated] = useState(false);
+export function KanjiScreen({
+  completedLessonIds,
+  checkpointProgress,
+  reviewItems,
+  onCourse,
+  onRecordWriting,
+}: KanjiScreenProps) {
   const [filter, setFilter] = useState<CatalogFilter>("available");
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    const hydrate = async () => {
-      const progress = await loadCourseProgress();
-      if (cancelled) return;
-      setSnapshot(progress);
-      setHydrated(true);
-    };
-    void hydrate();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const entries = useMemo<CatalogEntry[]>(() => {
-    const completedLessonIds = snapshot?.completedLessonIds ?? [];
     const completedLessonIdSet = new Set(completedLessonIds);
-    const checkpointProgress = snapshot?.checkpointProgress ?? [];
     const availableLessonIds = new Set(
       lessonBundles
         .filter((bundle) => bundle.lesson.order <= 36)
@@ -195,25 +189,24 @@ export function KanjiScreen({ onCourse }: KanjiScreenProps) {
         .map((bundle) => bundle.lesson.id),
     );
     const progressById = new Map(
-      buildKanjiProgressCatalog(
-        n5KanjiCatalog,
-        snapshot?.reviewItems ?? [],
-      ).map((progress) => [progress.itemId, progress]),
+      buildKanjiProgressCatalog(n5KanjiCatalog, reviewItems).map((progress) => [
+        progress.itemId,
+        progress,
+      ]),
     );
 
     return n5KanjiCatalog.map((item) => {
-      const lessonOrder = lessonOrderById.get(item.introducedInLessonId) ?? 999;
       const progress = progressById.get(item.id);
       if (!progress) throw new Error(`Нет прогресса для ${item.id}`);
       return {
         item,
         progress,
-        lessonOrder,
+        lessonOrder: lessonOrderById.get(item.introducedInLessonId) ?? 999,
         available: availableLessonIds.has(item.introducedInLessonId),
         completedLesson: completedLessonIdSet.has(item.introducedInLessonId),
       };
     });
-  }, [snapshot]);
+  }, [checkpointProgress, completedLessonIds, reviewItems]);
 
   const normalizedQuery = normalizeSearch(query);
   const filteredEntries = useMemo(() => {
@@ -236,7 +229,6 @@ export function KanjiScreen({ onCourse }: KanjiScreenProps) {
   const selectedEntry =
     filteredEntries.find((entry) => entry.item.id === selectedId) ??
     filteredEntries[0];
-
   const availableEntries = entries.filter((entry) => entry.available);
   const startedCount = availableEntries.filter(
     (entry) => entry.progress.status !== "new",
@@ -245,17 +237,6 @@ export function KanjiScreen({ onCourse }: KanjiScreenProps) {
     (entry) => entry.progress.status === "review",
   ).length;
   const weakCount = availableEntries.filter((entry) => entry.progress.weak).length;
-
-  if (!hydrated) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.loading}>
-          <ActivityIndicator size="large" />
-          <Text style={styles.loadingText}>Собираю прогресс кандзи…</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -269,10 +250,10 @@ export function KanjiScreen({ onCourse }: KanjiScreenProps) {
         </View>
 
         <Text style={styles.eyebrow}>漢字 · Kanji Study</Text>
-        <Text style={styles.title}>Кандзи без свалки чтений</Text>
+        <Text style={styles.title}>Кандзи: значение, чтение и письмо</Text>
         <Text style={styles.description}>
-          Знак открывается вместе с уроком и учится в знакомом слове. Значение,
-          чтение и письмо считаются отдельно; слабые навыки остаются в общей SRS-очереди.
+          103 знака идут вместе с курсом. Чтения учатся в словах, а письмо теперь
+          проверяет порядок, направление и форму каждого штриха — без самооценки на честном слове.
         </Text>
 
         <View style={styles.summaryGrid}>
@@ -391,11 +372,27 @@ export function KanjiScreen({ onCourse }: KanjiScreenProps) {
             <SkillCard
               title="Письмо"
               progress={selectedEntry.progress.writing}
-              note="Пока не оценивается: следующим этапом будет настоящий порядок черт и обведение, а не декоративная кнопка."
+              note="Пройди обведение ниже: результат попадёт в общую интервальную очередь."
             />
 
+            {selectedEntry.available ? (
+              <KanjiWritingPanel
+                key={selectedEntry.item.id}
+                item={selectedEntry.item}
+                progress={selectedEntry.progress.writing}
+                onComplete={(result: KanjiTracingResult) =>
+                  onRecordWriting(selectedEntry.item, result)
+                }
+              />
+            ) : (
+              <Text style={styles.lockedWriting}>
+                Письмо откроется вместе с уроком {selectedEntry.lessonOrder}. Полный каталог
+                можно просматривать заранее, но прогресс не перескакивает через курс.
+              </Text>
+            )}
+
             <Text style={styles.nextReview}>
-              Ближайшее повторение значения или чтения: {formatDue(selectedEntry.progress.nextDueAt)}.
+              Ближайшее повторение: {formatDue(selectedEntry.progress.nextDueAt)}.
             </Text>
           </View>
         )}
@@ -415,7 +412,7 @@ export function KanjiScreen({ onCourse }: KanjiScreenProps) {
             </Text>
             <Text style={styles.emptyBody}>
               {filter === "weak"
-                ? "Это не амнистия: слабые места появятся после реальных попыток в уроках и повторении."
+                ? "Слабые места появятся после реальных попыток в уроках, письме и повторении."
                 : "Попробуй искать по знаку, русскому значению или чтению."}
             </Text>
           </View>
@@ -448,355 +445,69 @@ export function KanjiScreen({ onCourse }: KanjiScreenProps) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#f4f7fa",
-  },
-  container: {
-    padding: 20,
-    paddingBottom: 48,
-    gap: 18,
-  },
-  loading: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 14,
-  },
-  loadingText: {
-    color: "#52606d",
-    fontSize: 16,
-  },
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  backButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 14,
-    backgroundColor: "#e7eef5",
-  },
-  backButtonText: {
-    color: "#183153",
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  levelBadge: {
-    color: "#31546f",
-    fontSize: 13,
-    fontWeight: "800",
-    letterSpacing: 0.5,
-  },
-  eyebrow: {
-    color: "#52606d",
-    fontSize: 13,
-    fontWeight: "800",
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-  },
-  title: {
-    color: "#15202b",
-    fontSize: 32,
-    lineHeight: 38,
-    fontWeight: "900",
-  },
-  description: {
-    color: "#52606d",
-    fontSize: 16,
-    lineHeight: 24,
-  },
-  summaryGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  summaryCard: {
-    minWidth: "47%",
-    flexGrow: 1,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "#d7e0e8",
-    borderRadius: 16,
-    backgroundColor: "#ffffff",
-  },
-  summaryValue: {
-    color: "#15202b",
-    fontSize: 26,
-    fontWeight: "900",
-  },
-  summaryLabel: {
-    color: "#66788a",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  searchInput: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: "#c9d5df",
-    borderRadius: 16,
-    backgroundColor: "#ffffff",
-    color: "#15202b",
-    fontSize: 16,
-  },
-  filters: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  filterButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: "#c9d5df",
-    borderRadius: 999,
-    backgroundColor: "#ffffff",
-  },
-  filterButtonActive: {
-    borderColor: "#183153",
-    backgroundColor: "#183153",
-  },
-  filterButtonText: {
-    color: "#52606d",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  filterButtonTextActive: {
-    color: "#ffffff",
-  },
-  detailCard: {
-    gap: 14,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: "#d7e0e8",
-    borderRadius: 24,
-    backgroundColor: "#ffffff",
-  },
-  detailHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-  },
-  largeGlyphBox: {
-    width: 104,
-    height: 104,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 24,
-    backgroundColor: "#eef4f8",
-  },
-  largeGlyph: {
-    color: "#15202b",
-    fontSize: 72,
-    lineHeight: 86,
-    fontWeight: "500",
-  },
-  detailHeaderText: {
-    flex: 1,
-    gap: 6,
-  },
-  meaning: {
-    color: "#15202b",
-    fontSize: 21,
-    lineHeight: 27,
-    fontWeight: "800",
-  },
-  lessonLabel: {
-    color: "#66788a",
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  statusLabel: {
-    color: "#31546f",
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: "700",
-  },
-  exampleCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 14,
-    borderRadius: 18,
-    backgroundColor: "#f8fafc",
-  },
-  exampleText: {
-    flex: 1,
-    gap: 2,
-  },
-  exampleWord: {
-    color: "#15202b",
-    fontSize: 26,
-    fontWeight: "800",
-  },
-  exampleReading: {
-    color: "#31546f",
-    fontSize: 16,
-  },
-  exampleMeaning: {
-    color: "#52606d",
-    fontSize: 14,
-  },
-  contextReading: {
-    marginTop: 5,
-    color: "#183153",
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  soundButton: {
-    width: 46,
-    height: 46,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 23,
-    backgroundColor: "#e7eef5",
-  },
-  soundButtonText: {
-    fontSize: 19,
-  },
-  skillCard: {
-    gap: 8,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "#e1e7ed",
-    borderRadius: 16,
-  },
-  skillHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  skillTitle: {
-    color: "#15202b",
-    fontSize: 16,
-    fontWeight: "800",
-  },
-  skillState: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 999,
-    overflow: "hidden",
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  stateNew: {
-    color: "#66788a",
-    backgroundColor: "#edf1f4",
-  },
-  stateLearning: {
-    color: "#7a4f00",
-    backgroundColor: "#fff1c7",
-  },
-  stateReview: {
-    color: "#1f6a45",
-    backgroundColor: "#dff5e9",
-  },
-  stateWeak: {
-    color: "#9c2f2f",
-    backgroundColor: "#fde7e7",
-  },
-  masteryTrack: {
-    height: 8,
-    overflow: "hidden",
-    borderRadius: 999,
-    backgroundColor: "#e8edf2",
-  },
-  masteryFill: {
-    height: "100%",
-    borderRadius: 999,
-  },
-  fillNew: {
-    backgroundColor: "#b8c3cc",
-  },
-  fillLearning: {
-    backgroundColor: "#d49b23",
-  },
-  fillReview: {
-    backgroundColor: "#3e9b6a",
-  },
-  fillWeak: {
-    backgroundColor: "#c85454",
-  },
-  masteryValue: {
-    color: "#183153",
-    fontSize: 18,
-    fontWeight: "900",
-  },
-  skillMeta: {
-    color: "#66788a",
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  nextReview: {
-    color: "#52606d",
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  sectionTitle: {
-    color: "#15202b",
-    fontSize: 22,
-    fontWeight: "900",
-  },
-  kanjiGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  kanjiTile: {
-    width: 72,
-    minHeight: 92,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 2,
-    padding: 8,
-    borderWidth: 1,
-    borderColor: "#d7e0e8",
-    borderRadius: 16,
-    backgroundColor: "#ffffff",
-  },
-  kanjiTileSelected: {
-    borderWidth: 2,
-    borderColor: "#183153",
-  },
-  kanjiTileLocked: {
-    opacity: 0.48,
-  },
-  kanjiTileWeak: {
-    borderColor: "#c85454",
-  },
-  tileGlyph: {
-    color: "#15202b",
-    fontSize: 34,
-    fontWeight: "600",
-  },
-  tileProgress: {
-    color: "#31546f",
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  tileLesson: {
-    color: "#7b8794",
-    fontSize: 10,
-  },
-  emptyCard: {
-    gap: 6,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: "#d7e0e8",
-    borderRadius: 18,
-    backgroundColor: "#ffffff",
-  },
-  emptyTitle: {
-    color: "#15202b",
-    fontSize: 17,
-    fontWeight: "800",
-  },
-  emptyBody: {
-    color: "#66788a",
-    fontSize: 14,
-    lineHeight: 20,
-  },
+  safeArea: { flex: 1, backgroundColor: "#f4f7fa" },
+  container: { padding: 20, paddingBottom: 48, gap: 18 },
+  topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  backButton: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 14, backgroundColor: "#e7eef5" },
+  backButtonText: { color: "#183153", fontSize: 15, fontWeight: "700" },
+  levelBadge: { color: "#31546f", fontSize: 13, fontWeight: "800", letterSpacing: 0.5 },
+  eyebrow: { color: "#52606d", fontSize: 13, fontWeight: "800", letterSpacing: 1.2, textTransform: "uppercase" },
+  title: { color: "#15202b", fontSize: 31, lineHeight: 38, fontWeight: "900" },
+  description: { color: "#52606d", fontSize: 16, lineHeight: 24 },
+  summaryGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  summaryCard: { minWidth: "47%", flexGrow: 1, padding: 14, borderWidth: 1, borderColor: "#d7e0e8", borderRadius: 16, backgroundColor: "#ffffff" },
+  summaryValue: { color: "#15202b", fontSize: 26, fontWeight: "900" },
+  summaryLabel: { color: "#66788a", fontSize: 13, fontWeight: "700" },
+  searchInput: { paddingHorizontal: 16, paddingVertical: 14, borderWidth: 1, borderColor: "#c9d5df", borderRadius: 16, backgroundColor: "#ffffff", color: "#15202b", fontSize: 16 },
+  filters: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  filterButton: { paddingVertical: 10, paddingHorizontal: 14, borderWidth: 1, borderColor: "#c9d5df", borderRadius: 999, backgroundColor: "#ffffff" },
+  filterButtonActive: { borderColor: "#183153", backgroundColor: "#183153" },
+  filterButtonText: { color: "#52606d", fontSize: 14, fontWeight: "700" },
+  filterButtonTextActive: { color: "#ffffff" },
+  detailCard: { gap: 14, padding: 18, borderWidth: 1, borderColor: "#d7e0e8", borderRadius: 24, backgroundColor: "#ffffff" },
+  detailHeader: { flexDirection: "row", alignItems: "center", gap: 16 },
+  largeGlyphBox: { width: 104, height: 104, alignItems: "center", justifyContent: "center", borderRadius: 24, backgroundColor: "#eef4f8" },
+  largeGlyph: { color: "#15202b", fontSize: 72, lineHeight: 86, fontWeight: "500" },
+  detailHeaderText: { flex: 1, gap: 6 },
+  meaning: { color: "#15202b", fontSize: 21, lineHeight: 27, fontWeight: "800" },
+  lessonLabel: { color: "#66788a", fontSize: 13, lineHeight: 18 },
+  statusLabel: { color: "#31546f", fontSize: 13, lineHeight: 18, fontWeight: "700" },
+  exampleCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 18, backgroundColor: "#f8fafc" },
+  exampleText: { flex: 1, gap: 2 },
+  exampleWord: { color: "#15202b", fontSize: 26, fontWeight: "800" },
+  exampleReading: { color: "#31546f", fontSize: 16 },
+  exampleMeaning: { color: "#52606d", fontSize: 14 },
+  contextReading: { marginTop: 5, color: "#183153", fontSize: 14, fontWeight: "800" },
+  soundButton: { width: 46, height: 46, alignItems: "center", justifyContent: "center", borderRadius: 23, backgroundColor: "#e7eef5" },
+  soundButtonText: { fontSize: 19 },
+  skillCard: { gap: 8, padding: 14, borderWidth: 1, borderColor: "#e1e7ed", borderRadius: 16 },
+  skillHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  skillTitle: { color: "#15202b", fontSize: 16, fontWeight: "800" },
+  skillState: { paddingVertical: 4, paddingHorizontal: 8, borderRadius: 999, overflow: "hidden", fontSize: 12, fontWeight: "800" },
+  stateNew: { color: "#66788a", backgroundColor: "#edf1f4" },
+  stateLearning: { color: "#7a4f00", backgroundColor: "#fff1c7" },
+  stateReview: { color: "#1f6a45", backgroundColor: "#dff5e9" },
+  stateWeak: { color: "#9c2f2f", backgroundColor: "#fde7e7" },
+  masteryTrack: { height: 8, overflow: "hidden", borderRadius: 999, backgroundColor: "#e8edf2" },
+  masteryFill: { height: "100%", borderRadius: 999 },
+  fillNew: { backgroundColor: "#b8c3cc" },
+  fillLearning: { backgroundColor: "#d49b23" },
+  fillReview: { backgroundColor: "#3e9b6a" },
+  fillWeak: { backgroundColor: "#c85454" },
+  masteryValue: { color: "#183153", fontSize: 18, fontWeight: "900" },
+  skillMeta: { color: "#66788a", fontSize: 13, lineHeight: 19 },
+  lockedWriting: { padding: 14, borderRadius: 16, backgroundColor: "#f1f4f7", color: "#66788a", fontSize: 13, lineHeight: 19 },
+  nextReview: { color: "#52606d", fontSize: 13, lineHeight: 19 },
+  sectionTitle: { color: "#15202b", fontSize: 22, fontWeight: "900" },
+  kanjiGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  kanjiTile: { width: 72, minHeight: 92, alignItems: "center", justifyContent: "center", gap: 2, padding: 8, borderWidth: 1, borderColor: "#d7e0e8", borderRadius: 16, backgroundColor: "#ffffff" },
+  kanjiTileSelected: { borderWidth: 2, borderColor: "#183153" },
+  kanjiTileLocked: { opacity: 0.48 },
+  kanjiTileWeak: { borderColor: "#c85454" },
+  tileGlyph: { color: "#15202b", fontSize: 34, fontWeight: "600" },
+  tileProgress: { color: "#31546f", fontSize: 12, fontWeight: "800" },
+  tileLesson: { color: "#7b8794", fontSize: 10 },
+  emptyCard: { gap: 6, padding: 18, borderWidth: 1, borderColor: "#d7e0e8", borderRadius: 18, backgroundColor: "#ffffff" },
+  emptyTitle: { color: "#15202b", fontSize: 17, fontWeight: "800" },
+  emptyBody: { color: "#66788a", fontSize: 14, lineHeight: 20 },
 });
