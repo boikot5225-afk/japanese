@@ -9,7 +9,8 @@ import {
   scheduleWritingReview,
 } from "./writingReview";
 
-const now = new Date("2026-08-02T00:00:00.000Z");
+const firstReviewAt = new Date("2026-08-02T00:00:00.000Z");
+const laterReviewAt = new Date("2026-08-06T00:00:00.000Z");
 const exercise: Exercise = {
   id: "lesson-001-kanji-日-writing",
   type: "handwriting",
@@ -24,7 +25,7 @@ const existing: ReviewItem = {
   skill: "writing",
   exerciseId: exercise.id,
   lessonId: "lesson-001",
-  dueAt: now.toISOString(),
+  dueAt: "2026-08-05T00:00:00.000Z",
   intervalDays: 3,
   ease: 2.3,
   streak: 2,
@@ -32,49 +33,90 @@ const existing: ReviewItem = {
   incorrectCount: 0,
   lapseCount: 0,
   lastStatus: "correct",
-  lastAnsweredAt: now.toISOString(),
+  lastAnsweredAt: "2026-08-02T00:00:00.000Z",
 };
 
-test("forgotten and hard writing return quickly and break the streak", () => {
-  const forgot = calculateWritingReviewSchedule(existing, 1, now);
-  const hard = calculateWritingReviewSchedule(existing, 2, now);
+const centerRandom = () => 0.5;
+
+test("Skritter Classic returns forgotten writing after 30 seconds", () => {
+  const forgot = calculateWritingReviewSchedule(
+    existing,
+    1,
+    laterReviewAt,
+    centerRandom,
+  );
   assert.equal(forgot.success, false);
   assert.equal(forgot.streak, 0);
-  assert.equal(Math.round((new Date(forgot.dueAt).getTime() - now.getTime()) / 60000), 10);
-  assert.equal(hard.success, false);
-  assert.equal(hard.streak, 0);
-  assert.equal(Math.round((new Date(hard.dueAt).getTime() - now.getTime()) / 3600000), 8);
+  assert.equal(
+    Math.round(
+      (new Date(forgot.dueAt).getTime() - laterReviewAt.getTime()) / 1000,
+    ),
+    30,
+  );
 });
 
-test("got-it and easy increase the interval, with easy clearly longer", () => {
-  const good = calculateWritingReviewSchedule(existing, 3, now);
-  const easy = calculateWritingReviewSchedule(existing, 4, now);
+test("hard is successful and every successful review is spaced at least one day", () => {
+  const hard = calculateWritingReviewSchedule(
+    existing,
+    2,
+    laterReviewAt,
+    centerRandom,
+  );
+  assert.equal(hard.success, true);
+  assert.ok(hard.intervalDays >= 1);
+});
+
+test("got-it and easy use readiness-adjusted Skritter factors", () => {
+  const good = calculateWritingReviewSchedule(
+    existing,
+    3,
+    laterReviewAt,
+    centerRandom,
+  );
+  const easy = calculateWritingReviewSchedule(
+    existing,
+    4,
+    laterReviewAt,
+    centerRandom,
+  );
   assert.equal(good.success, true);
   assert.equal(easy.success, true);
-  assert.ok(good.intervalDays >= 7);
+  assert.ok(good.intervalDays > existing.intervalDays);
   assert.ok(easy.intervalDays > good.intervalDays);
 });
 
-test("writing review counts grades one and two as lapses", () => {
+test("only grade one counts as a writing lapse", () => {
   const hard = scheduleWritingReview(
     existing,
     "kanji-日",
     exercise,
     "lesson-001",
     2,
-    now,
+    laterReviewAt,
   );
-  assert.equal(hard.lastStatus, "incorrect");
-  assert.equal(hard.correctCount, 2);
-  assert.equal(hard.incorrectCount, 1);
-  assert.equal(hard.lapseCount, 1);
+  assert.equal(hard.lastStatus, "acceptable");
+  assert.equal(hard.correctCount, 3);
+  assert.equal(hard.incorrectCount, 0);
+  assert.equal(hard.lapseCount, 0);
+
+  const forgot = scheduleWritingReview(
+    existing,
+    "kanji-日",
+    exercise,
+    "lesson-001",
+    1,
+    laterReviewAt,
+  );
+  assert.equal(forgot.lastStatus, "incorrect");
+  assert.equal(forgot.incorrectCount, 1);
+  assert.equal(forgot.lapseCount, 1);
 });
 
-test("interval previews expose all four buttons", () => {
-  assert.deepEqual(previewWritingGradeIntervals(undefined, now), {
-    1: "10 мин",
-    2: "8 ч",
+test("new-item previews match Skritter Classic defaults", () => {
+  assert.deepEqual(previewWritingGradeIntervals(undefined, firstReviewAt), {
+    1: "30 сек",
+    2: "1 дн",
     3: "1 дн",
-    4: "4 дн",
+    4: "4 нед",
   });
 });
