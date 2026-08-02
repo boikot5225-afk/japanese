@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: build-apk-${{ github.ref }}
@@ -36,22 +36,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      - name: Apply final kanji access audit
-        run: node scripts/apply-kanji-access-persistence-fixes.mjs
-
-      - name: Persist audited source
-        shell: bash
-        env:
-          TARGET_BRANCH: ${{ github.head_ref || github.ref_name }}
-        run: |
-          rm scripts/apply-kanji-access-persistence-fixes.mjs
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- AppRoot.tsx src/screens/KanjiScreen.tsx
-          git add -u -- scripts/apply-kanji-access-persistence-fixes.mjs
-          git commit -m "Fix kanji access and progress persistence [skip build]"
-          git push origin HEAD:${TARGET_BRANCH}
 
       - name: Read version
         run: echo "APP_VERSION=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
