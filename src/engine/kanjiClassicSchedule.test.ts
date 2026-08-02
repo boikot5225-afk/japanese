@@ -79,3 +79,29 @@ test("Skritter Classic easy introduces new knowledge at roughly four weeks", () 
   assert.equal(easy.correctCount, 1);
   assert.equal(easy.streak, 1);
 });
+
+test("Skritter Classic keeps scores above one successful on later reviews", () => {
+  const first = scheduleItemReview(
+    undefined,
+    "kanji-日",
+    "reading",
+    exerciseForGrade(3),
+    "lesson-001",
+    "correct",
+    now,
+  );
+  const hard = scheduleItemReview(
+    first,
+    "kanji-日",
+    "reading",
+    exerciseForGrade(2),
+    "lesson-001",
+    "acceptable",
+    new Date(first.dueAt),
+  );
+  assert.ok(hard.intervalDays >= 1);
+  assert.equal(hard.correctCount, 2);
+  assert.equal(hard.incorrectCount, 0);
+  assert.equal(hard.lapseCount, 0);
+  assert.equal(hard.streak, 2);
+});
