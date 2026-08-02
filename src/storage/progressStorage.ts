@@ -9,6 +9,7 @@ import {
 } from "../engine/checkpointEngine";
 import {
   migrateLegacyReviewItems,
+  normalizeReviewItems,
   type AttemptLogEntry,
   type LegacyReviewItemV2,
   type ReviewItem,
@@ -57,6 +58,7 @@ const skills: Skill[] = [
 ];
 
 const knownCheckpointIds = new Set(courseCheckpoints.map((checkpoint) => checkpoint.id));
+let saveChain: Promise<void> = Promise.resolve();
 
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === "string");
@@ -66,11 +68,17 @@ const hasReviewCounters = (item: Record<string, unknown>): boolean =>
   typeof item.lessonId === "string" &&
   typeof item.dueAt === "string" &&
   typeof item.intervalDays === "number" &&
+  Number.isFinite(item.intervalDays) &&
   typeof item.ease === "number" &&
+  Number.isFinite(item.ease) &&
   typeof item.streak === "number" &&
+  Number.isFinite(item.streak) &&
   typeof item.correctCount === "number" &&
+  Number.isFinite(item.correctCount) &&
   typeof item.incorrectCount === "number" &&
+  Number.isFinite(item.incorrectCount) &&
   typeof item.lapseCount === "number" &&
+  Number.isFinite(item.lapseCount) &&
   typeof item.lastStatus === "string" &&
   typeof item.lastAnsweredAt === "string";
 
@@ -161,8 +169,8 @@ export async function loadCourseProgress(): Promise<CourseProgressSnapshot | nul
           version: 4,
           completedLessonIds: candidate.completedLessonIds,
           lastLessonId: candidate.lastLessonId,
-          reviewItems: candidate.reviewItems,
-          attemptHistory: candidate.attemptHistory,
+          reviewItems: normalizeReviewItems(candidate.reviewItems),
+          attemptHistory: candidate.attemptHistory.slice(0, 200),
           checkpointProgress: restoreCheckpointProgress(
             candidate.checkpointProgress,
             candidate.completedLessonIds,
@@ -189,8 +197,8 @@ export async function loadCourseProgress(): Promise<CourseProgressSnapshot | nul
           version: 4,
           completedLessonIds: typed.completedLessonIds,
           lastLessonId: typed.lastLessonId,
-          reviewItems: typed.reviewItems,
-          attemptHistory: typed.attemptHistory,
+          reviewItems: normalizeReviewItems(typed.reviewItems),
+          attemptHistory: typed.attemptHistory.slice(0, 200),
           checkpointProgress: restoreCheckpointProgress([], typed.completedLessonIds),
           updatedAt: typed.updatedAt ?? new Date(0).toISOString(),
         };
@@ -207,13 +215,17 @@ export async function loadCourseProgress(): Promise<CourseProgressSnapshot | nul
         candidate.reviewItems.every(isLegacyReviewItemV2)
       ) {
         const typed = candidate as unknown as LegacyCourseProgressV2;
-        const exercises = lessonBundles.flatMap((bundle) => bundle.exercises);
+        const exercises = lessonBundles.flatMap(
+          (bundle) => bundle.reviewExercises ?? bundle.exercises,
+        );
         return {
           version: 4,
           completedLessonIds: typed.completedLessonIds,
           lastLessonId: typed.lastLessonId,
-          reviewItems: migrateLegacyReviewItems(typed.reviewItems, exercises),
-          attemptHistory: typed.attemptHistory,
+          reviewItems: normalizeReviewItems(
+            migrateLegacyReviewItems(typed.reviewItems, exercises),
+          ),
+          attemptHistory: typed.attemptHistory.slice(0, 200),
           checkpointProgress: restoreCheckpointProgress([], typed.completedLessonIds),
           updatedAt: typed.updatedAt ?? new Date(0).toISOString(),
         };
@@ -256,8 +268,15 @@ export async function saveCourseProgress(
   const stored: CourseProgressSnapshot = {
     version: 4,
     ...snapshot,
+    reviewItems: normalizeReviewItems(snapshot.reviewItems),
     attemptHistory: snapshot.attemptHistory.slice(0, 200),
     updatedAt: new Date().toISOString(),
   };
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+
+  // React may request several saves in one event (Learn completes three skills).
+  // Serialize them so a slower older write can never overwrite the newest state.
+  saveChain = saveChain
+    .catch(() => undefined)
+    .then(() => AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(stored)));
+  await saveChain;
 }
