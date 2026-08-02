@@ -27,7 +27,7 @@
     "test": "npm run test:review && npm run test:kanji-progress && npm run test:kanji-study && npm run test:kanji-strokes && npm run test:writing-session && npm run test:writing-review && npm run test:lesson-review && npm run test:practice-queue && npm run test:checkpoint && npm run test:answer && npm run test:kana && npm run test:kana-words && npm run test:katakana && npm run test:numbers && npm run test:speech && npm run test:exercise-speech && npm run test:content",
     "typecheck": "tsc --noEmit",
     "typecheck:tests": "tsc --noEmit -p tsconfig.tests.json",
-    "test:kanji-study": "tsx --test src/engine/kanjiStudySession.test.ts"
+    "test:kanji-study": "tsx --test src/engine/kanjiStudySession.test.ts src/engine/kanjiDueBoundary.test.ts"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
