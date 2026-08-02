@@ -7,6 +7,7 @@ import {
   buildKanjiLearnQueue,
   buildKanjiReviewQueue,
   buildKanjiStudyResult,
+  findNextNewKanjiId,
   gradeKanjiStudyAnswer,
   requeueForgottenKanjiCard,
 } from "./kanjiStudySession";
@@ -50,6 +51,13 @@ test("learn introduces one new N5 kanji through the exact six Skritter stages", 
   );
   assert.equal(new Set(queue.map((card) => card.itemId)).size, 1);
   assert.ok(queue.every((card) => card.mode === "learn" && card.isNew));
+});
+
+test("auto-learn never selects the just-finished item from stale progress", () => {
+  assert.notEqual(
+    findNextNewKanjiId(n5KanjiCatalog, emptyProgress, person.id),
+    person.id,
+  );
 });
 
 test("review contains due skill cards only and never mixes new material", () => {
@@ -143,9 +151,11 @@ test("only forgotten review cards return at the end of the queue", () => {
   assert.deepEqual(requeueForgottenKanjiCard(remaining, current, 4), remaining);
 });
 
-test("maps basic Skritter grades to canonical SRS exercises", () => {
+test("maps Skritter grades above one to successful SRS results", () => {
   assert.equal(gradeKanjiStudyAnswer(1), "incorrect");
-  assert.equal(gradeKanjiStudyAnswer(3), "acceptable");
+  assert.equal(gradeKanjiStudyAnswer(2), "acceptable");
+  assert.equal(gradeKanjiStudyAnswer(3), "correct");
+  assert.equal(gradeKanjiStudyAnswer(4), "correct");
 
   const card = {
     id: `${person.id}:reading:review:0`,
@@ -163,5 +173,5 @@ test("maps basic Skritter grades to canonical SRS exercises", () => {
     result.exercise.id,
     `${person.introducedInLessonId}-kanji-${person.literal}-reading`,
   );
-  assert.equal(result.status, "acceptable");
+  assert.equal(result.status, "correct");
 });
