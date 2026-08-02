@@ -9,7 +9,9 @@ import {
   type KanjiStudySkill,
 } from "../engine/kanjiProgress";
 import {
+  getKanjiLessonCompletedSkills,
   getKanjiLessonRuntime,
+  markKanjiLessonSkillComplete,
   registerKanjiLessonGate,
 } from "../engine/kanjiLessonBridge";
 import type { KanjiStudyResult } from "../engine/kanjiStudySession";
@@ -36,11 +38,12 @@ const buildCompletedSkills = (
   Object.fromEntries(
     progress.map((entry) => [
       entry.itemId,
-      [
+      [...new Set<KanjiStudySkill>([
         ...(entry.meaning.attempts > 0 ? ["meaning" as const] : []),
         ...(entry.reading.attempts > 0 ? ["reading" as const] : []),
         ...(entry.writing.attempts > 0 ? ["writing" as const] : []),
-      ],
+        ...getKanjiLessonCompletedSkills(entry.itemId),
+      ])],
     ]),
   );
 
@@ -69,6 +72,7 @@ export function KanjiLessonStage({ lessonId, kanji }: KanjiLessonStageProps) {
   }, [lessonId, progressCatalog]);
 
   const markSkillComplete = (itemId: string, skill: KanjiStudySkill) => {
+    markKanjiLessonSkillComplete(itemId, skill);
     setCompletedSkills((previous) => {
       const current = previous[itemId] ?? [];
       if (current.includes(skill)) return previous;
