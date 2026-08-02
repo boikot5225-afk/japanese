@@ -62,8 +62,10 @@ const createCard = (
   repetition,
 });
 
-const isDue = (item: ReviewItem, now: Date): boolean =>
-  new Date(item.dueAt).getTime() <= now.getTime();
+const isDue = (item: ReviewItem, now: Date): boolean => {
+  const dueAt = new Date(item.dueAt).getTime();
+  return Number.isFinite(dueAt) && dueAt <= now.getTime();
+};
 
 const reviewPartBySkill = (
   skill: Skill,
@@ -86,29 +88,42 @@ const progressById = (
 ): ReadonlyMap<string, KanjiProgressSummary> =>
   new Map(progress.map((entry) => [entry.itemId, entry]));
 
+/**
+ * A kanji remains in Learn until all three independent Skritter parts exist.
+ * This also repairs progress made by the broken 0.22.0 build, which could save
+ * definition or reading before the six-stage Learn flow was finished.
+ */
+export const isKanjiPendingLearn = (
+  progress: KanjiProgressSummary | undefined,
+): boolean =>
+  !progress ||
+  progress.meaning.attempts === 0 ||
+  progress.reading.attempts === 0 ||
+  progress.writing.attempts === 0;
+
 export const findNextNewKanjiId = (
   catalog: readonly KanjiItem[],
   progress: readonly KanjiProgressSummary[],
   afterItemId?: string,
 ): string | null => {
   const byId = progressById(progress);
-  const startIndex = afterItemId
-    ? Math.max(0, catalog.findIndex((item) => item.id === afterItemId) + 1)
-    : 0;
+  const foundIndex = afterItemId
+    ? catalog.findIndex((item) => item.id === afterItemId)
+    : -1;
+  const startIndex = foundIndex >= 0 ? foundIndex + 1 : 0;
   const ordered = [
     ...catalog.slice(startIndex),
     ...catalog.slice(0, startIndex),
   ];
   return ordered.find(
-    (item) =>
-      item.id !== afterItemId && byId.get(item.id)?.status === "new",
+    (item) => item.id !== afterItemId && isKanjiPendingLearn(byId.get(item.id)),
   )?.id ?? null;
 };
 
 /**
- * Skritter's Learn activity handles exactly one new vocabulary item at a time.
- * A Japanese kanji follows six stages and none of the teaching stages is graded:
- * preview → definition → reading → writing teach → writing snap → writing recall.
+ * Skritter Learn handles exactly one new vocabulary item at a time. Japanese
+ * kanji follow six stages and none of the teaching stages is graded visibly:
+ * preview → definition → reading → writing teach → writing snap → recall.
  */
 export const buildKanjiLearnQueue = (
   catalog: readonly KanjiItem[],
@@ -119,7 +134,7 @@ export const buildKanjiLearnQueue = (
   const requested = requestedItemId
     ? catalog.find(
         (item) =>
-          item.id === requestedItemId && byId.get(item.id)?.status === "new",
+          item.id === requestedItemId && isKanjiPendingLearn(byId.get(item.id)),
       )
     : undefined;
   const itemId = requested?.id ?? findNextNewKanjiId(catalog, progress);
@@ -160,9 +175,8 @@ const orderReviewCandidates = (
 };
 
 /**
- * Review is a separate activity. It contains due skill cards only; new material is
- * never mixed into the review queue. Recognition and recall collapse into one
- * definition card, matching the single definition part used by Skritter.
+ * Review is separate from Learn and contains due skill cards only. Recognition
+ * and legacy recall records collapse into Skritter's single definition part.
  */
 export const buildKanjiReviewQueue = (
   catalog: readonly KanjiItem[],
@@ -203,14 +217,20 @@ export const countDueKanjiCards = (
   catalog: readonly KanjiItem[],
   reviewItems: readonly ReviewItem[],
   now = new Date(),
-): number => buildKanjiReviewQueue(catalog, reviewItems, now, Number.MAX_SAFE_INTEGER).length;
+): number =>
+  buildKanjiReviewQueue(
+    catalog,
+    reviewItems,
+    now,
+    Number.MAX_SAFE_INTEGER,
+  ).length;
 
 export const countNewKanji = (
   catalog: readonly KanjiItem[],
   progress: readonly KanjiProgressSummary[],
 ): number => {
   const byId = progressById(progress);
-  return catalog.filter((item) => byId.get(item.id)?.status === "new").length;
+  return catalog.filter((item) => isKanjiPendingLearn(byId.get(item.id))).length;
 };
 
 export const findKanjiStudyExercise = (
@@ -265,9 +285,25 @@ export const buildKanjiStudyResult = (
   };
 };
 
+/** Build the hidden definition and reading reviews committed at Learn finish. */
+export const buildKanjiLearnKnowledgeResults = (
+  item: KanjiItem,
+): readonly KanjiStudyResult[] => [
+  buildKanjiStudyResult(
+    createCard(item.id, "learn", "definition", true),
+    item,
+    3,
+  ),
+  buildKanjiStudyResult(
+    createCard(item.id, "learn", "reading", true),
+    item,
+    3,
+  ),
+];
+
 /**
- * Skritter's review queue repeats only forgotten cards. Grade 1 goes to the end
- * of the queue; hard, got-it and easy continue normally.
+ * Skritter repeats only forgotten review cards. Grade 1 goes to the queue tail;
+ * hard, got-it and easy continue normally.
  */
 export const requeueForgottenKanjiCard = (
   remaining: readonly KanjiStudyCard[],
