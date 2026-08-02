@@ -1,0 +1,749 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  PanResponder,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import Svg, {
+  Circle,
+  Line,
+  Path,
+  Polyline,
+  Text as SvgText,
+} from "react-native-svg";
+
+import type {
+  KanjiStrokeData,
+  KanjiStrokePoint,
+} from "../domain/kanjiStroke";
+import {
+  assessKanjiStroke,
+  kanjiStrokeIssueMessage,
+  normalizePadStroke,
+} from "../engine/kanjiStrokeEngine";
+import type { WritingGrade, WritingMode } from "../engine/writingSession";
+
+export type SkritterExactWritingMode = "teach" | "snap" | "recall";
+export type SkritterExactGrading = "none" | "basic" | "advanced";
+
+export interface SkritterExactWritingResult {
+  grade: WritingGrade;
+  mode: WritingMode;
+  mistakes: number;
+  attempts: number;
+  hints: number;
+  revealAll: boolean;
+  completed: boolean;
+}
+
+interface SkritterExactWritingPadProps {
+  data: KanjiStrokeData;
+  mode: SkritterExactWritingMode;
+  grading: SkritterExactGrading;
+  gradeIntervalLabels?: Partial<Record<WritingGrade, string>>;
+  onComplete: (result: SkritterExactWritingResult) => void;
+}
+
+const TAP_DELAY_MS = 270;
+
+const pointDistance = (left: KanjiStrokePoint, right: KanjiStrokePoint): number =>
+  Math.hypot(right.x - left.x, right.y - left.y);
+
+const polylineLength = (points: readonly KanjiStrokePoint[]): number =>
+  points.slice(1).reduce(
+    (sum, current, index) =>
+      sum + pointDistance(points[index] as KanjiStrokePoint, current),
+    0,
+  );
+
+const polylineValue = (points: readonly KanjiStrokePoint[]): string =>
+  points.map((point) => `${point.x},${point.y}`).join(" ");
+
+const resultMode = (mode: SkritterExactWritingMode): WritingMode =>
+  mode === "snap" ? "guided" : mode;
+
+const failureLimit = (strokeCount: number): number => {
+  if (strokeCount > 11) return 3;
+  if (strokeCount > 6) return 3;
+  if (strokeCount > 2) return 2;
+  return 1;
+};
+
+const gradeLabel = (grade: WritingGrade): string => {
+  switch (grade) {
+    case 1:
+      return "Забыл";
+    case 2:
+      return "Трудно";
+    case 3:
+      return "Знаю";
+    case 4:
+      return "Легко";
+  }
+};
+
+const gradeColor = (grade: WritingGrade): string => {
+  switch (grade) {
+    case 1:
+      return "#c44747";
+    case 2:
+      return "#b97817";
+    case 3:
+      return "#2e7d55";
+    case 4:
+      return "#2e609d";
+  }
+};
+
+const modeTitle = (mode: SkritterExactWritingMode): string => {
+  switch (mode) {
+    case "teach":
+      return "Изучи порядок черт";
+    case "snap":
+      return "Напиши поверх контура";
+    case "recall":
+      return "Напиши по памяти";
+  }
+};
+
+const modeInstruction = (mode: SkritterExactWritingMode): string => {
+  switch (mode) {
+    case "teach":
+      return "Следуй за синей анимацией. Принятый штрих выравнивается по эталону.";
+    case "snap":
+      return "Весь знак виден бледным контуром. Пиши в правильном порядке.";
+    case "recall":
+      return "Знак скрыт. Одно касание показывает следующую черту, двойное — весь ответ.";
+  }
+};
+
+export function SkritterExactWritingPad({
+  data,
+  mode,
+  grading,
+  gradeIntervalLabels,
+  onComplete,
+}: SkritterExactWritingPadProps) {
+  const [acceptedCount, setAcceptedCount] = useState(0);
+  const [currentStroke, setCurrentStroke] = useState<KanjiStrokePoint[]>([]);
+  const [rejectedStroke, setRejectedStroke] = useState<KanjiStrokePoint[]>([]);
+  const [padSize, setPadSize] = useState({ width: 0, height: 0 });
+  const [mistakes, setMistakes] = useState(0);
+  const [attempts, setAttempts] = useState(0);
+  const [consecutiveFailures, setConsecutiveFailures] = useState(0);
+  const [hints, setHints] = useState(0);
+  const [revealedAll, setRevealedAll] = useState(false);
+  const [hintStrokeIndex, setHintStrokeIndex] = useState<number | null>(null);
+  const [teachingSampleCount, setTeachingSampleCount] = useState(1);
+  const [completed, setCompleted] = useState(false);
+  const [awaitingGrade, setAwaitingGrade] = useState(false);
+  const [suggestedGrade, setSuggestedGrade] = useState<WritingGrade>(3);
+  const [maximumGrade, setMaximumGrade] = useState<WritingGrade>(4);
+  const [feedback, setFeedback] = useState(modeInstruction(mode));
+
+  const currentStrokeRef = useRef<KanjiStrokePoint[]>([]);
+  const gestureStartedAtRef = useRef(0);
+  const lastTapAtRef = useRef(0);
+  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rejectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const completionSentRef = useRef(false);
+
+  const activeIndex = acceptedCount;
+  const activeStroke = data.strokes[activeIndex];
+  const inputLocked = completed || awaitingGrade;
+  const showFullGuide = mode === "teach" || mode === "snap" || revealedAll;
+  const showActiveHint =
+    mode === "teach" || hintStrokeIndex === activeIndex;
+
+  const clearTimers = useCallback(() => {
+    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
+    if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
+    if (rejectTimerRef.current) clearTimeout(rejectTimerRef.current);
+    tapTimerRef.current = null;
+    hintTimerRef.current = null;
+    rejectTimerRef.current = null;
+  }, []);
+
+  const reset = useCallback(() => {
+    clearTimers();
+    currentStrokeRef.current = [];
+    gestureStartedAtRef.current = 0;
+    lastTapAtRef.current = 0;
+    completionSentRef.current = false;
+    setAcceptedCount(0);
+    setCurrentStroke([]);
+    setRejectedStroke([]);
+    setMistakes(0);
+    setAttempts(0);
+    setConsecutiveFailures(0);
+    setHints(0);
+    setRevealedAll(false);
+    setHintStrokeIndex(null);
+    setTeachingSampleCount(1);
+    setCompleted(false);
+    setAwaitingGrade(false);
+    setSuggestedGrade(3);
+    setMaximumGrade(4);
+    setFeedback(modeInstruction(mode));
+  }, [clearTimers, mode]);
+
+  useEffect(() => {
+    reset();
+  }, [data.literal, mode]);
+
+  useEffect(() => () => clearTimers(), [clearTimers]);
+
+  useEffect(() => {
+    if (mode !== "teach" || !activeStroke || completed) {
+      setTeachingSampleCount(1);
+      return;
+    }
+    const sampleCount = Math.max(activeStroke.samples.length, 2);
+    const timer = setInterval(() => {
+      setTeachingSampleCount((previous) =>
+        previous >= sampleCount ? 1 : previous + 1,
+      );
+    }, 55);
+    return () => clearInterval(timer);
+  }, [activeStroke, completed, mode]);
+
+  const sendResult = useCallback(
+    (grade: WritingGrade) => {
+      if (completionSentRef.current) return;
+      completionSentRef.current = true;
+      onComplete({
+        grade,
+        mode: resultMode(mode),
+        mistakes,
+        attempts,
+        hints,
+        revealAll: revealedAll,
+        completed: true,
+      });
+    }, [attempts, hints, mistakes, mode, onComplete, revealedAll],
+  );
+
+  const finishCharacter = useCallback(
+    (nextMistakes: number, nextAttempts: number, nextHints: number) => {
+      const lapse =
+        revealedAll || nextMistakes > failureLimit(data.strokes.length);
+      const suggested: WritingGrade = lapse ? 1 : 3;
+      const maximum: WritingGrade = lapse ? 1 : 4;
+      setCompleted(true);
+      setSuggestedGrade(suggested);
+      setMaximumGrade(maximum);
+
+      if (grading === "none") {
+        setFeedback("Готово.");
+        sendResult(3);
+        return;
+      }
+
+      setAwaitingGrade(true);
+      setFeedback(
+        lapse
+          ? "Подсказки или ошибки снизили результат до «Забыл»."
+          : "Знак завершён. Оцени ответ.",
+      );
+    }, [data.strokes.length, grading, revealedAll, sendResult],
+  );
+
+  const showNextStroke = useCallback(
+    (automatic = false) => {
+      if (!activeStroke || inputLocked) return;
+      if (hintTimerRef.current) clearTimeout(hintTimerRef.current);
+      const nextHints = hints + 1;
+      setHints(nextHints);
+      setHintStrokeIndex(activeIndex);
+      if (grading !== "none") {
+        setSuggestedGrade(1);
+        setMaximumGrade(1);
+      }
+      setFeedback(
+        automatic
+          ? "Три ошибки подряд: показываю следующую черту."
+          : "Следующая черта показана.",
+      );
+      hintTimerRef.current = setTimeout(() => {
+        setHintStrokeIndex(null);
+        hintTimerRef.current = null;
+      }, data.strokes.length < 10 ? 1200 : 1800);
+    }, [activeIndex, activeStroke, data.strokes.length, grading, hints, inputLocked]);
+
+  const revealWholeCharacter = useCallback(() => {
+    if (inputLocked) return;
+    const nextHints = hints + 1;
+    setHints(nextHints);
+    setRevealedAll(true);
+    setSuggestedGrade(1);
+    setMaximumGrade(1);
+    setFeedback("Ответ открыт полностью.");
+  }, [hints, inputLocked]);
+
+  const handleTap = useCallback(() => {
+    if (mode !== "recall" || inputLocked) return;
+    const now = Date.now();
+    if (now - lastTapAtRef.current <= TAP_DELAY_MS) {
+      if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
+      tapTimerRef.current = null;
+      lastTapAtRef.current = 0;
+      revealWholeCharacter();
+      return;
+    }
+    lastTapAtRef.current = now;
+    tapTimerRef.current = setTimeout(() => {
+      showNextStroke(false);
+      tapTimerRef.current = null;
+    }, TAP_DELAY_MS);
+  }, [inputLocked, mode, revealWholeCharacter, showNextStroke]);
+
+  const rejectStroke = useCallback(
+    (drawn: readonly KanjiStrokePoint[], message: string) => {
+      const nextMistakes = mistakes + 1;
+      const nextAttempts = attempts + 1;
+      const nextFailures = consecutiveFailures + 1;
+      setMistakes(nextMistakes);
+      setAttempts(nextAttempts);
+      setConsecutiveFailures(nextFailures);
+      setRejectedStroke(
+        normalizePadStroke(drawn, padSize.width, padSize.height),
+      );
+      setFeedback(message);
+      if (rejectTimerRef.current) clearTimeout(rejectTimerRef.current);
+      rejectTimerRef.current = setTimeout(() => {
+        setRejectedStroke([]);
+        rejectTimerRef.current = null;
+      }, 420);
+
+      if (grading !== "none" && nextMistakes > failureLimit(data.strokes.length)) {
+        setSuggestedGrade(1);
+        setMaximumGrade(1);
+      }
+      if (nextFailures >= 3) {
+        setConsecutiveFailures(0);
+        showNextStroke(true);
+      }
+    }, [
+      attempts,
+      consecutiveFailures,
+      data.strokes.length,
+      grading,
+      mistakes,
+      padSize.height,
+      padSize.width,
+      showNextStroke,
+    ],
+  );
+
+  const acceptStroke = useCallback(
+    (drawn: readonly KanjiStrokePoint[]) => {
+      if (!activeStroke || padSize.width <= 0 || padSize.height <= 0) return;
+      const assessment = assessKanjiStroke(
+        drawn,
+        activeStroke,
+        padSize.width,
+        padSize.height,
+      );
+      const guidedAcceptance =
+        (mode === "teach" || mode === "snap") &&
+        assessment.score >= 47 &&
+        assessment.directionSimilarity > 0.02 &&
+        assessment.startDistance < 31;
+      if (!assessment.accepted && !guidedAcceptance) {
+        rejectStroke(drawn, kanjiStrokeIssueMessage(assessment.issue));
+        return;
+      }
+
+      const nextAttempts = attempts + 1;
+      const nextAccepted = acceptedCount + 1;
+      setAttempts(nextAttempts);
+      setAcceptedCount(nextAccepted);
+      setConsecutiveFailures(0);
+      setHintStrokeIndex(null);
+      setTeachingSampleCount(1);
+
+      if (nextAccepted >= data.strokes.length) {
+        finishCharacter(mistakes, nextAttempts, hints);
+      } else {
+        setFeedback(`Штрих ${nextAccepted} принят. Следующий: ${nextAccepted + 1}.`);
+      }
+    }, [
+      acceptedCount,
+      activeStroke,
+      attempts,
+      data.strokes.length,
+      finishCharacter,
+      hints,
+      mistakes,
+      mode,
+      padSize.height,
+      padSize.width,
+      rejectStroke,
+    ],
+  );
+
+  const finishInput = useCallback(() => {
+    const drawn = currentStrokeRef.current;
+    currentStrokeRef.current = [];
+    setCurrentStroke([]);
+    if (inputLocked || drawn.length === 0) return;
+
+    const duration = Date.now() - gestureStartedAtRef.current;
+    const length = polylineLength(drawn);
+    const first = drawn[0];
+    const last = drawn.at(-1);
+    if (!first || !last) return;
+    const deltaX = last.x - first.x;
+    const deltaY = last.y - first.y;
+
+    if (
+      mode === "recall" &&
+      duration < 260 &&
+      length < 9 &&
+      Math.abs(deltaX) < 8 &&
+      Math.abs(deltaY) < 8
+    ) {
+      handleTap();
+      return;
+    }
+
+    if (
+      duration < 900 &&
+      deltaY < -72 &&
+      Math.abs(deltaY) > Math.abs(deltaX) * 1.35
+    ) {
+      reset();
+      setFeedback("Поле очищено жестом вверх.");
+      return;
+    }
+
+    acceptStroke(drawn);
+  }, [acceptStroke, handleTap, inputLocked, mode, reset]);
+
+  const responder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => !inputLocked,
+        onMoveShouldSetPanResponder: () => !inputLocked,
+        onPanResponderGrant: (event) => {
+          gestureStartedAtRef.current = Date.now();
+          const point = {
+            x: event.nativeEvent.locationX,
+            y: event.nativeEvent.locationY,
+          };
+          currentStrokeRef.current = [point];
+          setCurrentStroke([point]);
+        },
+        onPanResponderMove: (event) => {
+          const point = {
+            x: event.nativeEvent.locationX,
+            y: event.nativeEvent.locationY,
+          };
+          const previous = currentStrokeRef.current.at(-1);
+          if (previous && pointDistance(previous, point) < 1.8) return;
+          currentStrokeRef.current = [...currentStrokeRef.current, point];
+          setCurrentStroke(currentStrokeRef.current);
+        },
+        onPanResponderRelease: finishInput,
+        onPanResponderTerminate: () => {
+          currentStrokeRef.current = [];
+          setCurrentStroke([]);
+        },
+        onPanResponderTerminationRequest: () => false,
+        onShouldBlockNativeResponder: () => true,
+      }),
+    [finishInput, inputLocked],
+  );
+
+  const normalizedCurrent = normalizePadStroke(
+    currentStroke,
+    padSize.width,
+    padSize.height,
+  );
+  const teachingSamples = activeStroke?.samples.slice(0, teachingSampleCount) ?? [];
+  const availableGrades: readonly WritingGrade[] =
+    grading === "advanced" ? [1, 2, 3, 4] : [1, 3];
+
+  return (
+    <View style={styles.wrapper}>
+      <View style={styles.headingRow}>
+        <View style={styles.headingCopy}>
+          <Text style={styles.title}>{modeTitle(mode)}</Text>
+          <Text style={styles.progress}>
+            {Math.min(acceptedCount, data.strokes.length)}/{data.strokes.length} черт
+          </Text>
+        </View>
+        <View style={styles.metrics}>
+          <Text style={styles.metric}>Ошибки {mistakes}</Text>
+          <Text style={styles.metric}>Подсказки {hints}</Text>
+        </View>
+      </View>
+
+      <Text style={styles.instruction}>{modeInstruction(mode)}</Text>
+
+      <View
+        accessibilityLabel={`Поле письма ${data.literal}`}
+        style={styles.pad}
+        onLayout={(event) => setPadSize(event.nativeEvent.layout)}
+        {...responder.panHandlers}
+      >
+        <Svg
+          pointerEvents="none"
+          width="100%"
+          height="100%"
+          viewBox={data.viewBox.join(" ")}
+        >
+          <Line x1="54.5" y1="0" x2="54.5" y2="109" stroke="#d8e0e7" strokeWidth="0.65" />
+          <Line x1="0" y1="54.5" x2="109" y2="54.5" stroke="#d8e0e7" strokeWidth="0.65" />
+          <Line x1="0" y1="0" x2="109" y2="109" stroke="#edf1f4" strokeWidth="0.45" />
+          <Line x1="109" y1="0" x2="0" y2="109" stroke="#edf1f4" strokeWidth="0.45" />
+
+          {showFullGuide &&
+            data.strokes.map((stroke, index) => (
+              <Path
+                key={`guide-${index}`}
+                d={stroke.path}
+                fill="none"
+                stroke={revealedAll ? "#4f9c70" : "#c3ced8"}
+                strokeWidth={mode === "teach" && index === activeIndex ? 4.1 : 2.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={
+                  revealedAll
+                    ? 0.65
+                    : mode === "snap"
+                      ? 0.5
+                      : index === activeIndex
+                        ? 0.75
+                        : 0.28
+                }
+              />
+            ))}
+
+          {data.strokes.slice(0, acceptedCount).map((stroke, index) => (
+            <Path
+              key={`accepted-${index}`}
+              d={stroke.path}
+              fill="none"
+              stroke="#152b44"
+              strokeWidth="4.25"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          ))}
+
+          {activeStroke && showActiveHint && !completed && (
+            <Path
+              d={activeStroke.path}
+              fill="none"
+              stroke="#2f91cb"
+              strokeWidth="4.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity={hintStrokeIndex === activeIndex ? 0.95 : 0.46}
+            />
+          )}
+
+          {teachingSamples.length > 1 && !completed && (
+            <Polyline
+              points={polylineValue(teachingSamples)}
+              fill="none"
+              stroke="#157ab5"
+              strokeWidth="5.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          )}
+
+          {normalizedCurrent.length > 0 && (
+            <Polyline
+              points={polylineValue(normalizedCurrent)}
+              fill="none"
+              stroke="#101820"
+              strokeWidth="4.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          )}
+
+          {rejectedStroke.length > 0 && (
+            <Polyline
+              points={polylineValue(rejectedStroke)}
+              fill="none"
+              stroke="#d24b4b"
+              strokeWidth="4.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity="0.82"
+            />
+          )}
+
+          {activeStroke &&
+            !completed &&
+            (mode !== "recall" || hintStrokeIndex === activeIndex) && (
+              <>
+                <Circle
+                  cx={activeStroke.start.x}
+                  cy={activeStroke.start.y}
+                  r="5.7"
+                  fill="#c44747"
+                />
+                <SvgText
+                  x={activeStroke.start.x}
+                  y={activeStroke.start.y + 2.5}
+                  fontSize="7"
+                  fontWeight="800"
+                  fill="#ffffff"
+                  textAnchor="middle"
+                >
+                  {activeIndex + 1}
+                </SvgText>
+              </>
+            )}
+        </Svg>
+      </View>
+
+      <Text style={styles.feedback}>{feedback}</Text>
+
+      {!completed && mode === "recall" && (
+        <View style={styles.actionRow}>
+          <TouchableOpacity style={styles.actionButton} onPress={() => showNextStroke(false)}>
+            <Text style={styles.actionButtonText}>Одна черта</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={revealWholeCharacter}>
+            <Text style={styles.actionButtonText}>Показать всё</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={reset}>
+            <Text style={styles.actionButtonText}>Стереть</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {!completed && mode !== "recall" && (
+        <TouchableOpacity style={styles.resetButton} onPress={reset}>
+          <Text style={styles.resetButtonText}>Начать заново</Text>
+        </TouchableOpacity>
+      )}
+
+      {awaitingGrade && (
+        <View style={styles.gradingCard}>
+          <Text style={styles.gradingTitle}>Оцени ответ</Text>
+          <View style={styles.gradeRow}>
+            {availableGrades.map((grade) => {
+              const disabled = grade > maximumGrade;
+              return (
+                <TouchableOpacity
+                  key={grade}
+                  disabled={disabled}
+                  style={[
+                    styles.gradeButton,
+                    { borderColor: gradeColor(grade) },
+                    disabled && styles.disabled,
+                  ]}
+                  onPress={() => sendResult(grade)}
+                >
+                  <Text style={[styles.gradeNumber, { color: gradeColor(grade) }]}>
+                    {grade}
+                  </Text>
+                  <Text style={styles.gradeLabel}>{gradeLabel(grade)}</Text>
+                  {gradeIntervalLabels?.[grade] && (
+                    <Text style={styles.gradeInterval}>{gradeIntervalLabels[grade]}</Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <Text style={styles.gradingHint}>
+            {grading === "basic"
+              ? "Обычный режим Skritter: «Забыл» или «Знаю»."
+              : `Рекомендуемая оценка: ${gradeLabel(suggestedGrade)}.`}
+          </Text>
+        </View>
+      )}
+
+      {mode === "recall" && !completed && (
+        <Text style={styles.gestureHint}>
+          Касание — следующая черта · двойное — весь знак · свайп вверх — стереть.
+        </Text>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  wrapper: { gap: 12 },
+  headingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  headingCopy: { flex: 1 },
+  title: { color: "#15202b", fontSize: 19, fontWeight: "900" },
+  progress: { marginTop: 2, color: "#66788a", fontSize: 13 },
+  metrics: { alignItems: "flex-end", gap: 3 },
+  metric: { color: "#66788a", fontSize: 11, fontWeight: "700" },
+  instruction: { color: "#52606d", fontSize: 14, lineHeight: 20 },
+  pad: {
+    width: "100%",
+    aspectRatio: 1,
+    overflow: "hidden",
+    borderWidth: 2,
+    borderColor: "#c9d5df",
+    borderRadius: 22,
+    backgroundColor: "#fbfcfd",
+  },
+  feedback: { minHeight: 40, color: "#52606d", fontSize: 14, lineHeight: 20 },
+  actionRow: { flexDirection: "row", gap: 8 },
+  actionButton: {
+    flex: 1,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: "#b9c7d3",
+    borderRadius: 13,
+    backgroundColor: "#ffffff",
+  },
+  actionButtonText: { color: "#263f57", fontSize: 12, fontWeight: "800" },
+  resetButton: {
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#b9c7d3",
+    borderRadius: 13,
+    backgroundColor: "#ffffff",
+  },
+  resetButtonText: { color: "#263f57", fontSize: 13, fontWeight: "800" },
+  gradingCard: {
+    gap: 10,
+    padding: 13,
+    borderWidth: 1,
+    borderColor: "#d3dde5",
+    borderRadius: 16,
+    backgroundColor: "#f8fafc",
+  },
+  gradingTitle: { color: "#15202b", fontSize: 16, fontWeight: "900" },
+  gradeRow: { flexDirection: "row", gap: 8 },
+  gradeButton: {
+    flex: 1,
+    minHeight: 78,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+    borderWidth: 2,
+    borderRadius: 13,
+    backgroundColor: "#ffffff",
+  },
+  gradeNumber: { fontSize: 21, fontWeight: "900" },
+  gradeLabel: { marginTop: 2, color: "#263746", fontSize: 12, fontWeight: "800" },
+  gradeInterval: { marginTop: 3, color: "#71808d", fontSize: 10, fontWeight: "700" },
+  gradingHint: { color: "#66788a", fontSize: 12, lineHeight: 17 },
+  gestureHint: { color: "#7b8794", fontSize: 11, lineHeight: 16 },
+  disabled: { opacity: 0.3 },
+});
