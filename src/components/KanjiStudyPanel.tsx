@@ -131,6 +131,50 @@ function ReadingWord({
   );
 }
 
+function WritingPrompt({
+  item,
+  mode,
+}: {
+  item: KanjiItem;
+  mode: SkritterExactWritingMode;
+}) {
+  const example = item.examples[0];
+  const recall = mode === "recall";
+
+  return (
+    <View style={styles.writingPrompt}>
+      <View style={styles.writingPromptCopy}>
+        <Text style={styles.writingPromptLabel}>
+          {recall ? "Какой кандзи нужно написать" : "Текущий кандзи"}
+        </Text>
+        {!recall && <Text style={styles.writingPromptGlyph}>{item.literal}</Text>}
+        <Text style={styles.writingPromptMeaning}>
+          {item.meaningsRu.join(", ")}
+        </Text>
+        {example && (
+          <>
+            <Text style={styles.writingPromptReading}>
+              Чтение: {example.kanjiReading}
+            </Text>
+            <Text style={styles.writingPromptContext}>
+              Слово звучит: {example.reading} — {example.meaningRu}
+            </Text>
+          </>
+        )}
+      </View>
+      {example && (
+        <TouchableOpacity
+          accessibilityLabel="Прослушать подсказку"
+          style={styles.soundButton}
+          onPress={() => void speakJapanese(example.reading)}
+        >
+          <Text style={styles.soundButtonText}>🔊</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
 export function KanjiStudyPanel({
   mode,
   catalog,
@@ -186,11 +230,6 @@ export function KanjiStudyPanel({
     loadNextLearnItem(item.id);
   };
 
-  /**
-   * Commit all missing skills only at the final Learn step. A killed process or
-   * deliberate exit before then leaves the kanji pending instead of corrupting
-   * the six-stage flow. Legacy partial records are completed without double-counting.
-   */
   const completeLearnItem = (writing: SkritterExactWritingResult) => {
     if (!item || mode !== "learn") return;
     const [definitionResult, readingResult] = buildKanjiLearnKnowledgeResults(item);
@@ -465,6 +504,7 @@ export function KanjiStudyPanel({
         }
         return (
           <View style={styles.writingCard}>
+            <WritingPrompt item={item} mode={writingMode} />
             <SkritterExactWritingPad
               key={card.id}
               data={strokeData}
@@ -527,12 +567,43 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
   },
   writingCard: {
+    gap: 14,
     padding: 18,
     borderWidth: 1,
     borderColor: "#d7e0e8",
     borderRadius: 24,
     backgroundColor: "#ffffff",
   },
+  writingPrompt: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderRadius: 17,
+    backgroundColor: "#edf3f7",
+  },
+  writingPromptCopy: { flex: 1, gap: 3 },
+  writingPromptLabel: {
+    color: "#52606d",
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  writingPromptGlyph: {
+    color: "#15202b",
+    fontSize: 46,
+    lineHeight: 54,
+    fontWeight: "600",
+  },
+  writingPromptMeaning: {
+    color: "#15202b",
+    fontSize: 23,
+    lineHeight: 29,
+    fontWeight: "900",
+  },
+  writingPromptReading: { color: "#31546f", fontSize: 15, fontWeight: "800" },
+  writingPromptContext: { color: "#66788a", fontSize: 13, lineHeight: 18 },
   previewGlyph: {
     textAlign: "center",
     color: "#15202b",
