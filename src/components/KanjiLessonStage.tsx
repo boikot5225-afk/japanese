@@ -79,10 +79,11 @@ export function KanjiLessonStage({ lessonId, kanji }: KanjiLessonStageProps) {
     });
   };
 
-  const finishedCount = kanji.filter((item) =>
-    hasFinishedItem(completedSkills, item.id),
-  ).length;
-  const allComplete = kanji.length === 0 || finishedCount === kanji.length;
+  const pendingKanji = kanji.filter((item) =>
+    !hasFinishedItem(completedSkills, item.id),
+  );
+  const finishedCount = kanji.length - pendingKanji.length;
+  const allComplete = pendingKanji.length === 0;
 
   useEffect(
     () =>
@@ -105,12 +106,13 @@ export function KanjiLessonStage({ lessonId, kanji }: KanjiLessonStageProps) {
   };
 
   if (sessionOpen && !allComplete && runtime) {
+    const sessionKey = `${lessonId}:${pendingKanji.map((item) => item.id).join(",")}`;
     return (
       <View style={styles.sessionSection}>
         <KanjiStudyPanel
-          key={lessonId}
+          key={sessionKey}
           mode="learn"
-          catalog={kanji}
+          catalog={pendingKanji}
           progress={progressCatalog}
           reviewItems={runtime.reviewItems}
           onRecordStudy={recordStudy}
