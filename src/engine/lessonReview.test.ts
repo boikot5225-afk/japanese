@@ -77,7 +77,7 @@ test("несколько заданий одного урока не накру�
   assert.equal(items[0]?.intervalDays, 0);
 });
 
-test("кандзи получает отдельные очереди значения и чтения даже после одного вида задания", () => {
+test("кандзи получает очереди значения, чтения и письма после одного вида задания", () => {
   const kanjiExercise: Exercise = {
     id: "lesson-test-kanji-日-recognition",
     type: "multiple-choice",
@@ -99,17 +99,21 @@ test("кандзи получает отдельные очереди значе
     now,
   });
 
-  assert.equal(items.length, 2);
+  assert.equal(items.length, 3);
   const meaning = items.find((item) => item.skill === "recognition");
   const reading = items.find((item) => item.skill === "reading");
+  const writing = items.find((item) => item.skill === "writing");
   assert.ok(meaning);
   assert.ok(reading);
+  assert.ok(writing);
   assert.equal(meaning.correctCount, 1);
   assert.equal(meaning.intervalDays, 1);
-  assert.equal(reading.correctCount, 0);
-  assert.equal(reading.incorrectCount, 0);
-  assert.equal(reading.intervalDays, 0);
-  assert.equal(reading.dueAt, now.toISOString());
+  [reading, writing].forEach((entry) => {
+    assert.equal(entry.correctCount, 0);
+    assert.equal(entry.incorrectCount, 0);
+    assert.equal(entry.intervalDays, 0);
+    assert.equal(entry.dueAt, now.toISOString());
+  });
 });
 
 test("незавершённый урок не засоряет долгосрочную очередь", () => {
