@@ -1,15 +1,6 @@
-import type { Exercise, ExerciseType, KanjiItem } from "../domain/course";
+import type { Exercise, KanjiItem } from "../domain/course";
 import type { LessonBundle } from "./lessonBundle";
 import { n5KanjiCatalog } from "./kanjiCatalog";
-
-const REQUIRED_PRACTICE_TYPES: readonly ExerciseType[] = [
-  "listening",
-  "text-input",
-  "sentence-builder",
-  "particle-gap",
-  "conjugation",
-  "handwriting",
-];
 
 const unique = (values: string[]): string[] => [...new Set(values)];
 
@@ -166,98 +157,6 @@ export const buildKanjiReviewExercises = (
     createKanjiWritingExercise(lessonId, item),
   ]);
 
-const countByType = (exercises: readonly Exercise[]): Map<ExerciseType, number> => {
-  const counts = new Map<ExerciseType, number>();
-  exercises.forEach((exercise) => {
-    counts.set(exercise.type, (counts.get(exercise.type) ?? 0) + 1);
-  });
-  return counts;
-};
-
-const countProtectedTargets = (
-  exercises: readonly Exercise[],
-  protectedTargetIds: ReadonlySet<string>,
-): Map<string, number> => {
-  const counts = new Map<string, number>();
-  protectedTargetIds.forEach((id) => counts.set(id, 0));
-  exercises.forEach((exercise) => {
-    exercise.targetItemIds.forEach((id) => {
-      if (protectedTargetIds.has(id)) counts.set(id, (counts.get(id) ?? 0) + 1);
-    });
-  });
-  return counts;
-};
-
-const chooseReplacementIndexes = (
-  exercises: readonly Exercise[],
-  replacementCount: number,
-  protectedTargetIds: ReadonlySet<string>,
-): number[] => {
-  const typeCounts = countByType(exercises);
-  const targetCounts = countProtectedTargets(exercises, protectedTargetIds);
-  let hardCount = exercises.filter((exercise) => exercise.difficulty === 4).length;
-  const generated = exercises
-    .map((exercise, index) => ({ exercise, index }))
-    .filter(({ exercise }) => exercise.id.includes("-auto-"))
-    .reverse();
-  const authored = exercises
-    .map((exercise, index) => ({ exercise, index }))
-    .filter(({ exercise }) => !exercise.id.includes("-auto-"))
-    .reverse();
-  const candidates = [...generated, ...authored];
-  const selected: number[] = [];
-
-  for (const { exercise, index } of candidates) {
-    if (selected.length >= replacementCount) break;
-
-    const typeMustRemain = REQUIRED_PRACTICE_TYPES.includes(exercise.type);
-    if (typeMustRemain && (typeCounts.get(exercise.type) ?? 0) <= 1) continue;
-    if (exercise.difficulty === 4 && hardCount <= 1) continue;
-
-    const removesOnlyProtectedTarget = exercise.targetItemIds.some(
-      (id) => protectedTargetIds.has(id) && (targetCounts.get(id) ?? 0) <= 1,
-    );
-    if (removesOnlyProtectedTarget) continue;
-
-    selected.push(index);
-    typeCounts.set(exercise.type, (typeCounts.get(exercise.type) ?? 0) - 1);
-    if (exercise.difficulty === 4) hardCount -= 1;
-    exercise.targetItemIds.forEach((id) => {
-      if (protectedTargetIds.has(id)) {
-        targetCounts.set(id, (targetCounts.get(id) ?? 0) - 1);
-      }
-    });
-  }
-
-  if (selected.length < replacementCount) {
-    throw new Error(
-      `${exercises[0]?.id ?? "lesson"}: недостаточно места для кандзи без потери обязательной практики`,
-    );
-  }
-
-  return selected.sort((left, right) => left - right);
-};
-
-const replacePracticeWithKanji = (
-  exercises: readonly Exercise[],
-  kanjiExercises: readonly Exercise[],
-  protectedTargetIds: ReadonlySet<string>,
-): Exercise[] => {
-  if (kanjiExercises.length === 0) return [...exercises];
-
-  const replacementIndexes = chooseReplacementIndexes(
-    exercises,
-    kanjiExercises.length,
-    protectedTargetIds,
-  );
-  const integrated = exercises.map((exercise) => ({ ...exercise }));
-  kanjiExercises.forEach((exercise, index) => {
-    const targetIndex = replacementIndexes[index];
-    if (targetIndex !== undefined) integrated[targetIndex] = exercise;
-  });
-  return integrated;
-};
-
 const mergeExercisePools = (
   ...exercisePools: readonly (readonly Exercise[])[]
 ): Exercise[] => {
@@ -268,33 +167,20 @@ const mergeExercisePools = (
   return [...byId.values()];
 };
 
-const grammarNeedingDirectPractice = (bundle: LessonBundle): Set<string> => {
-  const grammarUsedInExamples = new Set(
-    bundle.sentences.flatMap((sentence) => sentence.grammarIds),
-  );
-  return new Set(
-    bundle.grammar
-      .map((grammar) => grammar.id)
-      .filter((id) => !grammarUsedInExamples.has(id)),
-  );
-};
-
 export const integrateKanjiCurriculum = (bundle: LessonBundle): LessonBundle => {
   const lessonKanji = getLessonKanji(bundle.lesson.id);
   if (lessonKanji.length === 0) {
     return { ...bundle, kanji: [] };
   }
 
-  const originalExercises = bundle.reviewExercises ?? bundle.exercises;
-  const kanjiExercises = buildLessonKanjiExercises(bundle.lesson.id, lessonKanji);
+  // The exact six-stage Skritter Learn now lives inside the lesson's word stage.
+  // Keep the twelve-question language practice intact instead of replacing its
+  // grammar and sentence work with the old approximate kanji quizzes.
+  const exercises = bundle.exercises.map((exercise) => ({ ...exercise }));
+  const originalExercises = bundle.reviewExercises ?? exercises;
   const kanjiReviewExercises = buildKanjiReviewExercises(
     bundle.lesson.id,
     lessonKanji,
-  );
-  const exercises = replacePracticeWithKanji(
-    bundle.exercises,
-    kanjiExercises,
-    grammarNeedingDirectPractice(bundle),
   );
   const reviewExercises = mergeExercisePools(
     exercises,
