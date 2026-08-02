@@ -2,25 +2,32 @@ import { useMemo, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { speakJapanese } from "../audio/japaneseSpeech";
+import { getKanjiStrokeData } from "../content/kanjiStrokeData";
 import type { KanjiItem } from "../domain/course";
 import type { KanjiProgressSummary } from "../engine/kanjiProgress";
 import {
-  buildKanjiStudyQueue,
+  buildKanjiLearnQueue,
+  buildKanjiReviewQueue,
   buildKanjiStudyResult,
+  findNextNewKanjiId,
   kanjiStudyPartLabel,
-  requeueKanjiStudyCard,
+  requeueForgottenKanjiCard,
   type KanjiStudyCard,
+  type KanjiStudyMode,
   type KanjiStudyResult,
 } from "../engine/kanjiStudySession";
 import type { ReviewItem } from "../engine/reviewEngine";
+import { previewWritingGradeIntervals } from "../engine/writingReview";
+import type { WritingGrade } from "../engine/writingSession";
 import {
-  WRITING_GRADE_DEFINITIONS,
-  type WritingGrade,
-} from "../engine/writingSession";
-import { KanjiWritingPanel } from "./KanjiWritingPanel";
+  SkritterExactWritingPad,
+  type SkritterExactWritingMode,
+  type SkritterExactWritingResult,
+} from "./SkritterExactWritingPad";
 import type { SkritterWritingResult } from "./SkritterWritingPad";
 
 interface KanjiStudyPanelProps {
+  mode: KanjiStudyMode;
   catalog: readonly KanjiItem[];
   progress: readonly KanjiProgressSummary[];
   reviewItems: readonly ReviewItem[];
@@ -29,63 +36,87 @@ interface KanjiStudyPanelProps {
   onExit: () => void;
 }
 
-interface SessionStats {
-  reviewed: number;
-  forgot: number;
-  hard: number;
-  known: number;
-  easy: number;
+interface ReviewStats {
+  answered: number;
+  forgotten: number;
+  remembered: number;
 }
 
-const emptyStats: SessionStats = {
-  reviewed: 0,
-  forgot: 0,
-  hard: 0,
-  known: 0,
-  easy: 0,
+const emptyStats: ReviewStats = {
+  answered: 0,
+  forgotten: 0,
+  remembered: 0,
 };
 
-const updateStats = (stats: SessionStats, grade: WritingGrade): SessionStats => ({
-  ...stats,
-  reviewed: stats.reviewed + 1,
-  forgot: stats.forgot + (grade === 1 ? 1 : 0),
-  hard: stats.hard + (grade === 2 ? 1 : 0),
-  known: stats.known + (grade === 3 ? 1 : 0),
-  easy: stats.easy + (grade === 4 ? 1 : 0),
-});
+const LEARN_PART_INDEX: Record<KanjiStudyCard["part"], number> = {
+  preview: 1,
+  definition: 2,
+  reading: 3,
+  "writing-teach": 4,
+  "writing-snap": 5,
+  "writing-recall": 6,
+};
 
-const partInstruction = (card: KanjiStudyCard): string => {
-  switch (card.part) {
-    case "preview":
-      return "Посмотри на знак и слово целиком. Это знакомство, оценка пока не нужна.";
-    case "meaning":
-      return "Вспомни основное значение знака, затем открой ответ и оцени себя честно.";
-    case "reading":
-      return "Вспомни чтение выделенного кандзи именно в этом слове.";
-    case "writing":
-      return "Напиши знак. Порядок черт, подсказки и ошибки ограничат доступную оценку.";
+const writingModeForPart = (
+  part: KanjiStudyCard["part"],
+): SkritterExactWritingMode | null => {
+  switch (part) {
+    case "writing-teach":
+      return "teach";
+    case "writing-snap":
+      return "snap";
+    case "writing-recall":
+      return "recall";
+    default:
+      return null;
   }
 };
 
-function GradeButtons({ onGrade }: { onGrade: (grade: WritingGrade) => void }) {
+const reviewItemForCard = (
+  card: KanjiStudyCard,
+  reviewItems: readonly ReviewItem[],
+): ReviewItem | undefined =>
+  reviewItems.find((reviewItem) => {
+    if (reviewItem.itemId !== card.itemId) return false;
+    if (card.part === "definition") {
+      return reviewItem.skill === "recognition" || reviewItem.skill === "recall";
+    }
+    if (card.part === "reading") return reviewItem.skill === "reading";
+    if (card.part === "writing-recall") return reviewItem.skill === "writing";
+    return false;
+  });
+
+function BasicGradeButtons({
+  intervals,
+  onGrade,
+}: {
+  intervals: Partial<Record<WritingGrade, string>>;
+  onGrade: (grade: WritingGrade) => void;
+}) {
   return (
     <View style={styles.gradeRow}>
-      {WRITING_GRADE_DEFINITIONS.map((definition) => (
-        <TouchableOpacity
-          key={definition.grade}
-          style={[styles.gradeButton, styles[`grade${definition.grade}`]]}
-          onPress={() => onGrade(definition.grade)}
-          accessibilityLabel={`Оценка ${definition.grade}: ${definition.label}`}
-        >
-          <Text style={styles.gradeNumber}>{definition.grade}</Text>
-          <Text style={styles.gradeLabel}>{definition.label}</Text>
-        </TouchableOpacity>
-      ))}
+      <TouchableOpacity
+        style={[styles.gradeButton, styles.gradeForgot]}
+        onPress={() => onGrade(1)}
+      >
+        <Text style={styles.gradeNumberForgot}>1</Text>
+        <Text style={styles.gradeLabel}>Забыл</Text>
+        {intervals[1] && <Text style={styles.gradeInterval}>{intervals[1]}</Text>}
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.gradeButton, styles.gradeGotIt]}
+        onPress={() => onGrade(3)}
+      >
+        <Text style={styles.gradeNumberGotIt}>3</Text>
+        <Text style={styles.gradeLabel}>Знаю</Text>
+        {intervals[3] && <Text style={styles.gradeInterval}>{intervals[3]}</Text>}
+      </TouchableOpacity>
     </View>
   );
 }
 
 export function KanjiStudyPanel({
+  mode,
   catalog,
   progress,
   reviewItems,
@@ -97,93 +128,128 @@ export function KanjiStudyPanel({
     () => new Map(catalog.map((item) => [item.id, item])),
     [catalog],
   );
-  const progressById = useMemo(
-    () => new Map(progress.map((entry) => [entry.itemId, entry])),
-    [progress],
-  );
   const [queue, setQueue] = useState<KanjiStudyCard[]>(() =>
-    buildKanjiStudyQueue(catalog, progress, reviewItems),
+    mode === "learn"
+      ? buildKanjiLearnQueue(catalog, progress)
+      : buildKanjiReviewQueue(catalog, reviewItems),
   );
   const [revealed, setRevealed] = useState(false);
-  const [handled, setHandled] = useState(0);
-  const [stats, setStats] = useState<SessionStats>(emptyStats);
+  const [stats, setStats] = useState<ReviewStats>(emptyStats);
+  const [incorrectPending, setIncorrectPending] = useState(0);
 
   const card = queue[0];
   const item = card ? itemById.get(card.itemId) : undefined;
   const example = item?.examples[0];
-  const itemProgress = item ? progressById.get(item.id) : undefined;
-  const writingReviewItem = item
-    ? reviewItems.find(
-        (reviewItem) =>
-          reviewItem.itemId === item.id && reviewItem.skill === "writing",
-      )
+  const writingMode = card ? writingModeForPart(card.part) : null;
+  const currentReviewItem = card
+    ? reviewItemForCard(card, reviewItems)
     : undefined;
+  const intervals = useMemo(
+    () => previewWritingGradeIntervals(currentReviewItem),
+    [currentReviewItem],
+  );
 
-  const restart = () => {
-    setQueue(buildKanjiStudyQueue(catalog, progress, reviewItems));
-    setRevealed(false);
-    setHandled(0);
-    setStats(emptyStats);
+  const resetReveal = () => setRevealed(false);
+
+  const loadNextLearnItem = (currentItemId: string) => {
+    const nextItemId = findNextNewKanjiId(catalog, progress, currentItemId);
+    setQueue(
+      nextItemId
+        ? buildKanjiLearnQueue(catalog, progress, nextItemId)
+        : [],
+    );
+    resetReveal();
   };
 
-  const continueAfterPreview = () => {
-    setQueue((previous) => previous.slice(1));
-    setHandled((previous) => previous + 1);
-    setRevealed(false);
+  const advanceLearn = () => {
+    if (!card || !item) return;
+    const remaining = queue.slice(1);
+    if (remaining.length > 0) {
+      setQueue(remaining);
+      resetReveal();
+      return;
+    }
+    loadNextLearnItem(item.id);
   };
 
-  const skipNewItem = () => {
-    if (!item) return;
-    setQueue((previous) => previous.filter((entry) => entry.itemId !== item.id));
-    setHandled((previous) => previous + 1);
-    setRevealed(false);
-  };
-
-  const finishCard = (grade: WritingGrade) => {
-    if (!card || !item || card.part === "preview") return;
+  const finishReviewCard = (grade: WritingGrade) => {
+    if (!card || !item || card.mode !== "review") return;
     onRecordStudy(item, buildKanjiStudyResult(card, item, grade));
-    setStats((previous) => updateStats(previous, grade));
-    setHandled((previous) => previous + 1);
+    setStats((previous) => ({
+      answered: previous.answered + 1,
+      forgotten: previous.forgotten + (grade === 1 ? 1 : 0),
+      remembered: previous.remembered + (grade === 3 ? 1 : 0),
+    }));
+    setIncorrectPending((previous) => {
+      if (grade === 1 && !card.remediation) return previous + 1;
+      if (grade === 3 && card.remediation) return Math.max(0, previous - 1);
+      return previous;
+    });
     setQueue((previous) =>
-      requeueKanjiStudyCard(previous.slice(1), card, grade),
+      requeueForgottenKanjiCard(previous.slice(1), card, grade),
     );
-    setRevealed(false);
+    resetReveal();
   };
 
-  const finishWriting = (result: SkritterWritingResult) => {
-    if (!card || !item || card.part !== "writing") return;
+  const finishLearnKnowledgePart = () => {
+    if (!card || !item || card.mode !== "learn") return;
+    if (card.part !== "definition" && card.part !== "reading") return;
+    onRecordStudy(item, buildKanjiStudyResult(card, item, 3));
+    advanceLearn();
+  };
+
+  const finishWriting = (result: SkritterExactWritingResult) => {
+    if (!card || !item || !writingMode) return;
+
+    if (mode === "learn") {
+      if (card.part === "writing-recall") {
+        onRecordWriting(item, result);
+      }
+      advanceLearn();
+      return;
+    }
+
+    if (card.part !== "writing-recall") return;
     onRecordWriting(item, result);
-    setStats((previous) => updateStats(previous, result.grade));
-    setHandled((previous) => previous + 1);
+    setStats((previous) => ({
+      answered: previous.answered + 1,
+      forgotten: previous.forgotten + (result.grade === 1 ? 1 : 0),
+      remembered: previous.remembered + (result.grade === 3 ? 1 : 0),
+    }));
+    setIncorrectPending((previous) => {
+      if (result.grade === 1 && !card.remediation) return previous + 1;
+      if (result.grade === 3 && card.remediation) return Math.max(0, previous - 1);
+      return previous;
+    });
     setQueue((previous) =>
-      requeueKanjiStudyCard(previous.slice(1), card, result.grade),
+      requeueForgottenKanjiCard(previous.slice(1), card, result.grade),
     );
-    setRevealed(false);
+    resetReveal();
   };
 
   if (!card || !item) {
     return (
       <View style={styles.completeCard}>
-        <Text style={styles.eyebrow}>Сессия завершена</Text>
-        <Text style={styles.completeTitle}>Очередь разобрана</Text>
-        <Text style={styles.completeBody}>
-          Проверено навыков: {stats.reviewed}. Забыл: {stats.forgot}, трудно: {stats.hard},
-          знаю: {stats.known}, легко: {stats.easy}.
+        <Text style={styles.eyebrow}>
+          {mode === "learn" ? "Обучение завершено" : "Повторение завершено"}
         </Text>
-        <View style={styles.completeActions}>
-          <TouchableOpacity style={styles.secondaryButton} onPress={onExit}>
-            <Text style={styles.secondaryButtonText}>К списку N5</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.primaryButton} onPress={restart}>
-            <Text style={styles.primaryButtonText}>Ещё занятие</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.completeTitle}>
+          {mode === "learn" ? "Новых кандзи больше нет" : "Очередь разобрана"}
+        </Text>
+        <Text style={styles.completeBody}>
+          {mode === "learn"
+            ? "Все 103 кандзи списка JLPT N5 уже введены в обучение."
+            : `Ответов: ${stats.answered}. Забыл: ${stats.forgotten}. Знаю: ${stats.remembered}.`}
+        </Text>
+        <TouchableOpacity style={styles.primaryButton} onPress={onExit}>
+          <Text style={styles.primaryButtonText}>К списку N5</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
-  const remaining = queue.length;
-  const total = handled + remaining;
+  const reviewRemaining = queue.length;
+  const learnStep = LEARN_PART_INDEX[card.part];
 
   return (
     <View style={styles.session}>
@@ -192,30 +258,39 @@ export function KanjiStudyPanel({
           <Text style={styles.exitButtonText}>×</Text>
         </TouchableOpacity>
         <View style={styles.headerCopy}>
-          <Text style={styles.eyebrow}>JLPT N5 · {kanjiStudyPartLabel(card.part)}</Text>
+          <Text style={styles.eyebrow}>
+            {mode === "learn" ? "Learn · JLPT N5" : "Review · JLPT N5"}
+          </Text>
           <Text style={styles.counter}>
-            {handled + 1} / {total} · в очереди {remaining}
+            {mode === "learn"
+              ? `Этап ${learnStep}/6 · ${kanjiStudyPartLabel(card.part)}`
+              : `Осталось ${reviewRemaining} · ошибок в хвосте ${incorrectPending}`}
           </Text>
         </View>
-        {card.remediation ? (
-          <Text style={styles.retryBadge}>повтор</Text>
-        ) : card.isNew ? (
-          <Text style={styles.newBadge}>новое</Text>
-        ) : (
-          <Text style={styles.reviewBadge}>SRS</Text>
-        )}
-      </View>
-
-      <View style={styles.progressTrack}>
-        <View
+        <Text
           style={[
-            styles.progressFill,
-            { width: `${Math.round((handled / Math.max(total, 1)) * 100)}%` as `${number}%` },
+            styles.badge,
+            card.remediation
+              ? styles.retryBadge
+              : mode === "learn"
+                ? styles.newBadge
+                : styles.reviewBadge,
           ]}
-        />
+        >
+          {card.remediation ? "повтор" : mode === "learn" ? "новое" : "SRS"}
+        </Text>
       </View>
 
-      <Text style={styles.instruction}>{partInstruction(card)}</Text>
+      {mode === "learn" && (
+        <View style={styles.progressTrack}>
+          <View
+            style={[
+              styles.progressFill,
+              { width: `${Math.round((learnStep / 6) * 100)}%` as `${number}%` },
+            ]}
+          />
+        </View>
+      )}
 
       {card.part === "preview" && (
         <View style={styles.studyCard}>
@@ -241,19 +316,13 @@ export function KanjiStudyPanel({
               </Text>
             </View>
           )}
-          <Text style={styles.masteryNote}>
-            Значение {itemProgress?.meaning.mastery ?? 0}% · чтение {itemProgress?.reading.mastery ?? 0}% · письмо {itemProgress?.writing.mastery ?? 0}%
-          </Text>
-          <TouchableOpacity style={styles.primaryButton} onPress={continueAfterPreview}>
-            <Text style={styles.primaryButtonText}>Продолжить обучение</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.linkButton} onPress={skipNewItem}>
-            <Text style={styles.linkButtonText}>Не добавлять этот кандзи сейчас</Text>
+          <TouchableOpacity style={styles.primaryButton} onPress={advanceLearn}>
+            <Text style={styles.primaryButtonText}>Начать</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {card.part === "meaning" && (
+      {card.part === "definition" && (
         <View style={styles.studyCard}>
           <Text style={styles.promptLabel}>Что означает этот кандзи?</Text>
           <Text style={styles.questionGlyph}>{item.literal}</Text>
@@ -271,8 +340,13 @@ export function KanjiStudyPanel({
                   </Text>
                 )}
               </View>
-              <Text style={styles.gradePrompt}>Насколько хорошо вспомнил?</Text>
-              <GradeButtons onGrade={finishCard} />
+              {mode === "learn" ? (
+                <TouchableOpacity style={styles.primaryButton} onPress={finishLearnKnowledgePart}>
+                  <Text style={styles.primaryButtonText}>Дальше</Text>
+                </TouchableOpacity>
+              ) : (
+                <BasicGradeButtons intervals={intervals} onGrade={finishReviewCard} />
+              )}
             </View>
           )}
         </View>
@@ -307,35 +381,50 @@ export function KanjiStudyPanel({
                   )}
                 </View>
               </View>
-              <Text style={styles.gradePrompt}>Насколько хорошо вспомнил?</Text>
-              <GradeButtons onGrade={finishCard} />
+              {mode === "learn" ? (
+                <TouchableOpacity style={styles.primaryButton} onPress={finishLearnKnowledgePart}>
+                  <Text style={styles.primaryButtonText}>Дальше</Text>
+                </TouchableOpacity>
+              ) : (
+                <BasicGradeButtons intervals={intervals} onGrade={finishReviewCard} />
+              )}
             </View>
           )}
         </View>
       )}
 
-      {card.part === "writing" && itemProgress && (
-        <View style={styles.writingCard}>
-          <KanjiWritingPanel
-            key={card.id}
-            item={item}
-            progress={itemProgress.writing}
-            reviewItem={writingReviewItem}
-            onComplete={finishWriting}
-          />
-        </View>
-      )}
+      {writingMode && (() => {
+        const strokeData = getKanjiStrokeData(item.literal);
+        if (!strokeData) {
+          return (
+            <View style={styles.unavailableCard}>
+              <Text style={styles.unavailableTitle}>Нет проверенных данных черт</Text>
+              <Text style={styles.unavailableBody}>
+                {item.literal} не будет оцениваться выдуманной геометрией.
+              </Text>
+            </View>
+          );
+        }
+        return (
+          <View style={styles.writingCard}>
+            <SkritterExactWritingPad
+              key={card.id}
+              data={strokeData}
+              mode={writingMode}
+              grading={mode === "learn" ? "none" : "basic"}
+              gradeIntervalLabels={intervals}
+              onComplete={finishWriting}
+            />
+          </View>
+        );
+      })()}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   session: { gap: 14 },
-  sessionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
+  sessionHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
   exitButton: {
     width: 42,
     height: 42,
@@ -344,7 +433,7 @@ const styles = StyleSheet.create({
     borderRadius: 21,
     backgroundColor: "#e7eef5",
   },
-  exitButtonText: { color: "#183153", fontSize: 27, lineHeight: 30, fontWeight: "500" },
+  exitButtonText: { color: "#183153", fontSize: 27, lineHeight: 30 },
   headerCopy: { flex: 1, gap: 2 },
   eyebrow: {
     color: "#31546f",
@@ -354,51 +443,121 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   counter: { color: "#66788a", fontSize: 13, fontWeight: "700" },
-  newBadge: { color: "#7a4f00", backgroundColor: "#fff1c7", paddingVertical: 5, paddingHorizontal: 9, borderRadius: 999, overflow: "hidden", fontSize: 11, fontWeight: "900" },
-  retryBadge: { color: "#9c2f2f", backgroundColor: "#fde7e7", paddingVertical: 5, paddingHorizontal: 9, borderRadius: 999, overflow: "hidden", fontSize: 11, fontWeight: "900" },
-  reviewBadge: { color: "#1f6a45", backgroundColor: "#dff5e9", paddingVertical: 5, paddingHorizontal: 9, borderRadius: 999, overflow: "hidden", fontSize: 11, fontWeight: "900" },
-  progressTrack: { height: 7, overflow: "hidden", borderRadius: 999, backgroundColor: "#e1e8ee" },
+  badge: {
+    paddingVertical: 5,
+    paddingHorizontal: 9,
+    borderRadius: 999,
+    overflow: "hidden",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  newBadge: { color: "#7a4f00", backgroundColor: "#fff1c7" },
+  retryBadge: { color: "#9c2f2f", backgroundColor: "#fde7e7" },
+  reviewBadge: { color: "#1f6a45", backgroundColor: "#dff5e9" },
+  progressTrack: {
+    height: 7,
+    overflow: "hidden",
+    borderRadius: 999,
+    backgroundColor: "#e1e8ee",
+  },
   progressFill: { height: "100%", borderRadius: 999, backgroundColor: "#183153" },
-  instruction: { color: "#52606d", fontSize: 14, lineHeight: 21 },
-  studyCard: { gap: 16, padding: 18, borderWidth: 1, borderColor: "#d7e0e8", borderRadius: 24, backgroundColor: "#ffffff" },
-  writingCard: { padding: 18, borderWidth: 1, borderColor: "#d7e0e8", borderRadius: 24, backgroundColor: "#ffffff" },
-  previewGlyph: { textAlign: "center", color: "#15202b", fontSize: 108, lineHeight: 128, fontWeight: "500" },
-  previewMeaning: { textAlign: "center", color: "#15202b", fontSize: 22, lineHeight: 29, fontWeight: "900" },
-  promptLabel: { textAlign: "center", color: "#52606d", fontSize: 15, fontWeight: "800" },
-  questionGlyph: { textAlign: "center", color: "#15202b", fontSize: 126, lineHeight: 146, fontWeight: "500" },
-  questionWord: { textAlign: "center", color: "#15202b", fontSize: 50, lineHeight: 64, fontWeight: "800" },
-  answerBox: { gap: 7, padding: 15, borderRadius: 18, backgroundColor: "#f1f6f9" },
-  answerTitle: { color: "#15202b", fontSize: 23, lineHeight: 30, fontWeight: "900" },
-  answerDetail: { color: "#52606d", fontSize: 15, lineHeight: 22 },
+  studyCard: {
+    gap: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "#d7e0e8",
+    borderRadius: 24,
+    backgroundColor: "#ffffff",
+  },
+  writingCard: {
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "#d7e0e8",
+    borderRadius: 24,
+    backgroundColor: "#ffffff",
+  },
+  previewGlyph: {
+    textAlign: "center",
+    color: "#15202b",
+    fontSize: 108,
+    lineHeight: 128,
+    fontWeight: "500",
+  },
+  previewMeaning: { textAlign: "center", color: "#15202b", fontSize: 22, fontWeight: "900" },
+  answerBox: { gap: 6, padding: 14, borderRadius: 17, backgroundColor: "#f2f6f9" },
   wordRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   wordCopy: { flex: 1, gap: 2 },
-  word: { color: "#15202b", fontSize: 28, fontWeight: "900" },
-  reading: { color: "#31546f", fontSize: 17 },
-  translation: { textAlign: "center", color: "#66788a", fontSize: 15, lineHeight: 21 },
-  focusReading: { color: "#183153", fontSize: 14, lineHeight: 20, fontWeight: "800" },
-  soundButton: { width: 46, height: 46, alignItems: "center", justifyContent: "center", borderRadius: 23, backgroundColor: "#dfeaf1" },
+  word: { color: "#15202b", fontSize: 27, fontWeight: "900" },
+  reading: { color: "#31546f", fontSize: 16 },
+  translation: { color: "#66788a", fontSize: 14 },
+  focusReading: { color: "#183153", fontSize: 14, fontWeight: "800" },
+  soundButton: {
+    width: 46,
+    height: 46,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 23,
+    backgroundColor: "#e1eaf1",
+  },
   soundButtonText: { fontSize: 19 },
-  masteryNote: { textAlign: "center", color: "#66788a", fontSize: 12, lineHeight: 18 },
-  revealButton: { alignItems: "center", paddingVertical: 17, paddingHorizontal: 18, borderRadius: 16, backgroundColor: "#183153" },
-  revealButtonText: { color: "#ffffff", fontSize: 17, fontWeight: "900" },
+  promptLabel: { textAlign: "center", color: "#52606d", fontSize: 15, fontWeight: "800" },
+  questionGlyph: { textAlign: "center", color: "#15202b", fontSize: 118, lineHeight: 138 },
+  questionWord: { textAlign: "center", color: "#15202b", fontSize: 40, fontWeight: "900" },
+  revealButton: {
+    minHeight: 54,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 16,
+    backgroundColor: "#183153",
+  },
+  revealButtonText: { color: "#ffffff", fontSize: 16, fontWeight: "900" },
   revealedArea: { gap: 13 },
-  gradePrompt: { textAlign: "center", color: "#52606d", fontSize: 13, fontWeight: "800" },
-  gradeRow: { flexDirection: "row", gap: 7 },
-  gradeButton: { flex: 1, minHeight: 67, alignItems: "center", justifyContent: "center", gap: 2, paddingVertical: 9, paddingHorizontal: 4, borderWidth: 1, borderRadius: 14 },
-  grade1: { borderColor: "#d98989", backgroundColor: "#fdecec" },
-  grade2: { borderColor: "#dfbd72", backgroundColor: "#fff4d8" },
-  grade3: { borderColor: "#83bfa0", backgroundColor: "#e7f7ee" },
-  grade4: { borderColor: "#75a9c0", backgroundColor: "#e4f2f8" },
-  gradeNumber: { color: "#15202b", fontSize: 18, fontWeight: "900" },
-  gradeLabel: { color: "#42596d", fontSize: 10, fontWeight: "800" },
-  primaryButton: { alignItems: "center", paddingVertical: 14, paddingHorizontal: 18, borderRadius: 15, backgroundColor: "#183153" },
+  answerTitle: { color: "#15202b", fontSize: 22, fontWeight: "900" },
+  answerDetail: { color: "#52606d", fontSize: 14, lineHeight: 20 },
+  gradeRow: { flexDirection: "row", gap: 10 },
+  gradeButton: {
+    flex: 1,
+    minHeight: 88,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 9,
+    borderWidth: 2,
+    borderRadius: 15,
+    backgroundColor: "#ffffff",
+  },
+  gradeForgot: { borderColor: "#c44747" },
+  gradeGotIt: { borderColor: "#2e7d55" },
+  gradeNumberForgot: { color: "#c44747", fontSize: 24, fontWeight: "900" },
+  gradeNumberGotIt: { color: "#2e7d55", fontSize: 24, fontWeight: "900" },
+  gradeLabel: { color: "#263746", fontSize: 13, fontWeight: "900" },
+  gradeInterval: { marginTop: 3, color: "#71808d", fontSize: 11, fontWeight: "700" },
+  primaryButton: {
+    minHeight: 50,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+    borderRadius: 15,
+    backgroundColor: "#183153",
+  },
   primaryButtonText: { color: "#ffffff", fontSize: 15, fontWeight: "900" },
-  secondaryButton: { alignItems: "center", paddingVertical: 13, paddingHorizontal: 17, borderWidth: 1, borderColor: "#afbdc9", borderRadius: 15, backgroundColor: "#ffffff" },
-  secondaryButtonText: { color: "#183153", fontSize: 14, fontWeight: "800" },
-  linkButton: { alignItems: "center", paddingVertical: 8 },
-  linkButtonText: { color: "#66788a", fontSize: 13, fontWeight: "700" },
-  completeCard: { gap: 14, padding: 22, borderWidth: 1, borderColor: "#9bc9ae", borderRadius: 24, backgroundColor: "#f0faf4" },
-  completeTitle: { color: "#15202b", fontSize: 27, fontWeight: "900" },
-  completeBody: { color: "#52606d", fontSize: 15, lineHeight: 23 },
-  completeActions: { flexDirection: "row", gap: 10 },
+  completeCard: {
+    gap: 12,
+    padding: 22,
+    borderWidth: 1,
+    borderColor: "#bfd5c7",
+    borderRadius: 24,
+    backgroundColor: "#f1faf4",
+  },
+  completeTitle: { color: "#15202b", fontSize: 25, fontWeight: "900" },
+  completeBody: { color: "#52606d", fontSize: 15, lineHeight: 22 },
+  unavailableCard: {
+    gap: 7,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "#e0c7c7",
+    borderRadius: 18,
+    backgroundColor: "#fff8f8",
+  },
+  unavailableTitle: { color: "#8a3030", fontSize: 16, fontWeight: "900" },
+  unavailableBody: { color: "#6c5050", fontSize: 13, lineHeight: 19 },
 });
