@@ -4,11 +4,14 @@ import test from "node:test";
 import { n5KanjiCatalog } from "../content/kanjiCatalog";
 import { buildKanjiProgressCatalog } from "./kanjiProgress";
 import {
+  buildKanjiLearnKnowledgeResults,
   buildKanjiLearnQueue,
   buildKanjiReviewQueue,
   buildKanjiStudyResult,
+  countNewKanji,
   findNextNewKanjiId,
   gradeKanjiStudyAnswer,
+  isKanjiPendingLearn,
   requeueForgottenKanjiCard,
 } from "./kanjiStudySession";
 import type { ReviewItem } from "./reviewEngine";
@@ -36,7 +39,18 @@ const dueReviewItem = (overrides: Partial<ReviewItem> = {}): ReviewItem => ({
   ...overrides,
 });
 
-test("learn introduces one new N5 kanji through the exact six Skritter stages", () => {
+const introducedItem = (
+  skill: ReviewItem["skill"],
+  exerciseId: string,
+): ReviewItem => ({
+  ...dueReviewItem({
+    skill,
+    exerciseId,
+    dueAt: "2026-08-03T00:00:00.000Z",
+  }),
+});
+
+test("learn introduces one N5 kanji through the exact six Skritter stages", () => {
   const queue = buildKanjiLearnQueue(n5KanjiCatalog, emptyProgress);
   assert.deepEqual(
     queue.map((card) => card.part),
@@ -53,13 +67,54 @@ test("learn introduces one new N5 kanji through the exact six Skritter stages", 
   assert.ok(queue.every((card) => card.mode === "learn" && card.isNew));
 });
 
-test("learn stages use the implicit got-it score instead of showing grading", () => {
-  const queue = buildKanjiLearnQueue(n5KanjiCatalog, emptyProgress);
-  const definition = queue.find((card) => card.part === "definition");
-  const reading = queue.find((card) => card.part === "reading");
-  assert.ok(definition && reading);
-  assert.equal(buildKanjiStudyResult(definition, person, 3).status, "correct");
-  assert.equal(buildKanjiStudyResult(reading, person, 3).status, "correct");
+test("hidden Learn knowledge results are created only for final atomic commit", () => {
+  const results = buildKanjiLearnKnowledgeResults(person);
+  assert.deepEqual(results.map((result) => result.exercise.skill), ["recognition", "reading"]);
+  assert.ok(results.every((result) => result.status === "correct" && result.grade === 3));
+});
+
+test("partially saved 0.22.0 progress remains pending and is recoverable", () => {
+  const partialItems = [
+    introducedItem(
+      "recognition",
+      `${person.introducedInLessonId}-kanji-${person.literal}-recognition`,
+    ),
+    introducedItem(
+      "reading",
+      `${person.introducedInLessonId}-kanji-${person.literal}-reading`,
+    ),
+  ];
+  const progress = buildKanjiProgressCatalog(n5KanjiCatalog, partialItems);
+  const personProgress = progress.find((entry) => entry.itemId === person.id);
+  assert.ok(personProgress);
+  assert.equal(personProgress.status, "learning");
+  assert.equal(isKanjiPendingLearn(personProgress), true);
+  assert.equal(findNextNewKanjiId(n5KanjiCatalog, progress), person.id);
+  assert.equal(buildKanjiLearnQueue(n5KanjiCatalog, progress)[0]?.itemId, person.id);
+  assert.equal(countNewKanji(n5KanjiCatalog, progress), n5KanjiCatalog.length);
+});
+
+test("a kanji leaves Learn only after meaning, reading and writing all exist", () => {
+  const completeItems = [
+    introducedItem(
+      "recognition",
+      `${person.introducedInLessonId}-kanji-${person.literal}-recognition`,
+    ),
+    introducedItem(
+      "reading",
+      `${person.introducedInLessonId}-kanji-${person.literal}-reading`,
+    ),
+    introducedItem(
+      "writing",
+      `${person.introducedInLessonId}-kanji-${person.literal}-writing`,
+    ),
+  ];
+  const progress = buildKanjiProgressCatalog(n5KanjiCatalog, completeItems);
+  const personProgress = progress.find((entry) => entry.itemId === person.id);
+  assert.ok(personProgress);
+  assert.equal(isKanjiPendingLearn(personProgress), false);
+  assert.notEqual(findNextNewKanjiId(n5KanjiCatalog, progress), person.id);
+  assert.equal(countNewKanji(n5KanjiCatalog, progress), n5KanjiCatalog.length - 1);
 });
 
 test("auto-learn never selects the just-finished item from stale progress", () => {
@@ -84,13 +139,19 @@ test("review contains due skill cards only and never mixes new material", () => 
   assert.ok(queue.every((card) => card.part !== "preview"));
 });
 
-test("review excludes future cards", () => {
-  const queue = buildKanjiReviewQueue(
+test("review excludes future and invalid due dates", () => {
+  const futureQueue = buildKanjiReviewQueue(
     n5KanjiCatalog,
     [dueReviewItem({ dueAt: "2026-08-03T00:00:00.000Z" })],
     new Date("2026-08-02T00:00:00.000Z"),
   );
-  assert.deepEqual(queue, []);
+  const invalidQueue = buildKanjiReviewQueue(
+    n5KanjiCatalog,
+    [dueReviewItem({ dueAt: "broken-date" })],
+    new Date("2026-08-02T00:00:00.000Z"),
+  );
+  assert.deepEqual(futureQueue, []);
+  assert.deepEqual(invalidQueue, []);
 });
 
 test("deduplicates recognition and recall into one definition card", () => {
