@@ -52,11 +52,19 @@ export const WRITING_GRADE_DEFINITIONS: readonly WritingGradeDefinition[] = [
 
 export const isPassingWritingGrade = (grade: WritingGrade): boolean => grade >= 3;
 
+const DEFAULT_WRITING_GRADE: WritingGradeDefinition = {
+  grade: 3,
+  label: "Знаю",
+  shortLabel: "Знаю",
+  description: "Написал правильно с допустимыми исправлениями.",
+  passing: true,
+};
+
 export const getWritingGradeDefinition = (
   grade: WritingGrade,
 ): WritingGradeDefinition =>
   WRITING_GRADE_DEFINITIONS.find((item) => item.grade === grade) ??
-  WRITING_GRADE_DEFINITIONS[2];
+  DEFAULT_WRITING_GRADE;
 
 const failedEnoughForForgotten = (
   strokeCount: number,
