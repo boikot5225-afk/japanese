@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  getKanjiLessonCompletedSkills,
   getKanjiLessonRuntime,
+  markKanjiLessonSkillComplete,
   registerKanjiLessonGate,
   registerKanjiLessonRuntime,
   requestKanjiLessonAdvance,
@@ -59,4 +61,17 @@ test("course screen exposes live SRS callbacks to the lesson stage", () => {
   };
   registerKanjiLessonRuntime(runtime);
   assert.equal(getKanjiLessonRuntime(), runtime);
+});
+
+test("completed skills survive a direct lesson retry before course rerenders", () => {
+  resetKanjiLessonBridgeForTests();
+  markKanjiLessonSkillComplete("kanji-日", "meaning");
+  markKanjiLessonSkillComplete("kanji-日", "reading");
+  markKanjiLessonSkillComplete("kanji-日", "writing");
+  markKanjiLessonSkillComplete("kanji-日", "writing");
+
+  assert.deepEqual(
+    [...getKanjiLessonCompletedSkills("kanji-日")].sort(),
+    ["meaning", "reading", "writing"],
+  );
 });
