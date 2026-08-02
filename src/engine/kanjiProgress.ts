@@ -121,7 +121,7 @@ export const buildKanjiProgress = (
   const meaning = buildSkillProgress(item.id, "meaning", reviewItems);
   const reading = buildSkillProgress(item.id, "reading", reviewItems);
   const writing = buildSkillProgress(item.id, "writing", reviewItems);
-  const activeSkills = [meaning, reading];
+  const activeSkills = [meaning, reading, writing];
   const overallMastery = Math.round(
     activeSkills.reduce((sum, progress) => sum + progress.mastery, 0) /
       activeSkills.length,
