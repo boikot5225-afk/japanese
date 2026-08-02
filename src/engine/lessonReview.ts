@@ -39,8 +39,55 @@ const statusPriority: Record<AnswerStatus, number> = {
   incorrect: 3,
 };
 
+const KANJI_CORE_SKILLS: readonly Skill[] = ["recognition", "reading"];
+
 const worseStatus = (left: AnswerStatus, right: AnswerStatus): AnswerStatus =>
   statusPriority[right] > statusPriority[left] ? right : left;
+
+const seedUnseenKanjiSkills = (
+  items: ReviewItem[],
+  sessionResults: readonly TargetSessionResult[],
+  lessonId: string,
+  now: Date,
+): ReviewItem[] => {
+  const sourceExerciseByItem = new Map<string, Exercise>();
+  sessionResults.forEach((result) => {
+    if (
+      result.itemId.startsWith("kanji-") &&
+      KANJI_CORE_SKILLS.includes(result.skill) &&
+      !sourceExerciseByItem.has(result.itemId)
+    ) {
+      sourceExerciseByItem.set(result.itemId, result.exercise);
+    }
+  });
+
+  return [...sourceExerciseByItem.entries()].reduce(
+    (currentItems, [itemId, sourceExercise]) =>
+      KANJI_CORE_SKILLS.reduce((skillItems, skill) => {
+        const key = reviewItemKey({ itemId, skill });
+        if (skillItems.some((item) => reviewItemKey(item) === key)) {
+          return skillItems;
+        }
+
+        return upsertReviewItem(skillItems, {
+          itemId,
+          skill,
+          exerciseId: sourceExercise.id,
+          lessonId,
+          dueAt: now.toISOString(),
+          intervalDays: 0,
+          ease: 2.3,
+          streak: 0,
+          correctCount: 0,
+          incorrectCount: 0,
+          lapseCount: 0,
+          lastStatus: "acceptable",
+          lastAnsweredAt: now.toISOString(),
+        });
+      }, currentItems),
+    items,
+  );
+};
 
 export function commitLessonReviewItems({
   items,
@@ -78,7 +125,8 @@ export function commitLessonReviewItems({
     });
   });
 
-  return [...sessionResults.values()].reduce((currentItems, target) => {
+  const results = [...sessionResults.values()];
+  const scheduledItems = results.reduce((currentItems, target) => {
     const key = reviewItemKey(target);
     const existing = currentItems.find((item) => reviewItemKey(item) === key);
     return upsertReviewItem(
@@ -94,4 +142,6 @@ export function commitLessonReviewItems({
       ),
     );
   }, items);
+
+  return seedUnseenKanjiSkills(scheduledItems, results, lessonId, now);
 }
