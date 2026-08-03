@@ -1,7 +1,8 @@
-import { SafeAreaView, ScrollView, StatusBar, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView, StatusBar, Text, TouchableOpacity, View } from "react-native";
 
 import { speakJapanese } from "../audio/japaneseSpeech";
 import { KanjiLessonStage } from "../components/KanjiLessonStage";
+import { KeyboardSafeScrollView } from "../components/KeyboardSafeScrollView";
 import { PracticeCard } from "../components/PracticeCard";
 import type { SkritterWritingResult } from "../components/SkritterWritingPad";
 import { SwipeNavigationView } from "../components/SwipeNavigationView";
@@ -99,7 +100,7 @@ export function LessonScreen({
     >
       <SafeAreaView style={styles.safeArea}>
         <StatusBar barStyle="dark-content" />
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <KeyboardSafeScrollView contentContainerStyle={styles.container}>
           <TouchableOpacity style={styles.backLink} onPress={onCourse}>
             <Text style={styles.backLinkText}>‹ К курсу</Text>
           </TouchableOpacity>
@@ -255,7 +256,7 @@ export function LessonScreen({
               </TouchableOpacity>
             </View>
           )}
-        </ScrollView>
+        </KeyboardSafeScrollView>
       </SafeAreaView>
     </SwipeNavigationView>
   );
@@ -293,7 +294,7 @@ export function ReviewScreen({
     <SwipeNavigationView onBack={onCourse}>
       <SafeAreaView style={styles.safeArea}>
         <StatusBar barStyle="dark-content" />
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <KeyboardSafeScrollView contentContainerStyle={styles.container}>
           <TouchableOpacity style={styles.backLink} onPress={onCourse}>
             <Text style={styles.backLinkText}>‹ Закончить повторение</Text>
           </TouchableOpacity>
@@ -326,7 +327,7 @@ export function ReviewScreen({
             onWritingComplete={onWritingComplete}
             onContinue={onContinue}
           />
-        </ScrollView>
+        </KeyboardSafeScrollView>
       </SafeAreaView>
     </SwipeNavigationView>
   );
