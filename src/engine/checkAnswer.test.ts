@@ -5,6 +5,7 @@ import { lesson004Exercises } from "../content/lesson004.ts";
 import { lesson006Exercises } from "../content/lesson006.ts";
 import { lesson007Exercises } from "../content/lesson007.ts";
 import { lesson010Exercises } from "../content/lesson010.ts";
+import { lesson012Exercises } from "../content/lesson012.ts";
 import { checkAnswer } from "./checkAnswer.ts";
 import {
   parseJapaneseInteger,
@@ -54,6 +55,37 @@ test("past negative destination accepts omitted topic, に and a kana verb stem"
   assert.equal(result.status, "acceptable");
   assert.equal(
     checkAnswer("いきませんでした", ["行きませんでした"]).status,
+    "correct",
+  );
+});
+
+test("いい inflections accept their standard 良 kanji spelling", () => {
+  const exercise = lesson012Exercises.find(
+    (item) => item.id === "exercise-tenki-yokatta-input",
+  );
+  assert.ok(exercise);
+
+  assert.equal(
+    checkAnswer(
+      "天気は良かったです",
+      exercise.correctAnswers,
+      exercise.acceptableAnswers,
+    ).status,
+    "correct",
+  );
+  assert.equal(
+    checkAnswer("良くありませんでした", ["よくなかったです"]).status,
+    "correct",
+  );
+});
+
+test("inflected i-adjectives normalize kanji and kana consistently", () => {
+  assert.equal(
+    checkAnswer("旅行は楽しかったです", ["りょこうはたのしかったです"]).status,
+    "correct",
+  );
+  assert.equal(
+    checkAnswer("昨日は寒くありませんでした", ["きのうはさむくなかったです"]).status,
     "correct",
   );
 });
