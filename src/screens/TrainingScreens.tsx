@@ -10,6 +10,7 @@ import type { LessonBundle } from "../content/lessonBundle";
 import type { Exercise } from "../domain/course";
 import type { AnswerCheckResult } from "../engine/checkAnswer";
 import { requestKanjiLessonAdvance } from "../engine/kanjiLessonBridge";
+import { buildReviewHeaderPresentation } from "../engine/reviewPresentation";
 import { styles } from "../theme/appStyles";
 
 export type LessonStage = "theory" | "words" | "examples" | "practice";
@@ -290,17 +291,11 @@ export function ReviewScreen({
   onWritingComplete,
   onContinue,
 }: ReviewScreenProps) {
-  const hidesKanjiWritingAnswer =
-    currentExercise.skill === "writing" &&
-    currentExercise.contentKey?.startsWith("kanji:") === true;
-  const visibleFocusLabel = hidesKanjiWritingAnswer
-    ? focusLabel.replace(/^.+? — /u, "")
-    : focusLabel;
-  const visibleTitle = focusLabel === "Материал урока"
-    ? lessonTitle
-    : hidesKanjiWritingAnswer
-      ? "Письмо по памяти"
-      : (visibleFocusLabel.split(" · ")[0] ?? lessonTitle);
+  const reviewHeader = buildReviewHeaderPresentation(
+    currentExercise,
+    lessonTitle,
+    focusLabel,
+  );
 
   return (
     <SwipeNavigationView onBack={onCourse}>
@@ -311,10 +306,8 @@ export function ReviewScreen({
             <Text style={styles.backLinkText}>‹ Закончить повторение</Text>
           </TouchableOpacity>
           <Text style={styles.eyebrow}>Повторение</Text>
-          <Text style={styles.title}>{visibleTitle}</Text>
-          <Text style={styles.meaning}>
-            Сейчас проверяем: {visibleFocusLabel === "Материал урока" ? currentExercise.prompt : visibleFocusLabel}
-          </Text>
+          <Text style={styles.title}>{reviewHeader.title}</Text>
+          <Text style={styles.meaning}>{reviewHeader.focus}</Text>
           <Text style={styles.description}>
             {coveredCount > 1
               ? `Одна уникальная задача проверяет сразу ${coveredCount} связанных знания. Повторять тот же текст для каждого из них не придётся.`
