@@ -1,50 +1,32 @@
 name: Build Android APK
 
 on:
-  push:
-    branches:
-      - main
-      - "agent/**"
   pull_request:
     branches:
       - main
-  workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: build-apk-${{ github.ref }}
+  group: review-repair-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
-  build-apk:
-    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip build]')
+  repair:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    env:
-      CI: "1"
-      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-      ANDROID_KEYSTORE_FILE: release.keystore
-
     steps:
-      - name: Checkout
+      - name: Checkout source branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref || github.ref }}
-          fetch-depth: 1
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
 
-      # REVIEW_AUDIT_PATCH_START
-      - name: Apply review audit fixes once
-        if: github.event_name == 'push' && github.event.head_commit.message == 'Run targeted review audit patch'
+      - name: Apply audited review fixes and restore build workflow
         shell: bash
         run: |
           python <<'PY'
           from pathlib import Path
-          import re
 
           def replace_once(path: str, old: str, new: str) -> None:
               file = Path(path)
@@ -267,27 +249,15 @@ jobs:
               '      "versionCode": 48,',
           )
 
+          original = Path("scripts/build-apk-original.yml")
+          Path(".github/workflows/build-apk.yml").write_text(
+              original.read_text(encoding="utf-8"),
+              encoding="utf-8",
+          )
+          original.unlink()
           temporary = Path(".github/workflows/apply-review-audit-fixes.yml")
           if temporary.exists():
               temporary.unlink()
-
-          workflow = Path(".github/workflows/build-apk.yml")
-          workflow_text = workflow.read_text(encoding="utf-8")
-          workflow_text = workflow_text.replace(
-              "permissions:\n  contents: write",
-              "permissions:\n  contents: read",
-              1,
-          )
-          workflow_text, count = re.subn(
-              r"\n      # REVIEW_AUDIT_PATCH_START.*?\n      # REVIEW_AUDIT_PATCH_END\n",
-              "\n",
-              workflow_text,
-              count=1,
-              flags=re.S,
-          )
-          if count != 1:
-              raise RuntimeError("Could not remove temporary build workflow patch")
-          workflow.write_text(workflow_text, encoding="utf-8")
           PY
 
           git config user.name "github-actions[bot]"
@@ -295,109 +265,3 @@ jobs:
           git add -A
           git commit -m "Fix misleading review prompts and answer validation"
           git push origin HEAD:agent/kanji-study-cycle-0.22.0
-      # REVIEW_AUDIT_PATCH_END
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Read version
-        run: echo "APP_VERSION=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Run full test suite
-        run: npm test
-
-      - name: Typecheck application
-        run: npm run typecheck
-
-      - name: Typecheck tests
-        run: npm run typecheck:tests
-
-      - name: Generate Android project
-        run: npx expo prebuild --platform android --no-install
-
-      - name: Validate signing secrets
-        shell: bash
-        run: |
-          values=(
-            "$ANDROID_KEYSTORE_BASE64"
-            "$ANDROID_KEYSTORE_PASSWORD"
-            "$ANDROID_KEY_ALIAS"
-            "$ANDROID_KEY_PASSWORD"
-          )
-          present=0
-          for value in "${values[@]}"; do
-            if [[ -n "$value" ]]; then present=$((present + 1)); fi
-          done
-          if [[ "$present" -ne 0 && "$present" -ne 4 ]]; then
-            echo "Android signing secrets are only partially configured." >&2
-            exit 1
-          fi
-          if [[ "$present" -eq 4 ]]; then
-            echo "HAS_RELEASE_SIGNING=1" >> "$GITHUB_ENV"
-          else
-            echo "HAS_RELEASE_SIGNING=0" >> "$GITHUB_ENV"
-          fi
-
-      - name: Configure protected release signing
-        if: env.HAS_RELEASE_SIGNING == '1'
-        shell: bash
-        run: |
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "android/app/$ANDROID_KEYSTORE_FILE"
-          node scripts/configure-android-release-signing.mjs
-
-      - name: Build standalone APK
-        run: cd android && ./gradlew app:assembleRelease --no-daemon --stacktrace
-
-      - name: Verify standalone bundle, permissions and signature
-        shell: bash
-        run: |
-          mkdir -p builds
-          APK="android/app/build/outputs/apk/release/app-release.apk"
-          test -s "$APK"
-          unzip -l "$APK" | tee builds/apk-contents.log
-          unzip -l "$APK" | grep -q "assets/index.android.bundle"
-
-          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
-          "$AAPT" dump permissions "$APK" | tee builds/apk-permissions.log
-          ! grep -Eq 'READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|SYSTEM_ALERT_WINDOW' builds/apk-permissions.log
-
-          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
-          "$APKSIGNER" verify --verbose --print-certs "$APK" | tee builds/apk-signature.log
-          if [[ "$HAS_RELEASE_SIGNING" == "1" ]]; then
-            ! grep -qi 'Android Debug' builds/apk-signature.log
-            echo "Protected release keystore" > builds/signing-status.txt
-          else
-            grep -qi 'Android Debug' builds/apk-signature.log
-            echo "Personal standalone fallback: Android Debug certificate" > builds/signing-status.txt
-          fi
-
-          cp "$APK" "builds/Japanese-${APP_VERSION}-standalone.apk"
-          sha256sum "builds/Japanese-${APP_VERSION}-standalone.apk" | tee builds/apk.sha256
-
-      - name: Upload standalone APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: Japanese-${{ env.APP_VERSION }}-standalone
-          path: |
-            builds/*.apk
-            builds/apk.sha256
-            builds/apk-contents.log
-            builds/apk-permissions.log
-            builds/apk-signature.log
-            builds/signing-status.txt
-          if-no-files-found: error
-          retention-days: 14
