@@ -9,9 +9,9 @@ import {
   type ViewStyle,
 } from "react-native";
 
-interface KeyboardSafeScrollViewProps extends PropsWithChildren {
+type KeyboardSafeScrollViewProps = PropsWithChildren<{
   contentContainerStyle?: StyleProp<ViewStyle>;
-}
+}>;
 
 export function KeyboardSafeScrollView({
   children,
