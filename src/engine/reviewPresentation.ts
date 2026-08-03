@@ -65,7 +65,7 @@ export const buildReviewHeaderPresentation = (
   if (focusLabel === "Материал урока") {
     return {
       title: lessonTitle,
-      focus: `Проверяем навык: ${skillLabel(exercise.skill)}`,
+      focus: `Сейчас проверяем навык: ${skillLabel(exercise.skill)}`,
     };
   }
 
@@ -74,29 +74,29 @@ export const buildReviewHeaderPresentation = (
     if (exercise.skill === "writing") {
       return {
         title: "Письмо по памяти",
-        focus: removeLeadingItemLabel(focusLabel),
+        focus: `Сейчас проверяем: ${removeLeadingItemLabel(focusLabel)}`,
       };
     }
     if (exercise.skill === "reading") {
       return {
         title: `Кандзи ${literal}`,
-        focus: "Проверяем чтение в слове",
+        focus: "Сейчас проверяем: чтение в слове",
       };
     }
     if (exercise.skill === "recognition" || exercise.skill === "recall") {
       return {
         title: `Кандзи ${literal}`,
-        focus: "Проверяем значение знака",
+        focus: "Сейчас проверяем: значение знака",
       };
     }
     return {
       title: `Кандзи ${literal}`,
-      focus: `Проверяем навык: ${skillLabel(exercise.skill)}`,
+      focus: `Сейчас проверяем навык: ${skillLabel(exercise.skill)}`,
     };
   }
 
   return {
     title: skillTitle(exercise.skill),
-    focus: `Проверяем навык: ${skillLabel(exercise.skill)}`,
+    focus: `Сейчас проверяем навык: ${skillLabel(exercise.skill)}`,
   };
 };
