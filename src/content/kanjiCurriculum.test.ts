@@ -109,6 +109,37 @@ test("exact lesson Learn preserves language practice while review keeps all kanj
   );
 });
 
+test("kanji review prompts never print the answer being tested", () => {
+  const reviewExercises = lessonBundles.flatMap(
+    (bundle) => bundle.reviewExercises ?? bundle.exercises,
+  );
+  const readingExercises = reviewExercises.filter(
+    (exercise) =>
+      exercise.skill === "reading" &&
+      exercise.contentKey?.startsWith("kanji:"),
+  );
+  const writingExercises = reviewExercises.filter(
+    (exercise) =>
+      exercise.skill === "writing" &&
+      exercise.contentKey?.startsWith("kanji:"),
+  );
+
+  assert.ok(readingExercises.length > 0);
+  assert.ok(writingExercises.length > 0);
+  readingExercises.forEach((exercise) => {
+    assert.doesNotMatch(exercise.prompt, /（[^）]+）/u);
+  });
+  writingExercises.forEach((exercise) => {
+    const literal = exercise.correctAnswers[0];
+    assert.ok(literal);
+    assert.equal(
+      exercise.prompt.includes(literal),
+      false,
+      `${exercise.id} reveals ${literal} in its recall prompt`,
+    );
+  });
+});
+
 test("explicit exercise skill overrides the generic interaction type", () => {
   const readingExercise = lessonBundles
     .flatMap((bundle) => bundle.reviewExercises ?? bundle.exercises)

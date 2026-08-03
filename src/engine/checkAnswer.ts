@@ -18,12 +18,28 @@ interface ReadingAlias {
   reading: string;
 }
 
+const createReadingAliases = (
+  writtenForm: string,
+  reading: string,
+): ReadingAlias[] => {
+  const aliases: ReadingAlias[] = [{ writtenForm, reading }];
+  if (writtenForm.endsWith("ます") && reading.endsWith("ます")) {
+    const writtenStem = writtenForm.slice(0, -2);
+    const readingStem = reading.slice(0, -2);
+    if (writtenStem && readingStem && writtenStem !== readingStem) {
+      aliases.push({ writtenForm: writtenStem, reading: readingStem });
+    }
+  }
+  return aliases;
+};
+
 const courseReadingAliases: ReadingAlias[] = Array.from(
   new Map(
     lessonBundles
       .flatMap((bundle) => bundle.vocabulary)
       .filter((item) => item.writtenForm !== item.reading)
-      .map((item) => [item.writtenForm, item.reading] as const),
+      .flatMap((item) => createReadingAliases(item.writtenForm, item.reading))
+      .map((alias) => [alias.writtenForm, alias.reading] as const),
   ).entries(),
 )
   .map(([writtenForm, reading]) => ({ writtenForm, reading }))

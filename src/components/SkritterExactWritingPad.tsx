@@ -142,7 +142,7 @@ export function SkritterExactWritingPad({
   const [hintStrokeIndex, setHintStrokeIndex] = useState<number | null>(null);
   const [teachingSampleCount, setTeachingSampleCount] = useState(1);
   const [phase, setPhase] = useState<PadPhase>("input");
-  const [feedback, setFeedback] = useState(modeInstruction(mode));
+  const [feedback, setFeedback] = useState("");
 
   const currentStrokeRef = useRef<KanjiStrokePoint[]>([]);
   const gestureStartedAtRef = useRef(0);
@@ -220,7 +220,7 @@ export function SkritterExactWritingPad({
     setHintStrokeIndex(null);
     setTeachingSampleCount(1);
     setPhase("input");
-    setFeedback(modeInstruction(mode));
+    setFeedback("");
   }, [clearTimers, mode]);
 
   useEffect(() => {
@@ -665,7 +665,7 @@ export function SkritterExactWritingPad({
         </Svg>
       </View>
 
-      <Text style={styles.feedback}>{feedback}</Text>
+      {feedback.length > 0 && <Text style={styles.feedback}>{feedback}</Text>}
 
       {phase === "input" && mode === "recall" && (
         <View style={styles.actionRow}>

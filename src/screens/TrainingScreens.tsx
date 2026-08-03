@@ -290,6 +290,18 @@ export function ReviewScreen({
   onWritingComplete,
   onContinue,
 }: ReviewScreenProps) {
+  const hidesKanjiWritingAnswer =
+    currentExercise.skill === "writing" &&
+    currentExercise.contentKey?.startsWith("kanji:") === true;
+  const visibleFocusLabel = hidesKanjiWritingAnswer
+    ? focusLabel.replace(/^.+? — /u, "")
+    : focusLabel;
+  const visibleTitle = focusLabel === "Материал урока"
+    ? lessonTitle
+    : hidesKanjiWritingAnswer
+      ? "Письмо по памяти"
+      : (visibleFocusLabel.split(" · ")[0] ?? lessonTitle);
+
   return (
     <SwipeNavigationView onBack={onCourse}>
       <SafeAreaView style={styles.safeArea}>
@@ -299,9 +311,9 @@ export function ReviewScreen({
             <Text style={styles.backLinkText}>‹ Закончить повторение</Text>
           </TouchableOpacity>
           <Text style={styles.eyebrow}>Повторение</Text>
-          <Text style={styles.title}>{lessonTitle}</Text>
+          <Text style={styles.title}>{visibleTitle}</Text>
           <Text style={styles.meaning}>
-            Сейчас проверяем: {focusLabel === "Материал урока" ? currentExercise.prompt : focusLabel}
+            Сейчас проверяем: {visibleFocusLabel === "Материал урока" ? currentExercise.prompt : visibleFocusLabel}
           </Text>
           <Text style={styles.description}>
             {coveredCount > 1

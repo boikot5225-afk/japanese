@@ -83,7 +83,7 @@ const createReadingExercise = (
   const katakanaReading = hiraganaToKatakana(example.kanjiReading);
   const common = {
     id: `${lessonId}-kanji-${item.literal}-reading`,
-    prompt: `Как читается выделенный знак ${item.literal} в слове ${example.written}（${example.reading}）?`,
+    prompt: `Как читается знак ${item.literal} в слове ${example.written}?`,
     targetItemIds: [item.id],
     correctAnswers: [example.kanjiReading],
     explanationRu: `В слове ${example.written} знак ${item.literal} читается ${example.kanjiReading}. Всё слово: ${example.reading} — ${example.meaningRu}.`,
@@ -115,7 +115,7 @@ export const createKanjiWritingExercise = (
 ): Exercise => ({
   id: `${lessonId}-kanji-${item.literal}-writing`,
   type: "handwriting",
-  prompt: `Напиши кандзи ${item.literal} в правильном порядке черт.`,
+  prompt: `Напиши по памяти кандзи со значением «${item.meaningsRu[0] ?? "заданное значение"}» в правильном порядке черт.`,
   targetItemIds: [item.id],
   correctAnswers: [item.literal],
   explanationRu: `${item.literal} — ${item.meaningsRu.join(", ")}. Порядок и форма штрихов проверяются автоматически.`,
