@@ -1,5 +1,6 @@
 import { SafeAreaView, ScrollView, StatusBar, Text, TouchableOpacity, View } from "react-native";
 
+import { KeyboardSafeScrollView } from "../components/KeyboardSafeScrollView";
 import { PracticeCard } from "../components/PracticeCard";
 import type { SkritterWritingResult } from "../components/SkritterWritingPad";
 import { SwipeNavigationView } from "../components/SwipeNavigationView";
@@ -52,7 +53,7 @@ export function CheckpointScreen({
     <SwipeNavigationView onBack={onCourse}>
       <SafeAreaView style={styles.safeArea}>
         <StatusBar barStyle="dark-content" />
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <KeyboardSafeScrollView contentContainerStyle={styles.container}>
           <TouchableOpacity style={styles.backLink} onPress={onCourse}>
             <Text style={styles.backLinkText}>‹ Прервать проверку</Text>
           </TouchableOpacity>
@@ -81,7 +82,7 @@ export function CheckpointScreen({
             onWritingComplete={onWritingComplete}
             onContinue={onContinue}
           />
-        </ScrollView>
+        </KeyboardSafeScrollView>
       </SafeAreaView>
     </SwipeNavigationView>
   );
