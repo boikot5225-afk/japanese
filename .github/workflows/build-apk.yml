@@ -46,6 +46,16 @@ jobs:
         if: ${{ hashFiles('scripts/apply-lesson-kanji-repair.mjs') != '' }}
         shell: bash
         run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/apply-lesson-kanji-repair.mjs')
+          source = path.read_text()
+          source = source.replace(
+              r'/function WritingPrompt\([\s\S]*?\n}\n\nexport function KanjiStudyPanel/u,',
+              r'/function WritingPrompt\([\s\S]*?\n\}\n\nexport function KanjiStudyPanel/u,',
+          )
+          path.write_text(source)
+          PY
           rm -rf .cache/kanjivg
           git clone --depth 1 https://github.com/KanjiVG/kanjivg.git .cache/kanjivg
           node scripts/apply-lesson-kanji-repair.mjs
