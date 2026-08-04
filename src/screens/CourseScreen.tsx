@@ -1,25 +1,32 @@
 import { useState } from "react";
 import { SafeAreaView, ScrollView, StatusBar, Text, TouchableOpacity, View } from "react-native";
 
+import type { SkritterWritingResult } from "../components/SkritterWritingPad";
 import {
   findCheckpointForUnit,
   type CourseCheckpoint,
 } from "../content/courseCheckpoints";
 import { courseUnits, findLessonBundle } from "../content/courseCatalog";
 import type { LessonBundle } from "../content/lessonBundle";
+import type { KanjiItem } from "../domain/course";
+import type { KanjiStudyResult } from "../engine/kanjiStudySession";
 import {
   isCheckpointAvailable,
   isCheckpointPassed,
   isLessonUnlocked,
   type CheckpointProgress,
 } from "../engine/checkpointEngine";
+import { registerKanjiLessonRuntime } from "../engine/kanjiLessonBridge";
+import type { ReviewItem } from "../engine/reviewEngine";
 import { styles } from "../theme/appStyles";
 import { kanaStyles } from "../theme/kanaStyles";
+import { KanjiScreen } from "./KanjiScreen";
 import { NumberTrainerScreen } from "./NumberTrainerScreen";
 
 interface CourseScreenProps {
   completedLessonIds: string[];
   checkpointProgress: CheckpointProgress[];
+  reviewItems: ReviewItem[];
   todayBundle: LessonBundle | undefined;
   dueReviewCount: number;
   weakTargetCount: number;
@@ -29,6 +36,8 @@ interface CourseScreenProps {
   onStartCheckpoint: (checkpoint: CourseCheckpoint) => void;
   onStartReview: () => void;
   onOpenKana: () => void;
+  onRecordKanjiWriting: (item: KanjiItem, result: SkritterWritingResult) => void;
+  onRecordKanjiStudy: (item: KanjiItem, result: KanjiStudyResult) => void;
 }
 
 const russianForm = (count: number, one: string, few: string, many: string): string => {
@@ -42,6 +51,7 @@ const lessonWord = (count: number): string => russianForm(count, "урок", "у
 export function CourseScreen({
   completedLessonIds,
   checkpointProgress,
+  reviewItems,
   todayBundle,
   dueReviewCount,
   weakTargetCount,
@@ -51,11 +61,33 @@ export function CourseScreen({
   onStartCheckpoint,
   onStartReview,
   onOpenKana,
+  onRecordKanjiWriting,
+  onRecordKanjiStudy,
 }: CourseScreenProps) {
+  const [kanjiOpen, setKanjiOpen] = useState(false);
   const [numbersOpen, setNumbersOpen] = useState(false);
   const todayCompleted = todayBundle
     ? completedLessonIds.includes(todayBundle.lesson.id)
     : false;
+
+  registerKanjiLessonRuntime({
+    reviewItems,
+    onRecordStudy: onRecordKanjiStudy,
+    onRecordWriting: onRecordKanjiWriting,
+  });
+
+  if (kanjiOpen) {
+    return (
+      <KanjiScreen
+        completedLessonIds={completedLessonIds}
+        checkpointProgress={checkpointProgress}
+        reviewItems={reviewItems}
+        onRecordWriting={onRecordKanjiWriting}
+        onRecordStudy={onRecordKanjiStudy}
+        onCourse={() => setKanjiOpen(false)}
+      />
+    );
+  }
 
   if (numbersOpen) {
     return <NumberTrainerScreen onCourse={() => setNumbersOpen(false)} />;
@@ -108,6 +140,26 @@ export function CourseScreen({
           </Text>
           <TouchableOpacity style={kanaStyles.primaryButton} onPress={onOpenKana}>
             <Text style={kanaStyles.primaryButtonText}>Открыть азбуки</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={kanaStyles.courseKanaCard}>
+          <View style={kanaStyles.courseKanaHeader}>
+            <View>
+              <Text style={styles.reviewEyebrow}>Письменность</Text>
+              <Text style={kanaStyles.courseKanaTitle}>Кандзи N5</Text>
+            </View>
+            <Text style={kanaStyles.courseKanaGlyph}>日 語</Text>
+          </View>
+          <Text style={kanaStyles.courseKanaBody}>
+            103 знака: первое знакомство через знакомое слово, значение, чтение
+            без вариантов, порядок черт и раздельная SRS каждого навыка.
+          </Text>
+          <TouchableOpacity
+            style={kanaStyles.primaryButton}
+            onPress={() => setKanjiOpen(true)}
+          >
+            <Text style={kanaStyles.primaryButtonText}>Открыть кандзи</Text>
           </TouchableOpacity>
         </View>
 

@@ -4,6 +4,8 @@ import test from "node:test";
 import { lesson004Exercises } from "../content/lesson004.ts";
 import { lesson006Exercises } from "../content/lesson006.ts";
 import { lesson007Exercises } from "../content/lesson007.ts";
+import { lesson010Exercises } from "../content/lesson010.ts";
+import { lesson012Exercises } from "../content/lesson012.ts";
 import { checkAnswer } from "./checkAnswer.ts";
 import {
   parseJapaneseInteger,
@@ -36,6 +38,56 @@ test("mixed kanji and hiragana remain equivalent to the taught answer", () => {
   );
 
   assert.equal(result.status, "acceptable");
+});
+
+test("past negative destination accepts omitted topic, に and a kana verb stem", () => {
+  const exercise = lesson010Exercises.find(
+    (item) => item.id === "exercise-kinou-gakkou-input",
+  );
+  assert.ok(exercise);
+
+  const result = checkAnswer(
+    "昨日学校にいきませんでした",
+    exercise.correctAnswers,
+    exercise.acceptableAnswers,
+  );
+
+  assert.equal(result.status, "acceptable");
+  assert.equal(
+    checkAnswer("いきませんでした", ["行きませんでした"]).status,
+    "correct",
+  );
+});
+
+test("いい inflections accept their standard 良 kanji spelling", () => {
+  const exercise = lesson012Exercises.find(
+    (item) => item.id === "exercise-tenki-yokatta-input",
+  );
+  assert.ok(exercise);
+
+  assert.equal(
+    checkAnswer(
+      "天気は良かったです",
+      exercise.correctAnswers,
+      exercise.acceptableAnswers,
+    ).status,
+    "correct",
+  );
+  assert.equal(
+    checkAnswer("良くありませんでした", ["よくなかったです"]).status,
+    "correct",
+  );
+});
+
+test("inflected i-adjectives normalize kanji and kana consistently", () => {
+  assert.equal(
+    checkAnswer("旅行は楽しかったです", ["りょこうはたのしかったです"]).status,
+    "correct",
+  );
+  assert.equal(
+    checkAnswer("昨日は寒くありませんでした", ["きのうはさむくなかったです"]).status,
+    "correct",
+  );
 });
 
 test("time answers accept Arabic digits and optional 今は", () => {

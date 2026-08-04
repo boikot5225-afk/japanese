@@ -32,8 +32,21 @@ import { lesson025Bundle } from "./lesson025";
 import { lesson026Bundle } from "./lesson026";
 import { lesson027Bundle } from "./lesson027";
 import { lesson028Bundle } from "./lesson028";
+import { lesson029Bundle } from "./lesson029";
+import { lesson030Bundle } from "./lesson030";
+import { lesson031Bundle } from "./lesson031";
+import { lesson032Bundle } from "./lesson032";
+import { lesson033Bundle } from "./lesson033";
+import { lesson034Bundle } from "./lesson034";
+import { lesson035Bundle } from "./lesson035";
+import { lesson036Bundle } from "./lesson036";
+import { lesson037Bundle } from "./lesson037";
+import { lesson038Bundle } from "./lesson038";
+import { lesson039Bundle } from "./lesson039";
+import { lesson040Bundle } from "./lesson040";
 import type { Lesson } from "../domain/course";
 import type { LessonBundle } from "./lessonBundle";
+import { integrateKanjiCurriculumSequence } from "./kanjiCurriculum";
 import { diversifyLessonPractice } from "./practiceDiversity";
 import { expandLessonPractice } from "./practiceExpansion";
 
@@ -87,6 +100,18 @@ const baseLessonBundles: readonly LessonBundle[] = [
   lesson026Bundle,
   lesson027Bundle,
   lesson028Bundle,
+  lesson029Bundle,
+  lesson030Bundle,
+  lesson031Bundle,
+  lesson032Bundle,
+  lesson033Bundle,
+  lesson034Bundle,
+  lesson035Bundle,
+  lesson036Bundle,
+  lesson037Bundle,
+  lesson038Bundle,
+  lesson039Bundle,
+  lesson040Bundle,
 ];
 
 const expandedLessonBundles: readonly LessonBundle[] = baseLessonBundles.map((bundle) =>
@@ -114,13 +139,16 @@ const exerciseMinutes = (bundle: LessonBundle): number =>
   }, 0);
 
 const withReviewedDuration = (bundle: LessonBundle): LessonBundle => {
-  if (bundle.lesson.order <= 10) return bundle;
-
   const studyMinutes =
     bundle.grammar.length * 1.1 +
     bundle.vocabulary.length * 0.2 +
+    (bundle.kanji?.length ?? 0) * 2.4 +
     bundle.sentences.length * 0.35;
-  const estimatedMinutes = Math.ceil(studyMinutes + exerciseMinutes(bundle));
+  const guidedReviewMinutes = 1.5;
+  const calculatedMinutes = Math.ceil(
+    studyMinutes + exerciseMinutes(bundle) + guidedReviewMinutes,
+  );
+  const estimatedMinutes = Math.min(30, Math.max(14, calculatedMinutes));
 
   return {
     ...bundle,
@@ -131,9 +159,12 @@ const withReviewedDuration = (bundle: LessonBundle): LessonBundle => {
   };
 };
 
-export const lessonBundles: readonly LessonBundle[] = expandedLessonBundles
-  .map((bundle) => diversifyLessonPractice(bundle, expandedLessonBundles))
-  .map(withReviewedDuration);
+const diversifiedLessonBundles: readonly LessonBundle[] = expandedLessonBundles
+  .map((bundle) => diversifyLessonPractice(bundle, expandedLessonBundles));
+
+export const lessonBundles: readonly LessonBundle[] = integrateKanjiCurriculumSequence(
+  diversifiedLessonBundles,
+).map(withReviewedDuration);
 
 export const lesson001Bundle = lessonBundles[0] ?? lesson001BaseBundle;
 
@@ -246,6 +277,45 @@ export const courseUnits: CourseUnit[] = [
       requireLesson("lesson-026"),
       requireLesson("lesson-027"),
       requireLesson("lesson-028"),
+    ],
+  },
+  {
+    id: "unit-009",
+    title: "Опыт, варианты и необходимость",
+    description:
+      "Прошлый опыт, перечисление характерных действий, советы, обязанность и отсутствие необходимости.",
+    jlptLevel: "N5",
+    lessons: [
+      requireLesson("lesson-029"),
+      requireLesson("lesson-030"),
+      requireLesson("lesson-031"),
+      requireLesson("lesson-032"),
+    ],
+  },
+  {
+    id: "unit-010",
+    title: "Разговор о действиях и времени",
+    description:
+      "Приглашения и предложения, уже завершённые и ещё не завершённые действия, связанные описания и временные конструкции с ～とき.",
+    jlptLevel: "N5",
+    lessons: [
+      requireLesson("lesson-033"),
+      requireLesson("lesson-034"),
+      requireLesson("lesson-035"),
+      requireLesson("lesson-036"),
+    ],
+  },
+  {
+    id: "unit-011",
+    title: "Мысли, речь и планы",
+    description:
+      "Мнения и предположения через ～と思います, прямая и косвенная речь, намерения ～つもり, конкретные планы ～予定 и вероятность ～でしょう.",
+    jlptLevel: "N4",
+    lessons: [
+      requireLesson("lesson-037"),
+      requireLesson("lesson-038"),
+      requireLesson("lesson-039"),
+      requireLesson("lesson-040"),
     ],
   },
 ];

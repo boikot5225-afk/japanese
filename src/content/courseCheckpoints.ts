@@ -98,6 +98,39 @@ export const courseCheckpoints: readonly CourseCheckpoint[] = [
     questionCount: 18,
     passPercent: 80,
   },
+  {
+    id: "checkpoint-unit-009",
+    unitId: "unit-009",
+    title: "Контрольная точка: опыт, советы и необходимость",
+    description:
+      "Проверка уроков 29–32: ～たことがあります, ～たり～たりします, советы через ほうがいい и конструкции обязанности／отсутствия необходимости.",
+    lessonIds: ["lesson-029", "lesson-030", "lesson-031", "lesson-032"],
+    unlockLessonId: "lesson-033",
+    questionCount: 18,
+    passPercent: 80,
+  },
+  {
+    id: "checkpoint-unit-010",
+    unitId: "unit-010",
+    title: "Контрольная точка: действия и время",
+    description:
+      "Проверка уроков 33–36: приглашения и предложения, もう／まだ, соединительные формы прилагательных и существительных, временная конструкция ～とき.",
+    lessonIds: ["lesson-033", "lesson-034", "lesson-035", "lesson-036"],
+    unlockLessonId: "lesson-037",
+    questionCount: 18,
+    passPercent: 80,
+  },
+  {
+    id: "checkpoint-unit-011",
+    unitId: "unit-011",
+    title: "Контрольная точка: мысли, речь и планы",
+    description:
+      "Проверка уроков 37–40: ～と思います, прямая и косвенная речь с と言います, намерение ～つもり, план ～予定 и вероятность ～でしょう.",
+    lessonIds: ["lesson-037", "lesson-038", "lesson-039", "lesson-040"],
+    unlockLessonId: "lesson-041",
+    questionCount: 18,
+    passPercent: 80,
+  },
 ];
 
 export const findCheckpoint = (checkpointId: string): CourseCheckpoint | undefined =>

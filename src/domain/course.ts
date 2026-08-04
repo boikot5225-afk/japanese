@@ -28,6 +28,37 @@ export interface VocabularyItem {
   tags?: string[];
 }
 
+export interface KanjiExample {
+  written: string;
+  reading: string;
+  kanjiReading: string;
+  meaningRu: string;
+  /**
+   * Character means an exact contextual reading of the highlighted glyph.
+   * Word means that only the complete lesson word reading is known, so the UI
+   * must ask for the word rather than pretend that it knows an individual
+   * on/kun segment inside a compound.
+   */
+  readingScope?: "character" | "word";
+}
+
+export interface KanjiItem {
+  id: string;
+  type: "kanji";
+  literal: string;
+  meaningsRu: string[];
+  jlptLevel: JlptLevel;
+  introducedInLessonId: string;
+  examples: KanjiExample[];
+  /**
+   * True when the glyph is introduced because it is required by an actual
+   * lesson word/example/test, but is outside the curated standalone N5 list.
+   * Its cue is therefore the lesson word context, not a fabricated dictionary
+   * definition of the isolated character.
+   */
+  contextualOnly?: boolean;
+}
+
 export interface GrammarPoint {
   id: string;
   type: "grammar";
@@ -50,7 +81,7 @@ export interface ExampleSentence {
   vocabularyIds: string[];
 }
 
-export type LearningItem = VocabularyItem | GrammarPoint | ExampleSentence;
+export type LearningItem = VocabularyItem | KanjiItem | GrammarPoint | ExampleSentence;
 
 export type ExerciseType =
   | "multiple-choice"
@@ -75,6 +106,7 @@ export interface Exercise {
   difficulty?: 1 | 2 | 3 | 4;
   confusionItemIds?: string[];
   audioText?: string;
+  skill?: Skill;
   sessionRole?: "core" | "remediation";
 }
 

@@ -1,8 +1,10 @@
 import type { AnswerStatus } from "./checkAnswer";
+import type { WritingGrade } from "./writingSession";
 
 export interface ExerciseAttempt {
   exerciseId: string;
   status: AnswerStatus;
+  writingGrade?: WritingGrade;
 }
 
 export interface LessonResult {

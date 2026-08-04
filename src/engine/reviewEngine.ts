@@ -1,6 +1,6 @@
 import type { Exercise, Skill } from "../domain/course";
-import { getExerciseContentKey } from "./exerciseIdentity";
 import type { AnswerStatus } from "./checkAnswer";
+import { getExerciseContentKey } from "./exerciseIdentity";
 
 export type AttemptSource = "lesson" | "review" | "practice";
 
@@ -59,7 +59,13 @@ export interface ReviewSessionOptions {
   recentAttemptLimit?: number;
 }
 
+type KanjiSelfGrade = 1 | 2 | 3 | 4;
+
 const DAY_MS = 24 * 60 * 60 * 1000;
+const SECOND_MS = 1000;
+const DAY_SECONDS = 24 * 60 * 60;
+const INITIAL_RIGHT_SECONDS = 7 * DAY_SECONDS;
+const MAX_INTERVAL_SECONDS = 31_556_952;
 const successfulStatuses: AnswerStatus[] = ["correct", "acceptable"];
 const WEAKNESS_THRESHOLD = 5;
 const DEFAULT_RECENT_ATTEMPT_LIMIT = 40;
@@ -68,6 +74,8 @@ export const isSuccessfulStatus = (status: AnswerStatus): boolean =>
   successfulStatuses.includes(status);
 
 export const inferExerciseSkill = (exercise: Exercise): Skill => {
+  if (exercise.skill) return exercise.skill;
+
   switch (exercise.type) {
     case "listening":
       return "listening";
@@ -86,15 +94,196 @@ export const inferExerciseSkill = (exercise: Exercise): Skill => {
   }
 };
 
-export const reviewItemKey = (item: Pick<ReviewItem, "itemId" | "skill">): string =>
-  `${item.itemId}:${item.skill}`;
+/**
+ * Skritter has one definition part. Older app builds could store that part as
+ * either recognition or recall, leaving a second permanently-due record behind.
+ * Canonicalize kanji meaning to recognition everywhere while preserving recall
+ * as a separate skill for ordinary vocabulary and grammar.
+ */
+export const canonicalReviewSkill = (itemId: string, skill: Skill): Skill =>
+  itemId.startsWith("kanji-") && skill === "recall" ? "recognition" : skill;
+
+export const reviewItemKey = (
+  item: Pick<ReviewItem, "itemId" | "skill">,
+): string => `${item.itemId}:${canonicalReviewSkill(item.itemId, item.skill)}`;
 
 export const reviewQuestionCoverageKey = (
   question: Pick<ReviewSessionQuestion, "items">,
 ): string => question.items.map(reviewItemKey).sort().join("|");
 
+const validTime = (value: string): number => {
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const canonicalizeReviewItem = (item: ReviewItem): ReviewItem => ({
+  ...item,
+  skill: canonicalReviewSkill(item.itemId, item.skill),
+});
+
+const sameReviewSnapshot = (left: ReviewItem, right: ReviewItem): boolean =>
+  left.exerciseId === right.exerciseId &&
+  left.lessonId === right.lessonId &&
+  left.dueAt === right.dueAt &&
+  left.intervalDays === right.intervalDays &&
+  left.ease === right.ease &&
+  left.streak === right.streak &&
+  left.correctCount === right.correctCount &&
+  left.incorrectCount === right.incorrectCount &&
+  left.lapseCount === right.lapseCount &&
+  left.lastStatus === right.lastStatus &&
+  left.lastAnsweredAt === right.lastAnsweredAt;
+
+const mergeReviewItems = (left: ReviewItem, right: ReviewItem): ReviewItem => {
+  const canonicalLeft = canonicalizeReviewItem(left);
+  const canonicalRight = canonicalizeReviewItem(right);
+  if (sameReviewSnapshot(canonicalLeft, canonicalRight)) return canonicalLeft;
+
+  const latest =
+    validTime(canonicalRight.lastAnsweredAt) > validTime(canonicalLeft.lastAnsweredAt)
+      ? canonicalRight
+      : canonicalLeft;
+  const earliestDue =
+    validTime(canonicalRight.dueAt) < validTime(canonicalLeft.dueAt)
+      ? canonicalRight.dueAt
+      : canonicalLeft.dueAt;
+
+  return {
+    ...latest,
+    skill: canonicalReviewSkill(latest.itemId, latest.skill),
+    dueAt: earliestDue,
+    intervalDays: Math.min(canonicalLeft.intervalDays, canonicalRight.intervalDays),
+    ease: Math.min(canonicalLeft.ease, canonicalRight.ease),
+    streak: Math.min(canonicalLeft.streak, canonicalRight.streak),
+    correctCount: canonicalLeft.correctCount + canonicalRight.correctCount,
+    incorrectCount: canonicalLeft.incorrectCount + canonicalRight.incorrectCount,
+    lapseCount: canonicalLeft.lapseCount + canonicalRight.lapseCount,
+  };
+};
+
+/**
+ * Repairs duplicate item+skill records while preserving the newest answer and
+ * the earliest pending due date. Map insertion order keeps the newest-first
+ * storage order used by the app.
+ */
+export const normalizeReviewItems = (
+  items: readonly ReviewItem[],
+): ReviewItem[] => {
+  const normalized = new Map<string, ReviewItem>();
+  items.forEach((rawItem) => {
+    const item = canonicalizeReviewItem(rawItem);
+    const key = reviewItemKey(item);
+    const existing = normalized.get(key);
+    normalized.set(key, existing ? mergeReviewItems(existing, item) : item);
+  });
+  return [...normalized.values()];
+};
+
 const addDays = (date: Date, days: number): string =>
   new Date(date.getTime() + days * DAY_MS).toISOString();
+
+const getKanjiSelfGrade = (exercise: Exercise): KanjiSelfGrade | null => {
+  const match = exercise.variantGroup?.match(/^kanji-self-grade:([1-4])$/);
+  if (!match) return null;
+  const grade = Number(match[1]);
+  return grade >= 1 && grade <= 4 ? grade as KanjiSelfGrade : null;
+};
+
+const randomizeInterval = (intervalSeconds: number): number =>
+  Math.round(intervalSeconds * (0.925 + Math.random() * 0.15));
+
+const initialSkritterInterval = (grade: KanjiSelfGrade): number => {
+  switch (grade) {
+    case 1:
+      return 30;
+    case 2:
+    case 3:
+      return DAY_SECONDS;
+    case 4:
+      return randomizeInterval(INITIAL_RIGHT_SECONDS * 4);
+  }
+};
+
+/**
+ * Skritter Classic scheduling for definition and reading cards. It mirrors the
+ * app's non-continuous mode: score 1 returns after 30 seconds, every score above
+ * one is successful and is spaced at least one day, and overdue answers adjust
+ * the right/easy factor by actual readiness.
+ */
+const scheduleKanjiSelfGrade = (
+  existing: ReviewItem | undefined,
+  itemId: string,
+  skill: Skill,
+  exercise: Exercise,
+  lessonId: string,
+  status: AnswerStatus,
+  grade: KanjiSelfGrade,
+  now: Date,
+): ReviewItem => {
+  const previousIntervalSeconds = Math.max(
+    0,
+    (existing?.intervalDays ?? 0) * DAY_SECONDS,
+  );
+  const reviews =
+    (existing?.correctCount ?? 0) + (existing?.incorrectCount ?? 0);
+  const successes = existing?.correctCount ?? 0;
+  const success = grade > 1;
+
+  let intervalSeconds: number;
+  if (!existing || previousIntervalSeconds <= 0 || !existing.lastAnsweredAt) {
+    intervalSeconds = initialSkritterInterval(grade);
+  } else {
+    const lastSeconds = new Date(existing.lastAnsweredAt).getTime() / SECOND_MS;
+    const dueSeconds = new Date(existing.dueAt).getTime() / SECOND_MS;
+    const nowSeconds = now.getTime() / SECOND_MS;
+    const actualInterval = Math.max(nowSeconds - lastSeconds, 1);
+    const scheduledInterval = Math.max(
+      dueSeconds - lastSeconds,
+      previousIntervalSeconds,
+      1,
+    );
+
+    let factor: number;
+    if (grade === 2) factor = 0.9;
+    else if (grade === 4) factor = 3.5;
+    else factor = grade === 1 ? 0.25 : 2.2;
+
+    if (grade > 2) {
+      factor = (factor - 1) * (actualInterval / scheduledInterval) + 1;
+    }
+
+    if (successes === reviews && reviews < 5) {
+      factor *= 1.5;
+    }
+
+    if (reviews > 8 && reviews > 0 && successes / reviews < 0.5) {
+      factor *= (successes / reviews) ** 0.7;
+    }
+
+    intervalSeconds = randomizeInterval(previousIntervalSeconds * factor);
+    if (grade === 1) intervalSeconds = 30;
+    if (grade > 1) intervalSeconds = Math.max(DAY_SECONDS, intervalSeconds);
+    if (intervalSeconds > MAX_INTERVAL_SECONDS) {
+      intervalSeconds = randomizeInterval(MAX_INTERVAL_SECONDS);
+    }
+  }
+
+  return {
+    itemId,
+    skill,
+    exerciseId: exercise.id,
+    lessonId,
+    dueAt: new Date(now.getTime() + intervalSeconds * SECOND_MS).toISOString(),
+    intervalDays: intervalSeconds / DAY_SECONDS,
+    ease: existing?.ease ?? 2.3,
+    streak: success ? (existing?.streak ?? 0) + 1 : 0,
+    correctCount: (existing?.correctCount ?? 0) + (success ? 1 : 0),
+    incorrectCount: (existing?.incorrectCount ?? 0) + (success ? 0 : 1),
+    lapseCount: (existing?.lapseCount ?? 0) + (grade === 1 ? 1 : 0),
+    lastStatus: status,
+    lastAnsweredAt: now.toISOString(),
+  };
+};
 
 const weaknessScore = (item: ReviewItem): number =>
   item.incorrectCount * 4 + item.lapseCount * 3 - item.correctCount +
@@ -114,10 +303,28 @@ export function scheduleItemReview(
   status: AnswerStatus,
   now: Date,
 ): ReviewItem {
+  const canonicalSkill = canonicalReviewSkill(itemId, skill);
+  const canonicalExisting = existing
+    ? canonicalizeReviewItem(existing)
+    : undefined;
+  const kanjiSelfGrade = getKanjiSelfGrade(exercise);
+  if (kanjiSelfGrade) {
+    return scheduleKanjiSelfGrade(
+      canonicalExisting,
+      itemId,
+      canonicalSkill,
+      exercise,
+      lessonId,
+      status,
+      kanjiSelfGrade,
+      now,
+    );
+  }
+
   const success = isSuccessfulStatus(status);
-  const previousStreak = existing?.streak ?? 0;
+  const previousStreak = canonicalExisting?.streak ?? 0;
   const streak = success ? previousStreak + 1 : 0;
-  const previousEase = existing?.ease ?? 2.3;
+  const previousEase = canonicalExisting?.ease ?? 2.3;
   const ease = success
     ? Math.min(2.8, previousEase + (status === "correct" ? 0.05 : 0))
     : Math.max(1.3, previousEase - 0.2);
@@ -131,23 +338,23 @@ export function scheduleItemReview(
     } else {
       intervalDays = Math.max(
         7,
-        Math.round(Math.max(existing?.intervalDays ?? 3, 3) * ease),
+        Math.round(Math.max(canonicalExisting?.intervalDays ?? 3, 3) * ease),
       );
     }
   }
 
   return {
     itemId,
-    skill,
+    skill: canonicalSkill,
     exerciseId: exercise.id,
     lessonId,
     dueAt: success ? addDays(now, intervalDays) : now.toISOString(),
     intervalDays,
     ease,
     streak,
-    correctCount: (existing?.correctCount ?? 0) + (success ? 1 : 0),
-    incorrectCount: (existing?.incorrectCount ?? 0) + (success ? 0 : 1),
-    lapseCount: (existing?.lapseCount ?? 0) + (success ? 0 : 1),
+    correctCount: (canonicalExisting?.correctCount ?? 0) + (success ? 1 : 0),
+    incorrectCount: (canonicalExisting?.incorrectCount ?? 0) + (success ? 0 : 1),
+    lapseCount: (canonicalExisting?.lapseCount ?? 0) + (success ? 0 : 1),
     lastStatus: status,
     lastAnsweredAt: now.toISOString(),
   };
@@ -169,39 +376,37 @@ export function upsertReviewItem(
   items: ReviewItem[],
   updated: ReviewItem,
 ): ReviewItem[] {
-  const updatedKey = reviewItemKey(updated);
-  return [updated, ...items.filter((item) => reviewItemKey(item) !== updatedKey)];
+  const canonicalUpdated = canonicalizeReviewItem(updated);
+  const updatedKey = reviewItemKey(canonicalUpdated);
+  return [
+    canonicalUpdated,
+    ...items.filter((item) => reviewItemKey(item) !== updatedKey),
+  ];
 }
 
 export function getDueReviewItems(items: ReviewItem[], now: Date): ReviewItem[] {
   const nowMs = now.getTime();
-  return items
-    .filter((item) => new Date(item.dueAt).getTime() <= nowMs)
+  return normalizeReviewItems(items)
+    .filter((item) => validTime(item.dueAt) <= nowMs)
     .sort((left, right) => {
-      const dueDifference = new Date(left.dueAt).getTime() - new Date(right.dueAt).getTime();
-      if (dueDifference !== 0) {
-        return dueDifference;
-      }
+      const dueDifference = validTime(left.dueAt) - validTime(right.dueAt);
+      if (dueDifference !== 0) return dueDifference;
       return weaknessScore(right) - weaknessScore(left);
     });
 }
 
 export function getNextReviewAt(items: ReviewItem[]): string | null {
-  if (items.length === 0) {
-    return null;
-  }
-
-  return items.reduce<string | null>((earliest, item) => {
-    if (!earliest || new Date(item.dueAt).getTime() < new Date(earliest).getTime()) {
-      return item.dueAt;
-    }
+  const normalized = normalizeReviewItems(items);
+  if (normalized.length === 0) return null;
+  return normalized.reduce<string | null>((earliest, item) => {
+    if (!earliest || validTime(item.dueAt) < validTime(earliest)) return item.dueAt;
     return earliest;
   }, null);
 }
 
 export function getWeakTargetIds(items: ReviewItem[]): string[] {
   const weakIds = new Set<string>();
-  items
+  normalizeReviewItems(items)
     .filter(isWeakReviewItem)
     .sort((left, right) => weaknessScore(right) - weaknessScore(left))
     .forEach((item) => weakIds.add(item.itemId));
@@ -223,7 +428,7 @@ const exactSkillCandidates = (
 ): Exercise[] => exercises.filter(
   (exercise) =>
     exercise.targetItemIds.includes(item.itemId) &&
-    inferExerciseSkill(exercise) === item.skill,
+    canonicalReviewSkill(item.itemId, inferExerciseSkill(exercise)) === item.skill,
 );
 
 const recentContentRanks = (
@@ -252,13 +457,14 @@ export function selectExerciseForReview(
   excludedContentKeys: ReadonlySet<string> = new Set<string>(),
   recentRanks: ReadonlyMap<string, number> = new Map<string, number>(),
 ): Exercise | undefined {
-  const candidates = exactSkillCandidates(item, exercises).filter(
+  const canonicalItem = canonicalizeReviewItem(item);
+  const candidates = exactSkillCandidates(canonicalItem, exercises).filter(
     (exercise) => !excludedContentKeys.has(getExerciseContentKey(exercise)),
   );
   if (candidates.length === 0) return undefined;
 
-  const attempts = item.correctCount + item.incorrectCount;
-  const rotationOffset = stableHash(reviewItemKey(item)) % candidates.length;
+  const attempts = canonicalItem.correctCount + canonicalItem.incorrectCount;
+  const rotationOffset = stableHash(reviewItemKey(canonicalItem)) % candidates.length;
   const ordered = candidates
     .map((exercise, index) => {
       const contentKey = getExerciseContentKey(exercise);
@@ -266,7 +472,7 @@ export function selectExerciseForReview(
       const recentPenalty = recentRank === undefined
         ? 0
         : 1000 - Math.min(recentRank, 999);
-      const sameExercisePenalty = exercise.id === item.exerciseId ? 100 : 0;
+      const sameExercisePenalty = exercise.id === canonicalItem.exerciseId ? 100 : 0;
       const rotationPenalty =
         (index - ((attempts + rotationOffset) % candidates.length) + candidates.length) %
         candidates.length;
@@ -275,7 +481,10 @@ export function selectExerciseForReview(
         score: recentPenalty + sameExercisePenalty + rotationPenalty,
       };
     })
-    .sort((left, right) => left.score - right.score || left.exercise.id.localeCompare(right.exercise.id));
+    .sort(
+      (left, right) =>
+        left.score - right.score || left.exercise.id.localeCompare(right.exercise.id),
+    );
 
   return ordered[0]?.exercise;
 }
@@ -289,6 +498,7 @@ export function buildReviewSession(
 ): ReviewSessionQuestion[] {
   if (limit <= 0) return [];
 
+  const normalizedDueItems = normalizeReviewItems(dueItems);
   const allExercises = [...exercisesByLesson.values()].flatMap((items) => [...items]);
   const exerciseById = new Map(allExercises.map((exercise) => [exercise.id, exercise]));
   const recentRanks = recentContentRanks(
@@ -300,7 +510,7 @@ export function buildReviewSession(
   const assignedItemKeys = new Set<string>();
   const questions: ReviewSessionQuestion[] = [];
 
-  for (const item of dueItems) {
+  for (const item of normalizedDueItems) {
     const itemKey = reviewItemKey(item);
     if (assignedItemKeys.has(itemKey)) continue;
 
@@ -313,8 +523,8 @@ export function buildReviewSession(
     );
     if (!exercise) continue;
 
-    const skill = inferExerciseSkill(exercise);
-    const coveredItems = dueItems.filter(
+    const skill = canonicalReviewSkill(item.itemId, inferExerciseSkill(exercise));
+    const coveredItems = normalizedDueItems.filter(
       (candidate) =>
         !assignedItemKeys.has(reviewItemKey(candidate)) &&
         candidate.lessonId === item.lessonId &&
@@ -343,14 +553,14 @@ export function migrateLegacyReviewItems(
   exercises: Exercise[],
 ): ReviewItem[] {
   const exerciseById = new Map(exercises.map((exercise) => [exercise.id, exercise]));
-  return [...legacyItems].reverse().reduce<ReviewItem[]>((items, legacy) => {
+  const migrated = [...legacyItems].reverse().reduce<ReviewItem[]>((items, legacy) => {
     const exercise = exerciseById.get(legacy.exerciseId);
     if (!exercise) return items;
     const skill = inferExerciseSkill(exercise);
     return legacy.targetItemIds.reduce((current, itemId) =>
       upsertReviewItem(current, {
         itemId,
-        skill,
+        skill: canonicalReviewSkill(itemId, skill),
         exerciseId: legacy.exerciseId,
         lessonId: legacy.lessonId,
         dueAt: legacy.dueAt,
@@ -364,6 +574,7 @@ export function migrateLegacyReviewItems(
         lastAnsweredAt: legacy.lastAnsweredAt,
       }), items);
   }, []);
+  return normalizeReviewItems(migrated);
 }
 
 export function createAttemptLogEntry(

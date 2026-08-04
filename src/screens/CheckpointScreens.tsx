@@ -1,6 +1,8 @@
 import { SafeAreaView, ScrollView, StatusBar, Text, TouchableOpacity, View } from "react-native";
 
+import { KeyboardSafeScrollView } from "../components/KeyboardSafeScrollView";
 import { PracticeCard } from "../components/PracticeCard";
+import type { SkritterWritingResult } from "../components/SkritterWritingPad";
 import { SwipeNavigationView } from "../components/SwipeNavigationView";
 import type { CourseCheckpoint } from "../content/courseCheckpoints";
 import type { Exercise } from "../domain/course";
@@ -23,6 +25,7 @@ interface CheckpointScreenProps {
   onRemoveToken: (index: number) => void;
   onClearTokens: () => void;
   onSubmit: () => void;
+  onWritingComplete: (result: SkritterWritingResult) => void;
   onContinue: () => void;
   onCourse: () => void;
 }
@@ -42,6 +45,7 @@ export function CheckpointScreen({
   onRemoveToken,
   onClearTokens,
   onSubmit,
+  onWritingComplete,
   onContinue,
   onCourse,
 }: CheckpointScreenProps) {
@@ -49,7 +53,7 @@ export function CheckpointScreen({
     <SwipeNavigationView onBack={onCourse}>
       <SafeAreaView style={styles.safeArea}>
         <StatusBar barStyle="dark-content" />
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <KeyboardSafeScrollView contentContainerStyle={styles.container}>
           <TouchableOpacity style={styles.backLink} onPress={onCourse}>
             <Text style={styles.backLinkText}>‹ Прервать проверку</Text>
           </TouchableOpacity>
@@ -75,9 +79,10 @@ export function CheckpointScreen({
             onRemoveToken={onRemoveToken}
             onClearTokens={onClearTokens}
             onSubmit={onSubmit}
+            onWritingComplete={onWritingComplete}
             onContinue={onContinue}
           />
-        </ScrollView>
+        </KeyboardSafeScrollView>
       </SafeAreaView>
     </SwipeNavigationView>
   );

@@ -1,13 +1,18 @@
 {
   "name": "japanese-tutor",
-  "version": "0.14.1",
+  "version": "0.22.6",
   "private": true,
   "main": "expo/AppEntry.js",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
     "web": "expo start --web",
-    "test:review": "tsx --test src/engine/reviewEngine.test.ts",
+    "generate:kanji-strokes": "node scripts/generate-kanji-strokes.mjs",
+    "test:review": "tsx --test src/engine/reviewEngine.test.ts src/engine/kanjiClassicSchedule.test.ts src/engine/kanjiSelfGradeReview.test.ts src/engine/kanjiReviewNormalization.test.ts src/engine/reviewPresentation.test.ts",
+    "test:kanji-progress": "tsx --test src/engine/kanjiProgress.test.ts",
+    "test:kanji-strokes": "tsx --test src/engine/kanjiStrokeEngine.test.ts src/engine/skritterWritingGestures.test.ts",
+    "test:writing-session": "tsx --test src/engine/writingSession.test.ts",
+    "test:writing-review": "tsx --test src/engine/writingReview.test.ts",
     "test:lesson-review": "tsx --test src/engine/lessonReview.test.ts",
     "test:practice-queue": "node --experimental-strip-types --test src/engine/practiceQueue.test.ts",
     "test:checkpoint": "tsx --test src/engine/checkpointEngine.test.ts",
@@ -19,9 +24,10 @@
     "test:speech": "node --experimental-strip-types --test src/audio/japaneseSpeechText.test.ts",
     "test:exercise-speech": "node --experimental-strip-types --test src/audio/exerciseSpeechText.test.ts",
     "test:content": "tsx --test src/content/*.test.ts",
-    "test": "npm run test:review && npm run test:lesson-review && npm run test:practice-queue && npm run test:checkpoint && npm run test:answer && npm run test:kana && npm run test:kana-words && npm run test:katakana && npm run test:numbers && npm run test:speech && npm run test:exercise-speech && npm run test:content",
+    "test": "npm run test:review && npm run test:kanji-progress && npm run test:kanji-study && npm run test:kanji-strokes && npm run test:writing-session && npm run test:writing-review && npm run test:lesson-review && npm run test:practice-queue && npm run test:checkpoint && npm run test:answer && npm run test:kana && npm run test:kana-words && npm run test:katakana && npm run test:numbers && npm run test:speech && npm run test:exercise-speech && npm run test:content",
     "typecheck": "tsc --noEmit",
-    "typecheck:tests": "tsc --noEmit -p tsconfig.tests.json"
+    "typecheck:tests": "tsc --noEmit -p tsconfig.tests.json",
+    "test:kanji-study": "tsx --test src/engine/kanjiStudySession.test.ts src/engine/kanjiDueBoundary.test.ts src/engine/kanjiLessonBridge.test.ts"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -29,7 +35,8 @@
     "expo-speech": "~14.0.8",
     "expo-status-bar": "~3.0.0",
     "react": "19.1.0",
-    "react-native": "0.81.4"
+    "react-native": "0.81.4",
+    "react-native-svg": "15.12.1"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
