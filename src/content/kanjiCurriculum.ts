@@ -355,6 +355,39 @@ export const maskKanjiInExample = (item: KanjiItem): string => {
   return `${written.slice(0, index)}□${written.slice(index + item.literal.length)}`;
 };
 
+export interface KanjiDefinitionPresentation {
+  contextual: boolean;
+  prompt: string;
+  written: string;
+  answer: string;
+  detail: string;
+}
+
+export const getKanjiDefinitionPresentation = (
+  item: KanjiItem,
+): KanjiDefinitionPresentation => {
+  const example = item.examples[0];
+  if (item.contextualOnly && example) {
+    return {
+      contextual: true,
+      prompt: "Что означает это слово?",
+      written: example.written,
+      answer: example.meaningRu,
+      detail: `Сейчас изучается знак ${item.literal} внутри слова ${example.written}（${example.reading}）. Значение «${example.meaningRu}» относится ко всему слову, а не к ${item.literal} отдельно.`,
+    };
+  }
+
+  return {
+    contextual: false,
+    prompt: "Что означает этот кандзи?",
+    written: item.literal,
+    answer: item.meaningsRu.join(", "),
+    detail: example
+      ? `${example.written}（${example.reading}）— ${example.meaningRu}`
+      : `${item.literal} — )}.`,
+  };
+};
+
 export const createKanjiWritingExercise = (
   lessonId: string,
   item: KanjiItem,

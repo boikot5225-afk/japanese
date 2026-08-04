@@ -6,6 +6,7 @@ import { lessonBundles } from "./courseCatalog.ts";
 import { n5KanjiCatalog } from "./kanjiCatalog.ts";
 import {
   extractKanjiLiterals,
+  getKanjiDefinitionPresentation,
   getRequiredLessonKanjiLiterals,
 } from "./kanjiCurriculum.ts";
 
@@ -79,6 +80,21 @@ test("lesson 13 words are covered by cumulative writing introduction", () => {
   "静元気有名便利町公園図書館".split("").forEach((literal) => {
     assert.ok(cumulative.has(literal), "expected lesson context glyph missing: " + literal);
   });
+});
+
+test("context-only kanji cards show the complete compound instead of lying about one glyph", () => {
+  const lesson13 = lessonBundles.find((bundle) => bundle.lesson.id === "lesson-013");
+  assert.ok(lesson13);
+  const yu = lesson13.kanji?.find((item) => item.literal === "有");
+  assert.ok(yu);
+  assert.equal(yu.contextualOnly, true);
+
+  const presentation = getKanjiDefinitionPresentation(yu);
+  assert.equal(presentation.contextual, true);
+  assert.equal(presentation.written, "有名");
+  assert.equal(presentation.answer, yu.examples[0]?.meaningRu);
+  assert.match(presentation.detail, /относится ко всему слову/u);
+  assert.doesNotMatch(presentation.prompt, /этот кандзи/u);
 });
 
 test("language practice stays compact while every new lesson kanji gets three review skills", () => {

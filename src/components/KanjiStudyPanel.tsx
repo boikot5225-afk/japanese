@@ -8,7 +8,10 @@ import {
 } from "react-native";
 
 import { speakJapanese } from "../audio/japaneseSpeech";
-import { maskKanjiInExample } from "../content/kanjiCurriculum";
+import {
+  getKanjiDefinitionPresentation,
+  maskKanjiInExample,
+} from "../content/kanjiCurriculum";
 import { getKanjiStrokeData } from "../content/kanjiStrokeData";
 import type { KanjiItem } from "../domain/course";
 import type { KanjiProgressSummary } from "../engine/kanjiProgress";
@@ -215,6 +218,9 @@ export function KanjiStudyPanel({
   const item = card ? itemById.get(card.itemId) : undefined;
   const itemProgress = item ? progressById.get(item.id) : undefined;
   const example = item?.examples[0];
+  const definitionPresentation = item
+    ? getKanjiDefinitionPresentation(item)
+    : undefined;
   const writingMode = card ? writingModeForPart(card.part) : null;
   const nextAvailableAt = findNextKanjiCardAvailableAt(queue, clockMs);
 
@@ -425,8 +431,24 @@ export function KanjiStudyPanel({
 
       {card.part === "preview" && (
         <View style={styles.studyCard}>
-          <Text style={styles.previewGlyph}>{item.literal}</Text>
-          <Text style={styles.previewMeaning}>{item.meaningsRu.join(", ")}</Text>
+          {item.contextualOnly && example ? (
+            <>
+              <Text style={styles.promptLabel}>
+                Изучаем знак {item.literal} внутри слова
+              </Text>
+              <ReadingWord written={example.written} literal={item.literal} />
+              <Text style={styles.previewMeaning}>{example.meaningRu}</Text>
+              <Text style={styles.contextualNote}>
+                Значение относится ко всему сочетанию. На письме будет
+                отрабатываться выделенный знак.
+              </Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.previewGlyph}>{item.literal}</Text>
+              <Text style={styles.previewMeaning}>{item.meaningsRu.join(", ")}</Text>
+            </>
+          )}
           {example && (
             <View style={styles.answerBox}>
               <View style={styles.wordRow}>
@@ -458,10 +480,14 @@ export function KanjiStudyPanel({
         </View>
       )}
 
-      {card.part === "definition" && (
+      {card.part === "definition" && definitionPresentation && (
         <View style={styles.studyCard}>
-          <Text style={styles.promptLabel}>Что означает этот кандзи?</Text>
-          <Text style={styles.questionGlyph}>{item.literal}</Text>
+          <Text style={styles.promptLabel}>{definitionPresentation.prompt}</Text>
+          {definitionPresentation.contextual && example ? (
+            <ReadingWord written={definitionPresentation.written} literal={item.literal} />
+          ) : (
+            <Text style={styles.questionGlyph}>{definitionPresentation.written}</Text>
+          )}
           {!revealed ? (
             <TouchableOpacity style={styles.revealButton} onPress={() => setRevealed(true)}>
               <Text style={styles.revealButtonText}>Показать ответ</Text>
@@ -469,12 +495,8 @@ export function KanjiStudyPanel({
           ) : (
             <View style={styles.revealedArea}>
               <View style={styles.answerBox}>
-                <Text style={styles.answerTitle}>{item.meaningsRu.join(", ")}</Text>
-                {example && (
-                  <Text style={styles.answerDetail}>
-                    {example.written}（{example.reading}）— {example.meaningRu}
-                  </Text>
-                )}
+                <Text style={styles.answerTitle}>{definitionPresentation.answer}</Text>
+                <Text style={styles.answerDetail}>{definitionPresentation.detail}</Text>
               </View>
               {mode === "learn" ? (
                 <TouchableOpacity style={styles.primaryButton} onPress={advanceLearn}>
@@ -663,6 +685,12 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   previewMeaning: { textAlign: "center", color: "#15202b", fontSize: 22, fontWeight: "900" },
+  contextualNote: {
+    textAlign: "center",
+    color: "#66788a",
+    fontSize: 14,
+    lineHeight: 20,
+  },
   answerBox: { gap: 6, padding: 14, borderRadius: 17, backgroundColor: "#f2f6f9" },
   wordRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   wordCopy: { flex: 1, gap: 2 },
