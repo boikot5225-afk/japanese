@@ -144,9 +144,10 @@ export function KanjiLessonStage({ lessonId, kanji }: KanjiLessonStageProps) {
       </View>
 
       <Text style={styles.intro}>
-        Каждый новый знак проходит полный цикл: Preview → значение → чтение →
-        Writing Teach → Writing Snap → Writing Recall. До завершения всех шести
-        этапов знание не считается изученным и не попадает в SRS.
+        Каждый новый знак, который встретится в словах, примерах или тестах
+        этого урока, проходит полный цикл: Preview → значение → чтение →
+        Writing Teach → Writing Snap → Writing Recall. Уже изученные знаки
+        повторно с нуля не вводятся.
       </Text>
 
       {kanji.map((item) => {
@@ -161,7 +162,7 @@ export function KanjiLessonStage({ lessonId, kanji }: KanjiLessonStageProps) {
               <View style={styles.headerText}>
                 <Text style={styles.meaning}>{item.meaningsRu.join(", ")}</Text>
                 <Text style={styles.level}>
-                  JLPT N5 · {complete ? "цикл завершён" : "ожидает полного цикла"}
+                  Материал урока · {complete ? "цикл завершён" : "ожидает полного цикла"}
                 </Text>
               </View>
               {complete && <Text style={styles.checkmark}>✓</Text>}
@@ -186,8 +187,16 @@ export function KanjiLessonStage({ lessonId, kanji }: KanjiLessonStageProps) {
 
             {example && (
               <View style={styles.focusRow}>
-                <Text style={styles.focusLabel}>Чтение знака в этом слове</Text>
-                <Text style={styles.focusReading}>{example.kanjiReading}</Text>
+                <Text style={styles.focusLabel}>
+                  {example.readingScope === "word"
+                    ? "Чтение слова целиком"
+                    : "Чтение знака в этом слове"}
+                </Text>
+                <Text style={styles.focusReading}>
+                  {example.readingScope === "word"
+                    ? example.reading
+                    : example.kanjiReading}
+                </Text>
               </View>
             )}
           </View>

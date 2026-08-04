@@ -19,9 +19,15 @@ const point = (x, y) => ({ x, y });
 const distance = (left, right) => Math.hypot(right.x - left.x, right.y - left.y);
 
 const extractLiterals = () => {
-  const source = fs.readFileSync(catalogFile, "utf8");
-  const literals = [...source.matchAll(/kanji\("([^"]+)"/gu)].map((match) => match[1]);
-  return [...new Set(literals)];
+  const contentDirectory = path.join(repositoryRoot, "src/content");
+  const sourceFiles = fs.readdirSync(contentDirectory)
+    .filter((name) => name.endsWith(".ts"))
+    .filter((name) => !name.endsWith(".test.ts"))
+    .filter((name) => name !== "kanjiStrokeData.ts");
+  const source = sourceFiles
+    .map((name) => fs.readFileSync(path.join(contentDirectory, name), "utf8"))
+    .join("\n");
+  return [...new Set(source.match(/\p{Script=Han}/gu) ?? [])];
 };
 
 const tokenizePath = (value) =>

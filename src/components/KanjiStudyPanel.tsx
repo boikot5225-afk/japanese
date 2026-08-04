@@ -8,6 +8,7 @@ import {
 } from "react-native";
 
 import { speakJapanese } from "../audio/japaneseSpeech";
+import { maskKanjiInExample } from "../content/kanjiCurriculum";
 import { getKanjiStrokeData } from "../content/kanjiStrokeData";
 import type { KanjiItem } from "../domain/course";
 import type { KanjiProgressSummary } from "../engine/kanjiProgress";
@@ -142,6 +143,7 @@ function WritingPrompt({
 }) {
   const example = item.examples[0];
   const recall = mode === "recall";
+  const maskedExample = maskKanjiInExample(item);
 
   return (
     <View style={styles.writingPrompt}>
@@ -151,15 +153,19 @@ function WritingPrompt({
         </Text>
         {!recall && <Text style={styles.writingPromptGlyph}>{item.literal}</Text>}
         <Text style={styles.writingPromptMeaning}>
-          {item.meaningsRu.join(", ")}
+          {item.contextualOnly && example
+            ? `Подсказка: ${recall ? maskedExample : example.written}`
+            : item.meaningsRu.join(", ")}
         </Text>
         {example && (
           <>
             <Text style={styles.writingPromptReading}>
-              Чтение: {example.kanjiReading}
+              {example.readingScope === "word"
+                ? `Чтение слова: ${example.reading}`
+                : `Чтение знака: ${example.kanjiReading}`}
             </Text>
             <Text style={styles.writingPromptContext}>
-              Слово звучит: {example.reading} — {example.meaningRu}
+              {recall ? maskedExample : example.written}（{example.reading}）— {example.meaningRu}
             </Text>
           </>
         )}
@@ -363,11 +369,11 @@ export function KanjiStudyPanel({
         </Text>
         <Text style={styles.completeBody}>
           {mode === "learn"
-            ? "Все 103 кандзи списка JLPT N5 введены в повторение."
+            ? "Все новые кандзи этого урока введены в повторение."
             : `Ответов: ${stats.answered}. Забыл: ${stats.forgotten}. Знаю: ${stats.remembered}.`}
         </Text>
         <TouchableOpacity style={styles.primaryButton} onPress={onExit}>
-          <Text style={styles.primaryButtonText}>К списку N5</Text>
+          <Text style={styles.primaryButtonText}>К списку</Text>
         </TouchableOpacity>
       </View>
     );
@@ -384,7 +390,7 @@ export function KanjiStudyPanel({
         </TouchableOpacity>
         <View style={styles.headerCopy}>
           <Text style={styles.eyebrow}>
-            {mode === "learn" ? "Learn · JLPT N5" : "Review · JLPT N5"}
+            {mode === "learn" ? "Learn · кандзи урока" : "Review · кандзи"}
           </Text>
           <Text style={styles.counter}>
             {mode === "learn"
@@ -437,7 +443,9 @@ export function KanjiStudyPanel({
                 </TouchableOpacity>
               </View>
               <Text style={styles.focusReading}>
-                {item.literal} здесь читается {example.kanjiReading}
+                {example.readingScope === "word"
+                  ? `Слово целиком читается ${example.reading}`
+                  : `${item.literal} здесь читается ${example.kanjiReading}`}
               </Text>
             </View>
           )}
@@ -482,8 +490,16 @@ export function KanjiStudyPanel({
 
       {card.part === "reading" && (
         <View style={styles.studyCard}>
-          <Text style={styles.promptLabel}>Как читается выделенный знак?</Text>
-          <ReadingWord written={example?.written ?? item.literal} literal={item.literal} />
+          <Text style={styles.promptLabel}>
+            {example?.readingScope === "word"
+              ? "Как читается это слово?"
+              : "Как читается выделенный знак?"}
+          </Text>
+          {example?.readingScope === "word" ? (
+            <Text style={styles.questionWord}>{example.written}</Text>
+          ) : (
+            <ReadingWord written={example?.written ?? item.literal} literal={item.literal} />
+          )}
           {example && <Text style={styles.translation}>{example.meaningRu}</Text>}
           {!revealed ? (
             <TouchableOpacity style={styles.revealButton} onPress={() => setRevealed(true)}>
@@ -494,7 +510,11 @@ export function KanjiStudyPanel({
               <View style={styles.answerBox}>
                 <View style={styles.wordRow}>
                   <View style={styles.wordCopy}>
-                    <Text style={styles.answerTitle}>{example?.kanjiReading ?? "—"}</Text>
+                    <Text style={styles.answerTitle}>
+                      {example?.readingScope === "word"
+                        ? example?.reading ?? "—"
+                        : example?.kanjiReading ?? "—"}
+                    </Text>
                     <Text style={styles.answerDetail}>
                       Всё слово: {example?.reading ?? item.literal}
                     </Text>
