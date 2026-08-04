@@ -46,7 +46,7 @@ import { lesson039Bundle } from "./lesson039";
 import { lesson040Bundle } from "./lesson040";
 import type { Lesson } from "../domain/course";
 import type { LessonBundle } from "./lessonBundle";
-import { integrateKanjiCurriculum } from "./kanjiCurriculum";
+import { integrateKanjiCurriculumSequence } from "./kanjiCurriculum";
 import { diversifyLessonPractice } from "./practiceDiversity";
 import { expandLessonPractice } from "./practiceExpansion";
 
@@ -159,10 +159,12 @@ const withReviewedDuration = (bundle: LessonBundle): LessonBundle => {
   };
 };
 
-export const lessonBundles: readonly LessonBundle[] = expandedLessonBundles
-  .map((bundle) => diversifyLessonPractice(bundle, expandedLessonBundles))
-  .map(integrateKanjiCurriculum)
-  .map(withReviewedDuration);
+const diversifiedLessonBundles: readonly LessonBundle[] = expandedLessonBundles
+  .map((bundle) => diversifyLessonPractice(bundle, expandedLessonBundles));
+
+export const lessonBundles: readonly LessonBundle[] = integrateKanjiCurriculumSequence(
+  diversifiedLessonBundles,
+).map(withReviewedDuration);
 
 export const lesson001Bundle = lessonBundles[0] ?? lesson001BaseBundle;
 

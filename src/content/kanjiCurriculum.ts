@@ -297,7 +297,9 @@ const createRecognitionExercise = (
     contentKey: `kanji:${item.literal}:recognition`,
     difficulty: 1,
     skill: "recognition",
-    confusionItemIds: confusions.map((candidate) => candidate.id),
+    confusionItemIds: confusions
+      .filter((candidate) => lessonKanji.some((item) => item.id === candidate.id))
+      .map((candidate) => candidate.id),
   };
 };
 
@@ -424,7 +426,11 @@ export const integrateKanjiCurriculum = (
   lessonKanji: readonly KanjiItem[] = getLessonKanji(bundle),
 ): LessonBundle => {
   if (lessonKanji.length === 0) {
-    return { ...bundle, kanji: [] };
+    return {
+      ...bundle,
+      kanji: [],
+      reviewExercises: bundle.reviewExercises ?? bundle.exercises,
+    };
   }
 
   const exercises = bundle.exercises.map((exercise) => ({ ...exercise }));

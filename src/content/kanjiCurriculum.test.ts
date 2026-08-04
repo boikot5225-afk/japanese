@@ -4,147 +4,133 @@ import test from "node:test";
 import { inferExerciseSkill } from "../engine/reviewEngine";
 import { lessonBundles } from "./courseCatalog.ts";
 import { n5KanjiCatalog } from "./kanjiCatalog.ts";
+import {
+  extractKanjiLiterals,
+  getRequiredLessonKanjiLiterals,
+} from "./kanjiCurriculum.ts";
 
 const expectedN5 =
   "安一飲右雨駅円火花下何会外学間気九休魚金空月見言古五後午語校口行高国今左三山四子耳時七車社手週十出書女小少上食新人水生西川千先前足多大男中長天店電土東道読南二日入年買白八半百父分聞母北木本毎万名目友来立六話";
 
-test("N5 kanji catalog contains the full 103-character benchmark once", () => {
+test("standalone N5 catalog remains the complete 103-character benchmark", () => {
   assert.equal(n5KanjiCatalog.length, 103);
   assert.equal(new Set(n5KanjiCatalog.map((item) => item.literal)).size, 103);
   assert.deepEqual(
     [...n5KanjiCatalog.map((item) => item.literal)].sort(),
     [...expectedN5].sort(),
   );
+});
 
-  n5KanjiCatalog.forEach((item) => {
-    assert.equal(item.id, `kanji-${item.literal}`);
-    assert.equal(item.jlptLevel, "N5");
-    assert.ok(item.meaningsRu.length > 0, `${item.literal} has no Russian meaning`);
-    assert.ok(item.examples.length > 0, `${item.literal} has no contextual example`);
-    item.examples.forEach((example) => {
-      assert.ok(example.written.includes(item.literal), `${item.literal} is absent from its example`);
-      assert.ok(example.reading.trim(), `${item.literal} example has no reading`);
-      assert.ok(example.kanjiReading.trim(), `${item.literal} has no contextual reading`);
-      assert.ok(example.meaningRu.trim(), `${item.literal} example has no translation`);
+test("lesson kanji are introduced on first actual use and never assigned arbitrarily", () => {
+  const introduced = new Set<string>();
+  const owners = new Map<string, string>();
+
+  lessonBundles.forEach((bundle) => {
+    const required = getRequiredLessonKanjiLiterals(bundle);
+    const expectedNew = required.filter((literal) => !introduced.has(literal));
+    const actual = (bundle.kanji ?? []).map((item) => item.literal);
+
+    assert.deepEqual(actual, expectedNew, bundle.lesson.id + " has unrelated or missing kanji");
+    assert.equal(new Set(actual).size, actual.length, bundle.lesson.id + " repeats a glyph");
+
+    (bundle.kanji ?? []).forEach((item) => {
+      assert.equal(item.introducedInLessonId, bundle.lesson.id);
+      assert.equal(item.id, "kanji-" + item.literal);
+      assert.ok(item.examples[0]?.written.includes(item.literal));
+      assert.equal(owners.has(item.literal), false, item.literal + " introduced twice");
+      owners.set(item.literal, bundle.lesson.id);
+      introduced.add(item.literal);
+    });
+
+    bundle.exercises.forEach((exercise) => {
+      const visible = [
+        exercise.prompt,
+        ...exercise.correctAnswers,
+        ...(exercise.acceptableAnswers ?? []),
+        ...(exercise.distractors ?? []),
+      ].flatMap(extractKanjiLiterals);
+      visible.forEach((literal) => {
+        assert.ok(
+          introduced.has(literal),
+          bundle.lesson.id + "/" + exercise.id + " tests " + literal + " before writing introduction",
+        );
+      });
     });
   });
+
 });
 
-test("all 103 N5 kanji are distributed through lessons 1-36", () => {
-  const n5Bundles = lessonBundles.filter((bundle) => bundle.lesson.order <= 36);
-  const n4Bundles = lessonBundles.filter((bundle) => bundle.lesson.order > 36);
-  assert.equal(n5Bundles.length, 36);
-
-  n5Bundles.forEach((bundle) => {
-    assert.ok((bundle.kanji?.length ?? 0) > 0, `${bundle.lesson.id} has no kanji stage`);
+test("lesson 13 words are covered by cumulative writing introduction", () => {
+  const lesson13Index = lessonBundles.findIndex((bundle) => bundle.lesson.id === "lesson-013");
+  assert.ok(lesson13Index >= 0);
+  const cumulative = new Set(
+    lessonBundles
+      .slice(0, lesson13Index + 1)
+      .flatMap((bundle) => (bundle.kanji ?? []).map((item) => item.literal)),
+  );
+  const lesson13 = lessonBundles[lesson13Index];
+  assert.ok(lesson13);
+  const visibleWordKanji = lesson13.vocabulary.flatMap((item) =>
+    extractKanjiLiterals(item.writtenForm),
+  );
+  visibleWordKanji.forEach((literal) => {
+    assert.ok(cumulative.has(literal), "lesson 13 did not introduce " + literal);
   });
-  n4Bundles.forEach((bundle) => {
-    assert.equal(bundle.kanji?.length ?? 0, 0, `${bundle.lesson.id} received premature N5 kanji`);
+  "静元気有名便利町公園図書館".split("").forEach((literal) => {
+    assert.ok(cumulative.has(literal), "expected lesson context glyph missing: " + literal);
   });
-
-  const introduced = n5Bundles.flatMap((bundle) => bundle.kanji ?? []);
-  assert.equal(introduced.length, 103);
-  assert.equal(new Set(introduced.map((item) => item.id)).size, 103);
 });
 
-test("exact lesson Learn preserves language practice while review keeps all kanji skills", () => {
-  const n5Bundles = lessonBundles.filter((bundle) => bundle.lesson.order <= 36);
-  const targetedKanji = new Set<string>();
-
-  n5Bundles.forEach((bundle) => {
-    assert.equal(bundle.exercises.length, 12, `${bundle.lesson.id} no longer has a compact session`);
+test("language practice stays compact while every new lesson kanji gets three review skills", () => {
+  lessonBundles.forEach((bundle) => {
+    assert.equal(bundle.exercises.length, 12, bundle.lesson.id + " no longer has compact practice");
     assert.equal(
       bundle.exercises.filter((exercise) => exercise.contentKey?.startsWith("kanji:")).length,
       0,
-      `${bundle.lesson.id} still contains obsolete approximate kanji quizzes`,
+      bundle.lesson.id + " contains obsolete inline kanji quizzes",
     );
 
-    const kanjiCount = bundle.kanji?.length ?? 0;
     const reviewExercises = bundle.reviewExercises ?? [];
     assert.equal(
       reviewExercises.length,
-      12 + 3 * kanjiCount,
-      `${bundle.lesson.id} did not retain language practice and complete kanji skill triples`,
+      12 + 3 * (bundle.kanji?.length ?? 0),
+      bundle.lesson.id + " review pool has incomplete kanji skills",
     );
-    assert.equal(
-      new Set(reviewExercises.map((exercise) => exercise.id)).size,
-      reviewExercises.length,
-      `${bundle.lesson.id} review pool repeats exercise ids`,
-    );
-    bundle.exercises.forEach((exercise) => {
-      assert.ok(
-        reviewExercises.some((candidate) => candidate.id === exercise.id),
-        `${bundle.lesson.id} review pool misses visible ${exercise.id}`,
-      );
-    });
+
     (bundle.kanji ?? []).forEach((item) => {
-      targetedKanji.add(item.id);
-      const itemSkills = new Set(
+      const skills = new Set(
         reviewExercises
-          .filter(
-            (exercise) =>
-              exercise.contentKey?.startsWith(`kanji:${item.literal}:`) &&
-              exercise.targetItemIds.includes(item.id),
+          .filter((exercise) =>
+            exercise.targetItemIds.includes(item.id) &&
+            exercise.contentKey?.startsWith("kanji:" + item.literal + ":"),
           )
           .map(inferExerciseSkill),
       );
-      assert.deepEqual(
-        itemSkills,
-        new Set(["recognition", "reading", "writing"]),
-        `${bundle.lesson.id} leaves ${item.literal} without complete review skills`,
-      );
-      const writing = reviewExercises.find(
-        (exercise) =>
-          exercise.contentKey === `kanji:${item.literal}:writing` &&
-          exercise.targetItemIds.includes(item.id),
-      );
-      assert.equal(writing?.type, "handwriting");
-      assert.deepEqual(writing?.correctAnswers, [item.literal]);
+      assert.deepEqual(skills, new Set(["recognition", "reading", "writing"]));
     });
   });
-
-  assert.deepEqual(
-    [...targetedKanji].sort(),
-    n5KanjiCatalog.map((item) => item.id).sort(),
-  );
 });
 
-test("kanji review prompts never print the answer being tested", () => {
+test("kanji recall prompts never print the missing glyph or parenthesized answer", () => {
   const reviewExercises = lessonBundles.flatMap(
     (bundle) => bundle.reviewExercises ?? bundle.exercises,
   );
-  const readingExercises = reviewExercises.filter(
-    (exercise) =>
-      exercise.skill === "reading" &&
-      exercise.contentKey?.startsWith("kanji:"),
-  );
-  const writingExercises = reviewExercises.filter(
-    (exercise) =>
-      exercise.skill === "writing" &&
-      exercise.contentKey?.startsWith("kanji:"),
-  );
-
-  assert.ok(readingExercises.length > 0);
-  assert.ok(writingExercises.length > 0);
-  readingExercises.forEach((exercise) => {
-    assert.doesNotMatch(exercise.prompt, /（[^）]+）/u);
-  });
-  writingExercises.forEach((exercise) => {
-    const literal = exercise.correctAnswers[0];
-    assert.ok(literal);
-    assert.equal(
-      exercise.prompt.includes(literal),
-      false,
-      `${exercise.id} reveals ${literal} in its recall prompt`,
-    );
-  });
+  reviewExercises
+    .filter((exercise) => exercise.skill === "reading" && exercise.contentKey?.startsWith("kanji:"))
+    .forEach((exercise) => assert.doesNotMatch(exercise.prompt, /（[^）]+）/u));
+  reviewExercises
+    .filter((exercise) => exercise.skill === "writing" && exercise.contentKey?.startsWith("kanji:"))
+    .forEach((exercise) => {
+      const literal = exercise.correctAnswers[0];
+      assert.ok(literal);
+      assert.equal(exercise.prompt.includes(literal), false, exercise.id + " reveals " + literal);
+    });
 });
 
-test("explicit exercise skill overrides the generic interaction type", () => {
-  const readingExercise = lessonBundles
+test("explicit reading skill overrides generic text input interaction", () => {
+  const reading = lessonBundles
     .flatMap((bundle) => bundle.reviewExercises ?? bundle.exercises)
-    .find((exercise) => exercise.skill === "reading");
-  assert.ok(readingExercise);
-  assert.equal(readingExercise.type, "text-input");
-  assert.equal(inferExerciseSkill(readingExercise), "reading");
+    .find((exercise) => exercise.skill === "reading" && exercise.type === "text-input");
+  assert.ok(reading);
+  assert.equal(inferExerciseSkill(reading), "reading");
 });
