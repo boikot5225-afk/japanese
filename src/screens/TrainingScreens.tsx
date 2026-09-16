@@ -1,16 +1,22 @@
-import { SafeAreaView, ScrollView, StatusBar, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView, StatusBar, Text, TouchableOpacity, View } from "react-native";
 
 import { speakJapanese } from "../audio/japaneseSpeech";
+import { KanjiLessonStage } from "../components/KanjiLessonStage";
+import { KeyboardSafeScrollView } from "../components/KeyboardSafeScrollView";
 import { PracticeCard } from "../components/PracticeCard";
+import type { SkritterWritingResult } from "../components/SkritterWritingPad";
 import { SwipeNavigationView } from "../components/SwipeNavigationView";
 import type { LessonBundle } from "../content/lessonBundle";
 import type { Exercise } from "../domain/course";
 import type { AnswerCheckResult } from "../engine/checkAnswer";
+import { requestKanjiLessonAdvance } from "../engine/kanjiLessonBridge";
+import { buildReviewHeaderPresentation } from "../engine/reviewPresentation";
 import { styles } from "../theme/appStyles";
 
 export type LessonStage = "theory" | "words" | "examples" | "practice";
 
 const lessonStages: LessonStage[] = ["theory", "words", "examples", "practice"];
+
 const stageLabels: Record<LessonStage, string> = {
   theory: "Грамматика",
   words: "Слова",
@@ -41,6 +47,7 @@ interface CommonPracticeProps {
   onRemoveToken: (index: number) => void;
   onClearTokens: () => void;
   onSubmit: () => void;
+  onWritingComplete: (result: SkritterWritingResult) => void;
   onContinue: () => void;
 }
 
@@ -73,19 +80,28 @@ export function LessonScreen({
   onRemoveToken,
   onClearTokens,
   onSubmit,
+  onWritingComplete,
   onContinue,
 }: LessonScreenProps) {
   const stageIndex = lessonStages.indexOf(stage);
   const navigateBack = stageIndex > 0 ? onPreviousStage : onCourse;
+  const advanceStage = () => {
+    if (stage === "words" && (activeBundle.kanji?.length ?? 0) > 0) {
+      requestKanjiLessonAdvance(activeBundle.lesson.id, onNextStage);
+      return;
+    }
+    onNextStage();
+  };
+
   return (
     <SwipeNavigationView
       onBack={navigateBack}
-      onForward={stage !== "practice" ? onNextStage : undefined}
+      onForward={stage !== "practice" ? advanceStage : undefined}
       backEdgeOnly={stage === "practice"}
     >
       <SafeAreaView style={styles.safeArea}>
         <StatusBar barStyle="dark-content" />
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <KeyboardSafeScrollView contentContainerStyle={styles.container}>
           <TouchableOpacity style={styles.backLink} onPress={onCourse}>
             <Text style={styles.backLinkText}>‹ К курсу</Text>
           </TouchableOpacity>
@@ -169,6 +185,13 @@ export function LessonScreen({
                   </View>
                 </View>
               ))}
+              {(activeBundle.kanji?.length ?? 0) > 0 && (
+                <KanjiLessonStage
+                  key={activeBundle.lesson.id}
+                  lessonId={activeBundle.lesson.id}
+                  kanji={activeBundle.kanji ?? []}
+                />
+              )}
             </View>
           )}
 
@@ -215,6 +238,7 @@ export function LessonScreen({
               onRemoveToken={onRemoveToken}
               onClearTokens={onClearTokens}
               onSubmit={onSubmit}
+              onWritingComplete={onWritingComplete}
               onContinue={onContinue}
             />
           )}
@@ -228,12 +252,12 @@ export function LessonScreen({
               >
                 <Text style={styles.secondaryButtonText}>Назад</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.primaryButtonSmall} onPress={onNextStage}>
+              <TouchableOpacity style={styles.primaryButtonSmall} onPress={advanceStage}>
                 <Text style={styles.primaryButtonText}>Дальше</Text>
               </TouchableOpacity>
             </View>
           )}
-        </ScrollView>
+        </KeyboardSafeScrollView>
       </SafeAreaView>
     </SwipeNavigationView>
   );
@@ -264,19 +288,26 @@ export function ReviewScreen({
   onRemoveToken,
   onClearTokens,
   onSubmit,
+  onWritingComplete,
   onContinue,
 }: ReviewScreenProps) {
+  const reviewHeader = buildReviewHeaderPresentation(
+    currentExercise,
+    lessonTitle,
+    focusLabel,
+  );
+
   return (
     <SwipeNavigationView onBack={onCourse}>
       <SafeAreaView style={styles.safeArea}>
         <StatusBar barStyle="dark-content" />
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <KeyboardSafeScrollView contentContainerStyle={styles.container}>
           <TouchableOpacity style={styles.backLink} onPress={onCourse}>
             <Text style={styles.backLinkText}>‹ Закончить повторение</Text>
           </TouchableOpacity>
           <Text style={styles.eyebrow}>Повторение</Text>
-          <Text style={styles.title}>{lessonTitle}</Text>
-          <Text style={styles.meaning}>Сейчас проверяем: {focusLabel}</Text>
+          <Text style={styles.title}>{reviewHeader.title}</Text>
+          <Text style={styles.meaning}>{reviewHeader.focus}</Text>
           <Text style={styles.description}>
             {coveredCount > 1
               ? `Одна уникальная задача проверяет сразу ${coveredCount} связанных знания. Повторять тот же текст для каждого из них не придётся.`
@@ -298,9 +329,10 @@ export function ReviewScreen({
             onRemoveToken={onRemoveToken}
             onClearTokens={onClearTokens}
             onSubmit={onSubmit}
+            onWritingComplete={onWritingComplete}
             onContinue={onContinue}
           />
-        </ScrollView>
+        </KeyboardSafeScrollView>
       </SafeAreaView>
     </SwipeNavigationView>
   );

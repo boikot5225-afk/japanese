@@ -1,0 +1,299 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import type { Exercise, GrammarPoint, VocabularyItem } from "../domain/course.ts";
+import { courseUnits, lessonBundles } from "./courseCatalog.ts";
+
+const compact = (value: string): string =>
+  value
+    .trim()
+    .normalize("NFKC")
+    .toLocaleLowerCase("ru-RU")
+    .replace(/[\s|_。、，！？!?.,:;「」『』（）()［\][\]{}"'«»—–-]+/gu, "");
+
+const exact = (value: string): string => value.trim().normalize("NFKC");
+
+const n5Bundles = lessonBundles.filter((bundle) => bundle.lesson.order <= 36);
+const n5Units = courseUnits.filter((unit) => unit.lessons.some((lesson) => lesson.order <= 36));
+
+const introducedAt = new Map<string, number>();
+lessonBundles.forEach((bundle) => {
+  [...bundle.vocabulary, ...bundle.grammar, ...bundle.sentences].forEach((item) => {
+    const previous = introducedAt.get(item.id);
+    if (previous === undefined || bundle.lesson.order < previous) {
+      introducedAt.set(item.id, bundle.lesson.order);
+    }
+  });
+});
+
+const describeExercise = (exercise: Exercise): string =>
+  `${exercise.id}: ${exercise.prompt} => ${exercise.correctAnswers.join(" / ")}`;
+
+const describeItem = (lessonId: string, item: VocabularyItem | GrammarPoint): string =>
+  `${lessonId}/${item.id}`;
+
+const findExercise = (exerciseId: string): Exercise => {
+  const exercise = n5Bundles
+    .flatMap((bundle) => bundle.exercises)
+    .find((candidate) => candidate.id === exerciseId);
+  assert.ok(exercise, exerciseId);
+  return exercise;
+};
+
+test("N5 is a contiguous ten-unit block ending at lesson 36", () => {
+  assert.deepEqual(
+    n5Bundles.map((bundle) => bundle.lesson.order),
+    Array.from({ length: 36 }, (_, index) => index + 1),
+  );
+  assert.equal(n5Units.length, 10);
+  n5Units.forEach((unit) => {
+    assert.equal(unit.jlptLevel, "N5", `${unit.id} is not marked N5`);
+    assert.ok(unit.lessons.every((lesson) => lesson.order <= 36), `${unit.id} mixes N5 and later lessons`);
+  });
+});
+
+test("N5 lessons do not label introduced vocabulary or grammar as a higher JLPT level", () => {
+  const advanced = n5Bundles.flatMap((bundle) =>
+    [...bundle.vocabulary, ...bundle.grammar]
+      .filter((item) => item.jlptLevel && item.jlptLevel !== "N5")
+      .map((item) => `${describeItem(bundle.lesson.id, item)}: ${item.jlptLevel}`),
+  );
+
+  assert.deepEqual(advanced, [], `advanced labels inside N5:\n${advanced.join("\n")}`);
+});
+
+test("N5 examples and graded targets never depend on material introduced in a future lesson", () => {
+  const futureReferences: string[] = [];
+
+  n5Bundles.forEach((bundle) => {
+    const order = bundle.lesson.order;
+    bundle.sentences.forEach((sentence) => {
+      [...sentence.grammarIds, ...sentence.vocabularyIds].forEach((itemId) => {
+        const firstOrder = introducedAt.get(itemId);
+        if (firstOrder !== undefined && firstOrder > order) {
+          futureReferences.push(
+            `${bundle.lesson.id}/${sentence.id} references ${itemId} from lesson ${firstOrder}`,
+          );
+        }
+      });
+    });
+
+    bundle.exercises.forEach((exercise) => {
+      exercise.targetItemIds.forEach((itemId) => {
+        const firstOrder = introducedAt.get(itemId);
+        if (firstOrder !== undefined && firstOrder > order) {
+          futureReferences.push(
+            `${bundle.lesson.id}/${exercise.id} targets ${itemId} from lesson ${firstOrder}`,
+          );
+        }
+      });
+    });
+  });
+
+  assert.deepEqual(
+    futureReferences,
+    [],
+    `future material used before introduction:\n${futureReferences.join("\n")}`,
+  );
+});
+
+test("N5 example sentences are unique and have clean readable kana transcriptions", () => {
+  const owners = new Map<string, string[]>();
+  const malformed: string[] = [];
+
+  n5Bundles.forEach((bundle) => {
+    bundle.sentences.forEach((sentence) => {
+      const key = compact(sentence.japanese);
+      owners.set(key, [...(owners.get(key) ?? []), `${bundle.lesson.id}/${sentence.id}`]);
+
+      if (!sentence.reading) {
+        malformed.push(`${bundle.lesson.id}/${sentence.id}: missing reading`);
+        return;
+      }
+      if (/[一-龯々〆ヵヶ]/u.test(sentence.reading)) {
+        malformed.push(`${bundle.lesson.id}/${sentence.id}: kanji in reading: ${sentence.reading}`);
+      }
+      if (/[A-Za-zА-Яа-яЁё]/u.test(sentence.reading)) {
+        malformed.push(`${bundle.lesson.id}/${sentence.id}: non-Japanese text in reading: ${sentence.reading}`);
+      }
+      const japaneseQuestion = /[？?]$/u.test(sentence.japanese.trim());
+      const readingQuestion = /[？?]$/u.test(sentence.reading.trim());
+      if (japaneseQuestion !== readingQuestion) {
+        malformed.push(`${bundle.lesson.id}/${sentence.id}: question punctuation mismatch`);
+      }
+    });
+  });
+
+  const duplicates = [...owners.entries()]
+    .filter(([, entries]) => entries.length > 1)
+    .map(([sentence, entries]) => `${sentence} => ${entries.join(", ")}`);
+
+  assert.deepEqual(duplicates, [], `duplicate examples:\n${duplicates.join("\n")}`);
+  assert.deepEqual(malformed, [], `malformed readings:\n${malformed.join("\n")}`);
+});
+
+test("N5 final sessions do not repeat the exact same task across different lessons", () => {
+  const owners = new Map<string, string[]>();
+
+  n5Bundles.forEach((bundle) => {
+    bundle.exercises.forEach((exercise) => {
+      const key = [
+        exercise.type,
+        compact(exercise.prompt),
+        ...exercise.correctAnswers.map(compact).sort(),
+      ].join("::");
+      owners.set(key, [...(owners.get(key) ?? []), `${bundle.lesson.id}/${exercise.id}`]);
+    });
+  });
+
+  const duplicates = [...owners.entries()]
+    .filter(([, entries]) => entries.length > 1)
+    .map(([key, entries]) => `${key} => ${entries.join(", ")}`);
+
+  assert.deepEqual(duplicates, [], `cross-lesson duplicate tasks:\n${duplicates.join("\n")}`);
+});
+
+test("N5 exercise answer sets and target sets contain no exact duplicates", () => {
+  const malformed: string[] = [];
+
+  n5Bundles.forEach((bundle) => {
+    bundle.exercises.forEach((exercise) => {
+      const correct = exercise.correctAnswers.map(exact);
+      const acceptable = (exercise.acceptableAnswers ?? []).map(exact);
+      const targets = exercise.targetItemIds.map(exact);
+      const distractors = (exercise.distractors ?? []).map(exact);
+
+      if (correct.length === 0 || correct.some((answer) => answer.length === 0)) {
+        malformed.push(`${bundle.lesson.id}/${exercise.id}: empty correct answer`);
+      }
+      if (new Set(correct).size !== correct.length) {
+        malformed.push(`${bundle.lesson.id}/${exercise.id}: duplicate correct answers`);
+      }
+      if (new Set(acceptable).size !== acceptable.length) {
+        malformed.push(`${bundle.lesson.id}/${exercise.id}: duplicate acceptable answers`);
+      }
+      if (acceptable.some((answer) => correct.includes(answer))) {
+        malformed.push(`${bundle.lesson.id}/${exercise.id}: acceptable answer repeats a correct answer`);
+      }
+      if (new Set(targets).size !== targets.length) {
+        malformed.push(`${bundle.lesson.id}/${exercise.id}: duplicate target ids`);
+      }
+      if (new Set(distractors).size !== distractors.length) {
+        malformed.push(`${bundle.lesson.id}/${exercise.id}: duplicate distractors`);
+      }
+    });
+  });
+
+  assert.deepEqual(malformed, [], `malformed exercises:\n${malformed.join("\n")}`);
+});
+
+test("N5 listening audio is Japanese and never leaks Russian instructional text", () => {
+  const malformed = n5Bundles.flatMap((bundle) =>
+    bundle.exercises
+      .filter((exercise) => exercise.type === "listening" && exercise.audioText)
+      .flatMap((exercise) => {
+        const audio = exercise.audioText ?? "";
+        const issues: string[] = [];
+        if (/[А-Яа-яЁё]/u.test(audio)) issues.push("contains Cyrillic");
+        if (!/[ぁ-んァ-ヶ一-龯]/u.test(audio)) issues.push("contains no Japanese text");
+        return issues.map((issue) => `${bundle.lesson.id}/${exercise.id}: ${issue}: ${audio}`);
+      }),
+  );
+
+  assert.deepEqual(malformed, [], `malformed listening audio:\n${malformed.join("\n")}`);
+});
+
+test("every N5 grammar point is used in an example or directly practised", () => {
+  const orphaned: string[] = [];
+
+  n5Bundles.forEach((bundle) => {
+    const sentenceGrammar = new Set(bundle.sentences.flatMap((sentence) => sentence.grammarIds));
+    const exerciseTargets = new Set(bundle.exercises.flatMap((exercise) => exercise.targetItemIds));
+    bundle.grammar.forEach((grammar) => {
+      if (!sentenceGrammar.has(grammar.id) && !exerciseTargets.has(grammar.id)) {
+        orphaned.push(`${bundle.lesson.id}/${grammar.id}`);
+      }
+    });
+  });
+
+  assert.deepEqual(orphaned, [], `orphaned N5 grammar:\n${orphaned.join("\n")}`);
+});
+
+test("kana-only vocabulary never receives a self-revealing reading exercise", () => {
+  const leaked = n5Bundles.flatMap((bundle) =>
+    bundle.vocabulary.flatMap((word) => {
+      const readings = [word.reading, ...(word.alternativeReadings ?? [])]
+        .map(compact)
+        .filter(Boolean);
+      if (!readings.includes(compact(word.writtenForm))) return [];
+
+      return bundle.exercises
+        .filter(
+          (exercise) =>
+            exercise.targetItemIds.length === 1 &&
+            exercise.targetItemIds[0] === word.id &&
+            exercise.contentKey === `vocabulary:${word.id}:reading`,
+        )
+        .map((exercise) => `${bundle.lesson.id}/${exercise.id}: ${word.writtenForm}`);
+    }),
+  );
+
+  assert.deepEqual(leaked, [], `self-revealing kana reading exercises:\n${leaked.join("\n")}`);
+});
+
+test("N5 generated sessions do not expose a Japanese answer verbatim inside its own prompt", () => {
+  const leaked = n5Bundles.flatMap((bundle) =>
+    bundle.exercises.flatMap((exercise) => {
+      const japaneseAnswers = exercise.correctAnswers
+        .filter((answer) => /[ぁ-んァ-ヶ一-龯]/u.test(answer))
+        .map((answer) => answer.replace(/\|/gu, ""))
+        .filter((answer) => compact(answer).length >= 4);
+
+      return japaneseAnswers
+        .filter((answer) => compact(exercise.prompt).includes(compact(answer)))
+        .map((answer) => `${bundle.lesson.id}/${describeExercise(exercise)} leaks ${answer}`);
+    }),
+  );
+
+  assert.deepEqual(leaked, [], `answers visible in prompts:\n${leaked.join("\n")}`);
+});
+
+test("generic suru conjugation drills credit grammar rather than unrelated vocabulary", () => {
+  ["exercise-22-shinai", "exercise-26-shinakatta", "exercise-32-suru-duty"].forEach((id) => {
+    const exercise = findExercise(id);
+    assert.ok(
+      exercise.targetItemIds.every((itemId) => !itemId.startsWith("word-")),
+      `${id} incorrectly credits vocabulary: ${exercise.targetItemIds.join(", ")}`,
+    );
+  });
+});
+
+test("te-form lesson titles do not imply that the te-form itself is past tense", () => {
+  const lesson17 = n5Bundles.find((bundle) => bundle.lesson.id === "lesson-017")?.lesson;
+  const lesson19 = n5Bundles.find((bundle) => bundle.lesson.id === "lesson-019")?.lesson;
+  assert.equal(lesson17?.title, "Одно действие за другим");
+  assert.equal(lesson19?.title, "Сначала одно, затем другое");
+  assert.doesNotMatch(`${lesson17?.description} ${lesson19?.description}`, /сама.*прошед/u);
+});
+
+test("daily newspaper example cannot be misread as the Mainichi Shimbun name", () => {
+  const lesson21 = n5Bundles.find((bundle) => bundle.lesson.id === "lesson-021");
+  const sentence = lesson21?.sentences.find(
+    (candidate) => candidate.id === "sentence-21-mainichi-shinbun-yomu",
+  );
+  assert.equal(sentence?.japanese, "毎日、新聞を読む。");
+  assert.equal(sentence?.reading, "まいにち、しんぶんをよむ。");
+});
+
+test("au marks the person met instead of treating that person as a travel destination", () => {
+  const lesson36 = n5Bundles.find((bundle) => bundle.lesson.id === "lesson-036");
+  const sentence = lesson36?.sentences.find(
+    (candidate) => candidate.id === "sentence-36-went-school-met",
+  );
+  assert.ok(sentence?.grammarIds.includes("grammar-au-person-ni-to"));
+
+  const particleExercise = findExercise("exercise-36-au-particle");
+  assert.deepEqual(particleExercise.correctAnswers, ["に"]);
+  assert.ok(particleExercise.acceptableAnswers?.includes("と"));
+  assert.ok(!particleExercise.correctAnswers.includes("を"));
+});

@@ -7,31 +7,31 @@ import {
   View,
 } from "react-native";
 
-interface Point {
-  x: number;
-  y: number;
-}
+import { getKanjiStrokeData } from "../content/kanjiStrokeData";
+import type { KanjiStrokePoint } from "../domain/kanjiStroke";
+import { KanjiTracingPad } from "./KanjiTracingPad";
 
 interface HandwritingPadProps {
   reference: string;
   disabled?: boolean;
   onInkChange: (hasInk: boolean) => void;
   onCompare: () => void;
+  onAutomaticAssessment?: (looksCorrect: boolean, mistakes: number) => void;
 }
 
-const pointDistance = (left: Point, right: Point): number =>
+const pointDistance = (left: KanjiStrokePoint, right: KanjiStrokePoint): number =>
   Math.hypot(right.x - left.x, right.y - left.y);
 
 const cleanReference = (value: string): string =>
   value.replace(/[|\s。！？!?]/gu, "").trim();
 
-export function HandwritingPad({
+function FreeHandwritingPad({
   reference,
   disabled = false,
   onInkChange,
   onCompare,
-}: HandwritingPadProps) {
-  const [strokes, setStrokes] = useState<Point[][]>([]);
+}: Omit<HandwritingPadProps, "onAutomaticAssessment">) {
+  const [strokes, setStrokes] = useState<KanjiStrokePoint[][]>([]);
   const [showReference, setShowReference] = useState(false);
   const displayReference = cleanReference(reference) || "字";
   const hasInk = strokes.some((stroke) => stroke.length > 0);
@@ -96,7 +96,8 @@ export function HandwritingPad({
   return (
     <View style={styles.wrapper}>
       <Text style={styles.instruction}>
-        Обведи образец или напиши знак самостоятельно. Начертание сохраняется сразу после первого движения.
+        Напиши ответ самостоятельно, затем сравни с образцом. Автоматическая
+        проверка включается для одиночных кандзи с данными порядка черт.
       </Text>
       <View
         accessibilityLabel={`Поле письма. Образец: ${displayReference}`}
@@ -127,19 +128,19 @@ export function HandwritingPad({
                   { left: first.x - 4, top: first.y - 4 },
                 ]}
               />
-              {stroke.slice(1).map((point, pointIndex) => {
+              {stroke.slice(1).map((item, pointIndex) => {
                 const previous = stroke[pointIndex];
                 if (!previous) return null;
-                const length = pointDistance(previous, point);
-                const angle = Math.atan2(point.y - previous.y, point.x - previous.x);
+                const length = pointDistance(previous, item);
+                const angle = Math.atan2(item.y - previous.y, item.x - previous.x);
                 return (
                   <View
                     key={`${strokeIndex}-${pointIndex}`}
                     style={[
                       styles.segment,
                       {
-                        left: (previous.x + point.x) / 2 - length / 2,
-                        top: (previous.y + point.y) / 2 - 4,
+                        left: (previous.x + item.x) / 2 - length / 2,
+                        top: (previous.y + item.y) / 2 - 4,
                         width: Math.max(length, 5),
                         transform: [{ rotateZ: `${angle}rad` }],
                       },
@@ -173,6 +174,43 @@ export function HandwritingPad({
         </Text>
       )}
     </View>
+  );
+}
+
+export function HandwritingPad({
+  reference,
+  disabled = false,
+  onInkChange,
+  onCompare,
+  onAutomaticAssessment,
+}: HandwritingPadProps) {
+  const displayReference = cleanReference(reference);
+  const strokeData = displayReference.length === 1
+    ? getKanjiStrokeData(displayReference)
+    : undefined;
+
+  if (strokeData) {
+    return (
+      <KanjiTracingPad
+        data={strokeData}
+        disabled={disabled}
+        compact
+        onComplete={({ mistakes }) => {
+          onInkChange(true);
+          const allowedMistakes = Math.max(2, Math.ceil(strokeData.strokes.length * 0.6));
+          onAutomaticAssessment?.(mistakes <= allowedMistakes, mistakes);
+        }}
+      />
+    );
+  }
+
+  return (
+    <FreeHandwritingPad
+      reference={reference}
+      disabled={disabled}
+      onInkChange={onInkChange}
+      onCompare={onCompare}
+    />
   );
 }
 

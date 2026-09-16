@@ -18,12 +18,84 @@ interface ReadingAlias {
   reading: string;
 }
 
+const isIAdjective = (partOfSpeech: readonly string[]): boolean =>
+  partOfSpeech.some((label) => label.includes("い-прилагательное"));
+
+const createReadingAliases = (
+  writtenForm: string,
+  reading: string,
+  partOfSpeech: readonly string[],
+): ReadingAlias[] => {
+  const aliases: ReadingAlias[] = [{ writtenForm, reading }];
+
+  if (writtenForm.endsWith("ます") && reading.endsWith("ます")) {
+    const writtenStem = writtenForm.slice(0, -2);
+    const readingStem = reading.slice(0, -2);
+    if (writtenStem && readingStem && writtenStem !== readingStem) {
+      aliases.push({ writtenForm: writtenStem, reading: readingStem });
+    }
+  }
+
+  if (
+    isIAdjective(partOfSpeech) &&
+    writtenForm.endsWith("い") &&
+    reading.endsWith("い")
+  ) {
+    const writtenStem = writtenForm.slice(0, -1);
+    const readingStem = reading.slice(0, -1);
+    if (writtenStem && readingStem && writtenStem !== readingStem) {
+      aliases.push(
+        {
+          writtenForm: `${writtenStem}くありませんでした`,
+          reading: `${readingStem}くありませんでした`,
+        },
+        {
+          writtenForm: `${writtenStem}くなかった`,
+          reading: `${readingStem}くなかった`,
+        },
+        {
+          writtenForm: `${writtenStem}くありません`,
+          reading: `${readingStem}くありません`,
+        },
+        {
+          writtenForm: `${writtenStem}かった`,
+          reading: `${readingStem}かった`,
+        },
+        {
+          writtenForm: `${writtenStem}くない`,
+          reading: `${readingStem}くない`,
+        },
+      );
+    }
+  }
+
+  return aliases;
+};
+
+const irregularGoodAliases: readonly ReadingAlias[] = [
+  { writtenForm: "良くありませんでした", reading: "よくありませんでした" },
+  { writtenForm: "良くなかった", reading: "よくなかった" },
+  { writtenForm: "良くありません", reading: "よくありません" },
+  { writtenForm: "良かった", reading: "よかった" },
+  { writtenForm: "良くない", reading: "よくない" },
+  { writtenForm: "良い", reading: "いい" },
+];
+
 const courseReadingAliases: ReadingAlias[] = Array.from(
   new Map(
-    lessonBundles
-      .flatMap((bundle) => bundle.vocabulary)
-      .filter((item) => item.writtenForm !== item.reading)
-      .map((item) => [item.writtenForm, item.reading] as const),
+    [
+      ...irregularGoodAliases,
+      ...lessonBundles
+        .flatMap((bundle) => bundle.vocabulary)
+        .filter((item) => item.writtenForm !== item.reading)
+        .flatMap((item) =>
+          createReadingAliases(
+            item.writtenForm,
+            item.reading,
+            item.partOfSpeech,
+          ),
+        ),
+    ].map((alias) => [alias.writtenForm, alias.reading] as const),
   ).entries(),
 )
   .map(([writtenForm, reading]) => ({ writtenForm, reading }))

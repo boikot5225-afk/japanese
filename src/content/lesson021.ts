@@ -39,7 +39,7 @@ export const lesson021Grammar: GrammarPoint[] = [
 ];
 
 export const lesson021Sentences: ExampleSentence[] = [
-  { id: "sentence-21-mainichi-shinbun-yomu", type: "sentence", japanese: "毎日新聞を読む。", reading: "まいにちしんぶんをよむ。", translationRu: "Каждый день читаю газету.", grammarIds: ["grammar-plain-nonpast", "grammar-dictionary-form-group1", "grammar-time-without-ni", "grammar-o-object"], vocabularyIds: ["word-mainichi", "word-shinbun", "word-yomimasu"] },
+  { id: "sentence-21-mainichi-shinbun-yomu", type: "sentence", japanese: "毎日、新聞を読む。", reading: "まいにち、しんぶんをよむ。", translationRu: "Каждый день читаю газету.", grammarIds: ["grammar-plain-nonpast", "grammar-dictionary-form-group1", "grammar-time-without-ni", "grammar-o-object"], vocabularyIds: ["word-mainichi", "word-shinbun", "word-yomimasu"] },
   { id: "sentence-21-maiasa-pan-taberu", type: "sentence", japanese: "毎朝パンを食べる。", reading: "まいあさパンをたべる。", translationRu: "Каждое утро ем хлеб.", grammarIds: ["grammar-plain-nonpast", "grammar-dictionary-form-group2-irregular", "grammar-time-without-ni", "grammar-o-object"], vocabularyIds: ["word-maiasa", "word-pan", "word-tabemasu"] },
   { id: "sentence-21-ie-kaeru", type: "sentence", japanese: "家に帰る。", reading: "いえにかえる。", translationRu: "Возвращаюсь домой.", grammarIds: ["grammar-plain-nonpast", "grammar-dictionary-form-group1", "grammar-ni-e-destination"], vocabularyIds: ["word-ie", "word-kaerimasu"] },
   { id: "sentence-21-nihongo-benkyou-suru", type: "sentence", japanese: "日本語を勉強する。", reading: "にほんごをべんきょうする。", translationRu: "Занимаюсь японским.", grammarIds: ["grammar-plain-nonpast", "grammar-dictionary-form-group2-irregular", "grammar-o-object"], vocabularyIds: ["word-nihongo", "word-benkyoushimasu"] },

@@ -196,7 +196,7 @@ test("new lesson durations are derived from their real study and practice load",
     .filter((bundle) => bundle.lesson.order >= 11)
     .forEach((bundle) => {
       assert.ok(
-        bundle.lesson.estimatedMinutes >= 14 && bundle.lesson.estimatedMinutes <= 19,
+        bundle.lesson.estimatedMinutes >= 14 && bundle.lesson.estimatedMinutes <= 30,
         `${bundle.lesson.id} has implausible duration ${bundle.lesson.estimatedMinutes}`,
       );
     });

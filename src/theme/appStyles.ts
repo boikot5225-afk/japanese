@@ -1,7 +1,11 @@
-import { StyleSheet } from "react-native";
+import { Platform, StatusBar, StyleSheet } from "react-native";
 
 export const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#F6F3EC" },
+  safeArea: {
+  flex: 1,
+  paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) : 0,
+  backgroundColor: "#F6F3EC",
+},
   container: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 },
   resultContainer: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 24, paddingVertical: 40 },
   eyebrow: { fontSize: 13, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase", color: "#9A3D3D" },
