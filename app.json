@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "Japanese",
+    "name": "Kanji",
     "slug": "japanese-tutor",
-    "version": "0.22.6",
+    "version": "0.23.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "android": {
       "package": "com.bulat.japanesetutor",
-      "versionCode": 52,
+      "versionCode": 53,
       "softwareKeyboardLayoutMode": "resize",
       "blockedPermissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
