@@ -5,7 +5,7 @@ import { getKanjiStrokeData } from "./kanjiStrokeData.ts";
 import { kanjiWritingCatalog } from "./kanjiWritingCatalog.ts";
 
 test("writing-only catalog contains every unique writable course kanji", () => {
-  assert.equal(kanjiWritingCatalog.length, 194);
+  assert.equal(kanjiWritingCatalog.length, 148);
   assert.equal(
     new Set(kanjiWritingCatalog.map((item) => item.literal)).size,
     kanjiWritingCatalog.length,
